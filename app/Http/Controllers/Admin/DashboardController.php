@@ -118,4 +118,54 @@ class DashboardController extends Controller
 
         return response()->json(['labels' => $labels, 'data' => $data]);
     }
+    public function activityFeed()
+    {
+        $feed = [];
+
+        // Latest 5 posts
+        if (Schema::hasTable('posts')) {
+            $posts = Post::latest()->take(5)->get(['id','user_id', 'caption', 'created_at']);
+            foreach ($posts as $p) {
+                $feed[] = [
+                    'type' => 'post',
+                    'user_id'=>$p->user_id,
+                    'title' => $p->caption ?? 'Untitled Post',
+                    'time' => $p->created_at->diffForHumans(),
+                ];
+            }
+        }
+
+        // Latest 5 orders
+        if (Schema::hasTable('orders')) {
+            $orders = Order::latest()->take(5)->get(['id','buyer_id', 'status', 'created_at']);
+            foreach ($orders as $o) {
+                $feed[] = [
+                    'type' => 'order',
+                    'user_id'=>$o->buyer_id,
+                    'title' => "Order #{$o->id} ({$o->status})",
+                    'time' => $o->created_at->diffForHumans(),
+                ];
+            }
+        }
+
+        // Latest 5 reports
+        if (Schema::hasTable('reports')) {
+            $reports = Report::latest()->take(5)->get(['id', 'reason', 'status', 'created_at']);
+            foreach ($reports as $r) {
+                $feed[] = [
+                    'type' => 'report',
+                    'user_id'=>$r->user_id,
+                    'title' => "Report #{$r->id} ({$r->status}) - " . ($r->reason ?? 'No reason'),
+                    'time' => $r->created_at->diffForHumans(),
+                ];
+            }
+        }
+
+        // Sort by time (latest first)
+        usort($feed, function ($a, $b) {
+            return strtotime($b['time']) <=> strtotime($a['time']);
+        });
+
+        return response()->json($feed);
+    }
 }

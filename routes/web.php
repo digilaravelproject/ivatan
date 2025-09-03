@@ -26,6 +26,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('dashboard.summary');
     Route::get('/dashboard/chart/{type}/{days?}', [DashboardController::class, 'chart'])->name('dashboard.chart');
+    Route::get('/dashboard/activity', [DashboardController::class, 'activityFeed'])->name('dashboard.activityfeed');
+
     Route::get('/profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [AdminProfileController::class, 'update'])->name('profile.update');
 });

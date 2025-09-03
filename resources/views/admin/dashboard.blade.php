@@ -105,6 +105,16 @@
                 <canvas id="reelsChart" width="400" height="200"></canvas>
             </div>
         </div>
+
+        {{-- Recents Activity --}}
+        <div class="bg-white p-4 rounded shadow mt-6">
+
+            <h3 class="font-semibold mb-2">Recent Activity</h3>
+            <ul id="activityFeed" class="space-y-2 text-sm text-gray-700">
+                <li class="text-gray-400">Loading...</li>
+            </ul>
+        </div>
+
     </div>
 
     <!-- Chart.js CDN -->
@@ -177,5 +187,42 @@
             });
         });
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const feedRes = await fetch("{{ url('/admin/dashboard/activity') }}");
+                const feedData = await feedRes.json();
+                const feedEl = document.getElementById('activityFeed');
+                feedEl.innerHTML = '';
+
+                if (!feedData || feedData.length === 0) {
+                    feedEl.innerHTML = '<li class="text-gray-400">No recent activity</li>';
+                } else {
+                    feedData.forEach(item => {
+                        const li = document.createElement('li');
+                        li.classList.add("flex", "items-center", "space-x-2");
+
+                        // Different icon/color for each type
+                        let color = "text-blue-500";
+                        if (item.type === "order") color = "text-green-500";
+                        if (item.type === "report") color = "text-red-500";
+
+                        li.innerHTML = `
+                    <span class="${color} font-semibold capitalize">● ${item.type}</span>
+                    <span>${item.title}</span>
+                    <span>${item.user_id}</span>
+                    <span class="text-gray-400 text-xs">(${item.time})</span>
+                `;
+                        feedEl.appendChild(li);
+                    });
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('activityFeed').innerHTML =
+                    '<li class="text-red-400">Failed to load activity</li>';
+            }
+        });
+    </script>
+
 
 @endsection
