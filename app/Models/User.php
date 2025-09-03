@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -46,4 +47,15 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+   public function getProfilePhotoUrlAttribute()
+{
+    if ($this->profile_photo_path) {
+        return Storage::disk('s3')->url($this->profile_photo_path);
+    }
+
+    // fallback default avatar
+    return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
+}
+
 }

@@ -23,6 +23,7 @@ class RoleSeeder extends Seeder
             [
                 'name' => 'Super Admin',
                 'password' => bcrypt('12345678'), // change later
+                'role' => 'admin',
             ]
         );
 
