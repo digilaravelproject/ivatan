@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -30,6 +31,22 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
 
     Route::get('/profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [AdminProfileController::class, 'update'])->name('profile.update');
+
+    // Users
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/users/trashed', [UserController::class, 'trashed'])->name('users.trashed');
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
+
+    // Actions
+    Route::put('/users/{user}/block', [UserController::class, 'block'])->name('users.block');
+    Route::put('/users/{user}/unblock', [UserController::class, 'unblock'])->name('users.unblock');
+    Route::put('/users/{user}/verify', [UserController::class, 'verify'])->name('users.verify');
+    Route::put('/users/{user}/unverify', [UserController::class, 'unverify'])->name('users.unverify');
+
+    Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+
+
+    Route::post('/users/{user}/restore', [UserController::class, 'restore'])->name('users.restore');
 });
 
 

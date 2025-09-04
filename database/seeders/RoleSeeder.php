@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use App\Models\User;
+use Illuminate\Support\Str;
 
 class RoleSeeder extends Seeder
 {
@@ -21,9 +22,10 @@ class RoleSeeder extends Seeder
         $admin = User::firstOrCreate(
             ['email' => 'admin@admin.com'],
             [
+                'uuid' => Str::uuid(),
                 'name' => 'Super Admin',
                 'password' => bcrypt('12345678'), // change later
-                'role' => 'admin',
+
             ]
         );
 

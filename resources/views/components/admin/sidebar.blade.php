@@ -1,4 +1,4 @@
-<nav class="mt-5 space-y-1">
+<nav class="mt-5 px-5 space-y-1">
     <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if(request()->routeIs('admin.dashboard')) bg-gray-700 text-white @endif transition-colors duration-300">
         <!-- Home Icon -->
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7,13 +7,13 @@
         <span>Dashboard</span>
     </a>
 
-    <a href="#" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300">
+    <a href="{{ route('admin.users.index') }}" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if(request()->routeIs('admin.users.index')) bg-gray-700 text-white @endif transition-colors duration-300">
         <!-- Users Icon -->
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 7a4 4 0 11-8 0 4 4 0 018 0z"/>
         </svg>
         <span>Users</span>
-        <span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">12</span>
+        {{-- <span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">{{ $summary['users_total'] ?? 0 }}</span> --}}
     </a>
 
     <a href="#" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300">

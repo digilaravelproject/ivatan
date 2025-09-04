@@ -35,6 +35,25 @@
                 <div class="text-3xl font-bold text-gray-900">{{ $summary['posts'] ?? 0 }}</div>
             </div>
 
+            <!-- Stories -->
+            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-500">Stories</span>
+                    <!-- Play Circle Icon (Better represents "stories") -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-pink-500" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M14.752 11.168l-4.596-2.65A1 1 0 009 9.36v5.278a1 1 0 001.156.987l4.596-1.3a1 1 0 00.748-.967V12.13a1 1 0 00-.748-.962z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="text-3xl font-bold text-gray-900">{{ $summary['stories_total'] ?? 0 }}</div>
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span>Active: {{ $summary['stories_active'] ?? 0 }}</span>
+                    <span>Archive: {{ $summary['stories_archived'] ?? 0 }}</span>
+                </div>
+            </div>
+
             <!-- Reels Card -->
             <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
                 <div class="flex items-center justify-between">
@@ -67,26 +86,40 @@
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-500">Orders</span>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v6H3z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18v12H3z" />
-                    </svg>
-                </div>
-                <div class="text-3xl font-bold text-gray-900">{{ $summary['orders'] ?? 0 }}</div>
+                    stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v6H3z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18v12H3z" />
+                </svg>
             </div>
+            <div class="text-3xl font-bold text-gray-900">{{ $summary['orders'] ?? 0 }}</div>
+        </div>
 
-            <!-- Jobs Card -->
-            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm text-gray-500">Jobs</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-500" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7V4a4 4 0 00-8 0v3" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 10h14l-1 9H6l-1-9z" />
-                    </svg>
-                </div>
-                <div class="text-3xl font-bold text-gray-900">{{ $summary['jobs'] ?? 0 }}</div>
-            </div>
+        <!-- Jobs Card -->
+        <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-500">Jobs</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-500" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7V4a4 4 0 00-8 0v3" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 10h14l-1 9H6l-1-9z" />
+            </svg>
+        </div>
+        <div class="text-3xl font-bold text-gray-900">{{ $summary['jobs'] ?? 0 }}</div>
+    </div>
+    <!-- Reports-->
+    <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Reports Pending</span>
+            <!-- Play Circle Icon (Better represents "stories") -->
+          📄
+        </div>
+        <div class="text-3xl font-bold text-gray-900">{{ $summary['reports_pending'] ?? 0 }}</div>
+        <div class="flex justify-between text-xs text-gray-400">
+            <span>Report Resolved: {{ $summary['reports_resolved'] ?? 0 }}</span>
+        </div>
+    </div>
+
+
         </div>
 
 
@@ -107,13 +140,8 @@
         </div>
 
         {{-- Recents Activity --}}
-        <div class="bg-white p-4 rounded shadow mt-6">
+        <x-admin.module.recent-activity url="{{ url('/admin/dashboard/activity') }}" />
 
-            <h3 class="font-semibold mb-2">Recent Activity</h3>
-            <ul id="activityFeed" class="space-y-2 text-sm text-gray-700">
-                <li class="text-gray-400">Loading...</li>
-            </ul>
-        </div>
 
     </div>
 
@@ -187,42 +215,10 @@
             });
         });
     </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const feedRes = await fetch("{{ url('/admin/dashboard/activity') }}");
-                const feedData = await feedRes.json();
-                const feedEl = document.getElementById('activityFeed');
-                feedEl.innerHTML = '';
 
-                if (!feedData || feedData.length === 0) {
-                    feedEl.innerHTML = '<li class="text-gray-400">No recent activity</li>';
-                } else {
-                    feedData.forEach(item => {
-                        const li = document.createElement('li');
-                        li.classList.add("flex", "items-center", "space-x-2");
 
-                        // Different icon/color for each type
-                        let color = "text-blue-500";
-                        if (item.type === "order") color = "text-green-500";
-                        if (item.type === "report") color = "text-red-500";
 
-                        li.innerHTML = `
-                    <span class="${color} font-semibold capitalize">● ${item.type}</span>
-                    <span>${item.title}</span>
-                    <span>${item.user_id}</span>
-                    <span class="text-gray-400 text-xs">(${item.time})</span>
-                `;
-                        feedEl.appendChild(li);
-                    });
-                }
-            } catch (e) {
-                console.error(e);
-                document.getElementById('activityFeed').innerHTML =
-                    '<li class="text-red-400">Failed to load activity</li>';
-            }
-        });
-    </script>
+
 
 
 @endsection

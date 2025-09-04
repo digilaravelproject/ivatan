@@ -52,8 +52,27 @@ class DashboardController extends Controller
 
         $posts = Schema::hasTable('posts') ? Post::count() : 0;
         $reels = Schema::hasTable('reels') ? Reel::count() : 0;
-        $storiesActive = Schema::hasTable('stories') ? Story::where('expires_at', '>', now())->count() : 0;
-        $storiesExpired = Schema::hasTable('stories') ? Story::where('expires_at', '<=', now())->count() : 0;
+        if (Schema::hasTable('stories')) {
+            $now = Carbon::now();
+
+            // ✅ Active stories: not expired AND not archived
+            $storiesActive = Story::where('expires_at', '>', $now)
+                ->where('is_archived', 0)
+                ->count();
+
+            // ✅ Expired stories: expired (<= now), regardless of archive status
+            $storiesExpired = Story::where('expires_at', '<=', $now)
+                ->count();
+
+            // ✅ Archived stories: is_archived = 1 (regardless of expiry)
+            $storiesArchived = Story::where('is_archived', 1)
+                ->count();
+
+            // ✅ Total stories: all
+            $storiesTotal = Story::count();
+        } else {
+            $storiesActive = $storiesExpired = $storiesArchived = $storiesTotal = 0;
+        }
         $products = Schema::hasTable('products') ? Product::count() : 0;
         $orders = Schema::hasTable('orders') ? Order::count() : 0;
         $jobs = Schema::hasTable('user_jobs') ? Job::count() : 0;
@@ -67,8 +86,10 @@ class DashboardController extends Controller
             'users_inactive' => $inactiveUsers,
             'posts' => $posts,
             'reels' => $reels,
+            'stories_total' => $storiesTotal,
             'stories_active' => $storiesActive,
             'stories_expired' => $storiesExpired,
+            'stories_archived' => $storiesArchived,
             'products' => $products,
             'orders' => $orders,
             'jobs' => $jobs,
@@ -124,11 +145,11 @@ class DashboardController extends Controller
 
         // Latest 5 posts
         if (Schema::hasTable('posts')) {
-            $posts = Post::latest()->take(5)->get(['id','user_id', 'caption', 'created_at']);
+            $posts = Post::latest()->take(5)->get(['id', 'user_id', 'caption', 'created_at']);
             foreach ($posts as $p) {
                 $feed[] = [
                     'type' => 'post',
-                    'user_id'=>$p->user_id,
+                    'user_id' => $p->user_id,
                     'title' => $p->caption ?? 'Untitled Post',
                     'time' => $p->created_at->diffForHumans(),
                 ];
@@ -137,11 +158,11 @@ class DashboardController extends Controller
 
         // Latest 5 orders
         if (Schema::hasTable('orders')) {
-            $orders = Order::latest()->take(5)->get(['id','buyer_id', 'status', 'created_at']);
+            $orders = Order::latest()->take(5)->get(['id', 'buyer_id', 'status', 'created_at']);
             foreach ($orders as $o) {
                 $feed[] = [
                     'type' => 'order',
-                    'user_id'=>$o->buyer_id,
+                    'user_id' => $o->buyer_id,
                     'title' => "Order #{$o->id} ({$o->status})",
                     'time' => $o->created_at->diffForHumans(),
                 ];
@@ -150,11 +171,11 @@ class DashboardController extends Controller
 
         // Latest 5 reports
         if (Schema::hasTable('reports')) {
-            $reports = Report::latest()->take(5)->get(['id', 'reason', 'status', 'created_at']);
+            $reports = Report::latest()->take(5)->get(['id', 'reason', 'reported_by', 'status', 'created_at']);
             foreach ($reports as $r) {
                 $feed[] = [
                     'type' => 'report',
-                    'user_id'=>$r->user_id,
+                    'user_id' => $r->reported_by,
                     'title' => "Report #{$r->id} ({$r->status}) - " . ($r->reason ?? 'No reason'),
                     'time' => $r->created_at->diffForHumans(),
                 ];
