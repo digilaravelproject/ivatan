@@ -151,7 +151,7 @@ class UserController extends Controller
 
         $user->delete(); // assumes SoftDeletes on User model
 
-        $this->logAdminAction('delete', $user, $request);
+        $this->logAdminAction('Move to Trash', $user, $request);
 
         return redirect()->route('admin.users.index')->with('success', 'User deleted.');
     }
@@ -168,6 +168,22 @@ class UserController extends Controller
 
         return redirect()->route('admin.users.index')->with('success', 'User restored successfully.');
     }
+
+
+    public function forceDelete($id, Request $request)
+    {
+        $this->authorizeAdminAction();
+
+        // Use findOrFail to manually fetch the user
+        $user = User::withTrashed()->findOrFail($id);
+
+        $user->forceDelete();
+
+        $this->logAdminAction('forceDelete', $user, $request);
+
+        return redirect()->route('admin.users.index')->with('success', 'User permanently deleted.');
+    }
+
 
 
 

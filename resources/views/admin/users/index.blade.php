@@ -25,7 +25,45 @@
             </a>
         </div>
 
+        {{-- Check if there is a success message --}}
+        @if (session('success'))
+            <div id="flash-message"
+                class="fixed top-4 right-4 z-50 flex items-center justify-between bg-green-500 text-white p-4 rounded-lg shadow-lg max-w-xs w-full transition-all duration-300"
+                x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" {{-- Automatically hide after 5 seconds --}} x-transition>
+                <span>{{ session('success') }}</span>
+
+                {{-- Close button --}}
+                <button @click="show = false" class="ml-4 text-white focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        @endif
+
+        {{-- Check if there is an error message --}}
+        @if (session('error'))
+            <div id="flash-message"
+                class="fixed top-4 right-4 z-50 flex items-center justify-between bg-red-500 text-white p-4 rounded-lg shadow-lg max-w-xs w-full transition-all duration-300"
+                x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)" {{-- Automatically hide after 5 seconds --}} x-transition>
+                <span>{{ session('error') }}</span>
+
+                {{-- Close button --}}
+                <button @click="show = false" class="ml-4 text-white focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        @endif
+
+
         <div class="bg-white rounded-lg shadow overflow-x-auto">
+
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
@@ -54,8 +92,16 @@
                                 </div>
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $user->email ?? '-' }}</td>
-                            <td class="px-4 py-3 text-sm text-gray-700">{{ $user->followers_count ?? '0' }}</td>
-                            <td class="px-4 py-3 text-sm text-gray-700">{{ $user->following_count ?? '0' }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700">
+                                <a href="{{ route('admin.user.follower',$user) }}">
+                                    {{ $user->followers_count ?? '0' }}
+                                </a>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-700">
+                               <a href="{{ route('admin.user.following',$user) }}">
+                                {{ $user->following_count ?? '0' }}
+                               </a>
+                            </td>
                             <td class="px-4 py-3 text-sm text-gray-700">
                                 {{ $user->roles->pluck('name')->join(', ') ?? 'User' }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $user->created_at->format('d M, Y') }}</td>

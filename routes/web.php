@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FollowController;
+use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\ProfileController;
@@ -47,6 +49,31 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
 
 
     Route::post('/users/{user}/restore', [UserController::class, 'restore'])->name('users.restore');
+    Route::post('/users/force-delete/{user}', [UserController::class, 'forceDelete'])->name('users.delete');
+
+
+
+    // followers
+    // Follow a user
+    // Route::post('/follow/{userId}', [FollowController::class, 'follow']);
+
+    // // Unfollow a user
+    // Route::delete('/unfollow/{userId}', [FollowController::class, 'unfollow']);
+
+    // Get followers of a user
+    Route::get('/user/{userId}/followers', [FollowController::class, 'getFollowers'])->name('user.follower');
+
+    // Get users being followed by a user
+    Route::get('/user/{userId}/following', [FollowController::class, 'getFollowing'])->name('user.following');
+
+// Posts
+
+    Route::prefix('/posts')->controller(PostController::class)->name('post.')->group(function () {
+         Route::get('/', 'index')->name('index');
+
+    });
+
+
 });
 
 

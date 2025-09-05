@@ -97,6 +97,16 @@
                                     <button type="submit" onclick="return confirm('Restore this user?')"
                                         class="px-3 py-1 bg-gray-200 text-gray-700 rounded text-sm">Restore</button>
                                 </form>
+                                <form action="{{ route('admin.users.delete', $user) }}" method="POST" class="inline">
+                                    @csrf
+                                    {{-- @method('DELETE') --}}
+                                    <button type="submit" onclick="return confirm('Permanently delete this user?')"
+                                        class="px-3 py-1 bg-red-50 text-red-700 rounded text-sm">Delete</button>
+                                </form>
+
+                                {{-- {{ dd($user) }} --}}
+
+
                             </td>
                         </tr>
                     @empty

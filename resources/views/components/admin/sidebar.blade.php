@@ -16,7 +16,7 @@
         {{-- <span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">{{ $summary['users_total'] ?? 0 }}</span> --}}
     </a>
 
-    <a href="#" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300">
+    <a href="{{ route('admin.post.index') }}" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if(request()->routeIs('admin.post.index')) bg-gray-700 text-white @endif transition-colors duration-300">
         <!-- Posts Icon -->
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m-6-8h6M21 12c0 4.418-3.582 8-8 8s-8-3.582-8-8 3.582-8 8-8 8 3.582 8 8z"/>
