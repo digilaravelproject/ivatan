@@ -71,7 +71,7 @@
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Email</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Followers</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Followings</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Role</th>
+                        {{-- <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Role</th> --}}
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Joined</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Status</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500">Actions</th>
@@ -102,8 +102,8 @@
                                 {{ $user->following_count ?? '0' }}
                                </a>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-700">
-                                {{ $user->roles->pluck('name')->join(', ') ?? 'User' }}</td>
+                            {{-- <td class="px-4 py-3 text-sm text-gray-700">
+                                {{ $user->roles->pluck('name')->join(', ') ?? 'User' }}</td> --}}
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $user->created_at->format('d M, Y') }}</td>
                             <td class="px-4 py-3 text-sm">
                                 @if ($user->is_blocked)

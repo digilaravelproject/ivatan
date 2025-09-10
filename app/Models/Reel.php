@@ -24,8 +24,18 @@ class Reel extends Model
         return $this->belongsTo(User::class);
     }
 
+
     public function scopeActive($q)
     {
         return $q->where('status', 'active');
+    }
+
+    public function comments()
+    {
+        return $this->morphMany(Comment::class, 'commentable');
+    }
+    public function likes()
+    {
+        return $this->morphMany(Like::class, 'likeable');
     }
 }

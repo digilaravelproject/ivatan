@@ -5,12 +5,16 @@ use App\Http\Controllers\Admin\FollowController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\AdminPostController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
     return view('welcome');
+});
+Route::get('/admin', function () {
+    return view('auth.login');
 });
 
 Route::get('/dashboard', function () {
@@ -54,26 +58,28 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
 
 
     // followers
-    // Follow a user
-    // Route::post('/follow/{userId}', [FollowController::class, 'follow']);
-
-    // // Unfollow a user
-    // Route::delete('/unfollow/{userId}', [FollowController::class, 'unfollow']);
-
     // Get followers of a user
     Route::get('/user/{userId}/followers', [FollowController::class, 'getFollowers'])->name('user.follower');
 
     // Get users being followed by a user
     Route::get('/user/{userId}/following', [FollowController::class, 'getFollowing'])->name('user.following');
 
-// Posts
+    // Posts
 
+    // Route::prefix('/posts')->controller(PostController::class)->name('post.')->group(function () {
+    //     Route::get('/', 'index')->name('index');
+    //     Route::get('/create', 'create')->name('create');
+    //     Route::get('/{id}/likes', 'getLikes')->name('likes');
+    //     Route::get('/{id}/comments', 'getComments')->name('comments');
+    // });
     Route::prefix('/posts')->controller(PostController::class)->name('post.')->group(function () {
-         Route::get('/', 'index')->name('index');
-
+        Route::get('/', 'index')->name('index');
+        Route::get('/{id}', 'showPostDetails')->name('show');
+        Route::get('/{id}/likes', 'showLikes')->name('likes');       // likes page
+        Route::get('/{id}/comments', 'showComments')->name('comments'); // comments page
     });
 
-
+    Route::get('/user-posts',[AdminPostController::class,'index']);
 });
 
 
