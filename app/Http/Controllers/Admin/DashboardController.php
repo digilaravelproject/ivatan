@@ -23,7 +23,7 @@ class DashboardController extends Controller
     public function index()
     {
         $summary = $this->getSummaryCounts();
-        return view('admin.dashboard', ['summary' => $summary]);
+        return view('admin.dashboard.index', ['summary' => $summary]);
     }
 
     // API: summary counts (JSON)

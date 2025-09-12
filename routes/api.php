@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\Ecommerce\CartController;
+use App\Http\Controllers\Api\Ecommerce\CheckoutController;
 use App\Http\Controllers\Api\FollowController;
+use App\Http\Controllers\Api\Seller\UserProductController;
 use App\Http\Controllers\Api\Story\StoryController;
 use App\Http\Controllers\Api\Story\StoryHighlightController;
 use App\Http\Controllers\Api\UserPostController;
@@ -8,7 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\CommentController;
-
+use App\Http\Controllers\Api\Ecommerce\OrderController;
+use App\Http\Controllers\Api\Seller\UserSellerController;
 
 /**
  * Public Routes (No authentication required)
@@ -118,5 +122,37 @@ Route::prefix('v1')->group(function () {
             Route::post('/{id}/remove', [StoryHighlightController::class, 'removeStory']); // Remove story from highlight
             Route::get('/{id}', [StoryHighlightController::class, 'show']); // Get a specific highlight
         });
+
+        // ================================
+        // Seller Routes
+        // ================================
+        Route::prefix('seller')->group(function () {
+            Route::post('/', [UserSellerController::class, 'toggleSelf']);
+            Route::get('products', [UserProductController::class, 'index']);
+            Route::post('products', [UserProductController::class, 'store']);
+            Route::get('products/{product}', [UserProductController::class, 'show']);
+            Route::put('products/{product}', [UserProductController::class, 'update']);
+            Route::delete('products/{product}', [UserProductController::class, 'destroy']);
+        });
+
+        // ================================
+        // Cart Routes
+        // ================================
+        Route::prefix('cart')->group(function () {
+            Route::get('/', [CartController::class, 'index']);            // View cart
+            Route::post('/add', [CartController::class, 'add']);          // Add item
+            Route::post('/update/{id}', [CartController::class, 'update']); // Update qty
+            Route::delete('/remove/{id}', [CartController::class, 'remove']); // Remove item
+            Route::delete('/clear', [CartController::class, 'clear']);    // Clear cart
+
+        });
+        // ================================
+        // Checkout Routes
+        // ================================
+
+            Route::post('/checkout', [CheckoutController::class, 'checkout']); // Checkout
+            Route::get('/orders', [OrderController::class, 'index']);       // user orders
+            Route::get('/orders/{order}', [OrderController::class, 'show']); // single order
+            Route::delete('/orders/{order}', [OrderController::class, 'destroy']); // delete order
     });
 });

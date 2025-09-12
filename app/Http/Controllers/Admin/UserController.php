@@ -228,4 +228,20 @@ class UserController extends Controller
         $users = User::onlyTrashed()->paginate(20);
         return view('admin.users.trashed', compact('users'));
     }
+
+    public function toggleSellerStatus(User $user, Request $request)
+    {
+        $this->authorizeAdminAction();
+
+        $user->is_seller = !$user->is_seller;
+        $user->save();
+
+        $this->logAdminAction('toggle_seller_status', $user, $request);
+
+        $message = $user->is_seller
+            ? "{$user->name} is now a seller."
+            : "{$user->name} is no longer a seller.";
+
+        return back()->with('success', $message);
+    }
 }

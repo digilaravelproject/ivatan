@@ -23,10 +23,10 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles,HasApiTokens;
+    use HasFactory, Notifiable, HasRoles, HasApiTokens;
     use HasRoles;
 
-     use SoftDeletes;
+    use SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -34,10 +34,11 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-         'uuid',
+        'uuid',
         'name',
         'email',
         'password',
+        'is_seller',
     ];
 
     /**
@@ -78,12 +79,11 @@ class User extends Authenticatable
         return $this->hasMany(Post::class);
     }
     public function reels()
-{
-    return $this->hasMany(Reel::class);
-}
+    {
+        return $this->hasMany(Reel::class);
+    }
     public function products()
-{
-    return $this->hasMany(Product::class);
-}
-
+    {
+        return $this->hasMany(Product::class);
+    }
 }

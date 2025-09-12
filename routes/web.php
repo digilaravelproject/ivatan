@@ -1,89 +1,114 @@
 <?php
 
-use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\FollowController;
-use App\Http\Controllers\Admin\PostController;
-use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\AdminPostController;
-use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Admin\Ecommerce\ProductController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
+use App\Http\Controllers\Admin\AdminPostController;
+use App\Http\Controllers\Admin\Ecommerce\OrderController;
+use App\Http\Controllers\Admin\PostController;
+use App\Http\Controllers\Admin\FollowController;
+use App\Http\Controllers\Admin\UserController;
 
-Route::get('/', function () {
-    return view('welcome');
-});
-Route::get('/admin', function () {
-    return view('auth.login');
-});
+// Public Routes
+Route::get('/', fn() => view('welcome'));
+Route::get('/admin', fn() => view('auth.login'));
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Dashboard (User)
+Route::middleware(['auth', 'verified'])->get('/dashboard', fn() => view('dashboard'))->name('dashboard');
 
+// Authenticated User Profile
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::controller(ProfileController::class)->group(function () {
+        Route::get('/profile', 'edit')->name('profile.edit');
+        Route::patch('/profile', 'update')->name('profile.update');
+        Route::delete('/profile', 'destroy')->name('profile.destroy');
+    });
 });
 
-
+// =====================
 // Admin Routes
+// =====================
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->name('dashboard.summary');
-    Route::get('/dashboard/chart/{type}/{days?}', [DashboardController::class, 'chart'])->name('dashboard.chart');
-    Route::get('/dashboard/activity', [DashboardController::class, 'activityFeed'])->name('dashboard.activityfeed');
-
-    Route::get('/profile', [AdminProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [AdminProfileController::class, 'update'])->name('profile.update');
-
-    // Users
-    Route::get('/users', [UserController::class, 'index'])->name('users.index');
-    Route::get('/users/trashed', [UserController::class, 'trashed'])->name('users.trashed');
-    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
-
-    // Actions
-    Route::put('/users/{user}/block', [UserController::class, 'block'])->name('users.block');
-    Route::put('/users/{user}/unblock', [UserController::class, 'unblock'])->name('users.unblock');
-    Route::put('/users/{user}/verify', [UserController::class, 'verify'])->name('users.verify');
-    Route::put('/users/{user}/unverify', [UserController::class, 'unverify'])->name('users.unverify');
-
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
-
-
-    Route::post('/users/{user}/restore', [UserController::class, 'restore'])->name('users.restore');
-    Route::post('/users/force-delete/{user}', [UserController::class, 'forceDelete'])->name('users.delete');
-
-
-
-    // followers
-    // Get followers of a user
-    Route::get('/user/{userId}/followers', [FollowController::class, 'getFollowers'])->name('user.follower');
-
-    // Get users being followed by a user
-    Route::get('/user/{userId}/following', [FollowController::class, 'getFollowing'])->name('user.following');
-
-    // Posts
-
-    // Route::prefix('/posts')->controller(PostController::class)->name('post.')->group(function () {
-    //     Route::get('/', 'index')->name('index');
-    //     Route::get('/create', 'create')->name('create');
-    //     Route::get('/{id}/likes', 'getLikes')->name('likes');
-    //     Route::get('/{id}/comments', 'getComments')->name('comments');
-    // });
-    Route::prefix('/posts')->controller(PostController::class)->name('post.')->group(function () {
+    // Route::get('/dashboard',
+    // Dashboard Controller
+    Route::controller(DashboardController::class)->prefix('dashboard')->name('dashboard.')->group(function () {
         Route::get('/', 'index')->name('index');
-        Route::get('/{id}', 'showPostDetails')->name('show');
-        Route::get('/{id}/likes', 'showLikes')->name('likes');       // likes page
-        Route::get('/{id}/comments', 'showComments')->name('comments'); // comments page
+        Route::get('/summary', 'summary')->name('summary');
+        Route::get('/chart/{type}/{days?}', 'chart')->name('chart');
+        Route::get('/activity', 'activityFeed')->name('activityfeed');
     });
 
-    Route::get('/user-posts',[AdminPostController::class,'index']);
+    // Admin Profile
+    Route::controller(AdminProfileController::class)->prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', 'edit')->name('edit');
+        Route::patch('/', 'update')->name('update');
+    });
+
+    // User Management
+    Route::controller(UserController::class)->prefix('users')->name('users.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/trashed', 'trashed')->name('trashed');
+        Route::get('/{user}', 'show')->name('show');
+
+        // Actions
+        Route::put('/{user}/block', 'block')->name('block');
+        Route::put('/{user}/unblock', 'unblock')->name('unblock');
+        Route::put('/{user}/verify', 'verify')->name('verify');
+        Route::put('/{user}/unverify', 'unverify')->name('unverify');
+        Route::put('/{user}/seller', 'toggleSellerStatus')->name('seller.toggle');
+
+        Route::delete('/{user}', 'destroy')->name('destroy');
+        Route::post('/{user}/restore', 'restore')->name('restore');
+        Route::post('/force-delete/{user}', 'forceDelete')->name('delete');
+    });
+
+    // Followers / Following
+    Route::controller(FollowController::class)->prefix('user')->name('user.')->group(function () {
+        Route::get('{userId}/followers', 'getFollowers')->name('follower');
+        Route::get('{userId}/following', 'getFollowing')->name('following');
+    });
+
+    // Posts Management (Admin)
+    Route::prefix('posts')->controller(PostController::class)->name('post.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{id}', 'showPostDetails')->name('show');
+        Route::get('/{id}/likes', 'showLikes')->name('likes');
+        Route::get('/{id}/comments', 'showComments')->name('comments');
+    });
+
+    // User Posts List
+    Route::get('/user-posts', [AdminPostController::class, 'index'])->name('userposts.index');
+
+
+    // =====================
+    // Product Management (Admin)
+    // =====================
+
+
+    Route::prefix('products')->controller(ProductController::class)->name('products.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{product}', 'show')->name('show');
+        Route::post('/{product}/approve', 'approve')->name('approve');
+        Route::post('/{product}/reject', 'reject')->name('reject');
+        Route::post('/bulk/approve', 'bulkApprove')->name('bulk.approve');
+        Route::post('/bulk/reject', 'bulkReject')->name('bulk.reject');
+    });
+    // =====================
+    // Order Management (Admin)
+    // =====================
+
+
+    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.updateStatus');
+
 });
 
-
-
+// =====================
+// Testing / Dev Routes
+// =====================
 
 Route::get('/test-s3', function () {
     try {
@@ -94,9 +119,7 @@ Route::get('/test-s3', function () {
     }
 });
 
-Route::get('/check-disk', function () {
-    return config('filesystems.default');
-});
+Route::get('/check-disk', fn() => config('filesystems.default'));
 
-
+// Auth scaffolding (Laravel Breeze / Jetstream / Fortify)
 require __DIR__ . '/auth.php';

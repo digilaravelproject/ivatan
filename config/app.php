@@ -124,11 +124,16 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-//     'providers' => [
-// Illuminate\Cache\CacheServiceProvider::class,
-//   Illuminate\Database\DatabaseServiceProvider::class,
-//         Illuminate\Auth\AuthServiceProvider::class,
-//         Illuminate\Filesystem\FilesystemServiceProvider::class,
-//     ],
+    // config/app.php
+
+    // 'providers' => [
+    //     \Intervention\Image\ImageServiceProviderLaravelRecent::class,
+    // ],
+
+    // 'aliases' => [
+    //     'Image' => \Intervention\Image\Facades\Image::class,
+    // ],
+
+
 
 ];

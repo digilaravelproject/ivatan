@@ -93,14 +93,14 @@
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $user->email ?? '-' }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">
-                                <a href="{{ route('admin.user.follower',$user) }}">
+                                <a href="{{ route('admin.user.follower', $user) }}">
                                     {{ $user->followers_count ?? '0' }}
                                 </a>
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700">
-                               <a href="{{ route('admin.user.following',$user) }}">
-                                {{ $user->following_count ?? '0' }}
-                               </a>
+                                <a href="{{ route('admin.user.following', $user) }}">
+                                    {{ $user->following_count ?? '0' }}
+                                </a>
                             </td>
                             {{-- <td class="px-4 py-3 text-sm text-gray-700">
                                 {{ $user->roles->pluck('name')->join(', ') ?? 'User' }}</td> --}}
@@ -148,6 +148,31 @@
                                             class="px-3 py-1 bg-red-50 text-red-700 rounded text-sm">Unverify</button>
                                     </form>
                                 @endif
+
+                                @if (!$user->is_seller)
+                                    <form action="{{ route('admin.users.seller.toggle', $user) }}" method="POST"
+                                        class="inline">
+                                        @csrf
+                                        @method('PUT')
+                                        <button type="submit"
+                                            onclick="return confirm('Enable seller status for this user?')"
+                                            class="px-3 py-1 bg-indigo-50 text-indigo-700 rounded text-sm">
+                                            Enable Seller
+                                        </button>
+                                    </form>
+                                @else
+                                    <form action="{{ route('admin.users.seller.toggle', $user) }}" method="POST"
+                                        class="inline">
+                                        @csrf
+                                        @method('PUT')
+                                        <button type="submit"
+                                            onclick="return confirm('Disable seller status for this user?')"
+                                            class="px-3 py-1 bg-red-50 text-red-700 rounded text-sm">
+                                            Disable Seller
+                                        </button>
+                                    </form>
+                                @endif
+
 
                                 <form action="{{ route('admin.users.destroy', $user) }}" method="POST" class="inline">
                                     @csrf @method('DELETE')

@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Ecommerce\UserOrder;
 use App\Models\UserPost;
 use App\Policies\PostPolicy;
+use App\Policies\OrderPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -18,6 +20,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         UserPost::class => PostPolicy::class,
+        UserOrder::class => OrderPolicy::class,
     ];
 
     /**
@@ -31,22 +34,11 @@ class AuthServiceProvider extends ServiceProvider
     /**
      * Bootstrap any authentication / authorization services.
      */
-    // public function boot(): void
-    // {
-    //     // $this->registerPolicies();
-
-    //     // // Optional: Define a Gate for admin-only actions
-    //     // Gate::define('admin-actions', function ($user) {
-    //     //     return $user->hasRole('admin'); // Spatie permission method
-    //     // });
-    // }
     public function boot()
-{ $this->registerPolicies();
-    Gate::define('admin-actions', function ($user) {
-    return $user->hasRole('admin');
-});
-
-
-}
-
+    {
+        $this->registerPolicies();
+        Gate::define('admin-actions', function ($user) {
+            return $user->hasRole('admin');
+        });
+    }
 }

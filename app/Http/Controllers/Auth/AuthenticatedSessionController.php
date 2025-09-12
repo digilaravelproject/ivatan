@@ -31,6 +31,21 @@ class AuthenticatedSessionController extends Controller
     //     return redirect()->intended(route('dashboard', absolute: false));
     // }
 
+    // public function store(LoginRequest $request): RedirectResponse
+    // {
+    //     $request->authenticate();
+
+    //     $request->session()->regenerate();
+
+    //     $user = $request->user();
+
+    //     // Role-based redirect
+    //     if ($user->hasRole('admin')) {
+    //         return redirect()->route('admin.dashboard.index');
+    //     }
+
+    //     return redirect()->intended(route('dashboard'));
+    // }
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
@@ -39,12 +54,19 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        // Role-based redirect
-        if ($user->hasRole('admin')) {
-            return redirect()->route('admin.dashboard');
+        // ✅ Allow only admin users to log in
+        if (!$user->hasRole('admin')) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors([
+                'email' => 'You are not authorized to access this panel.',
+            ]);
         }
 
-        return redirect()->intended(route('dashboard'));
+        // ✅ Redirect admin to dashboard
+        return redirect()->route('admin.dashboard.index');
     }
 
 
