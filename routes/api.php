@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\Ecommerce\CartController;
 use App\Http\Controllers\Api\Ecommerce\CheckoutController;
+use App\Http\Controllers\Api\Ecommerce\PaymentController;
+use App\Http\Controllers\Api\Ecommerce\ShippingController;
 use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\Seller\UserProductController;
 use App\Http\Controllers\Api\Story\StoryController;
@@ -140,19 +142,45 @@ Route::prefix('v1')->group(function () {
         // ================================
         Route::prefix('cart')->group(function () {
             Route::get('/', [CartController::class, 'index']);            // View cart
-            Route::post('/add', [CartController::class, 'add']);          // Add item
+            // Route::post('/add', [CartController::class, 'add']);          // Add item
+            Route::post('/', [CartController::class, 'add']);          // Add item
             Route::post('/update/{id}', [CartController::class, 'update']); // Update qty
             Route::delete('/remove/{id}', [CartController::class, 'remove']); // Remove item
             Route::delete('/clear', [CartController::class, 'clear']);    // Clear cart
 
         });
-        // ================================
-        // Checkout Routes
-        // ================================
 
-            Route::post('/checkout', [CheckoutController::class, 'checkout']); // Checkout
-            Route::get('/orders', [OrderController::class, 'index']);       // user orders
-            Route::get('/orders/{order}', [OrderController::class, 'show']); // single order
-            Route::delete('/orders/{order}', [OrderController::class, 'destroy']); // delete order
+    /*
+    |--------------------------------------------------------------------------
+    | Checkout
+    |--------------------------------------------------------------------------
+    */
+    Route::post('/checkout', [CheckoutController::class, 'checkout']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Razorpay Payment
+    |--------------------------------------------------------------------------
+    */
+    Route::post('/payment/razorpay/order', [PaymentController::class, 'createRazorpayOrder']);
+    Route::post('/payment/razorpay/verify', [PaymentController::class, 'verifyRazorpayPayment']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Orders
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/orders', [OrderController::class, 'index']);                // List user's orders
+    Route::get('/orders/{order}', [OrderController::class, 'show']);         // Show specific order
+    Route::delete('/orders/{order}', [OrderController::class, 'destroy']);   // Delete order (if allowed)
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shipping
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/orders/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
+    Route::post('/orders/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
+
     });
 });

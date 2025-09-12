@@ -40,4 +40,12 @@ class UserProduct extends Model
     {
         return $this->hasMany(UserProductImage::class, 'product_id');
     }
+    public function cartItems()
+    {
+        return $this->hasMany(UserCartItem::class);
+    }
+    public function orderItems()
+    {
+        return $this->hasMany(UserOrderItem::class, 'item_id')->where('item_type', 'user_products');
+    }
 }

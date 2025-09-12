@@ -22,6 +22,7 @@
         "meilisearch/meilisearch-php": "^1.15",
         "pbmedia/laravel-ffmpeg": "^8.7",
         "pion/laravel-chunk-upload": "^1.5",
+        "razorpay/razorpay": "2.9",
         "spatie/laravel-image-optimizer": "^1.8",
         "spatie/laravel-medialibrary": "^11.14",
         "spatie/laravel-permission": "*"

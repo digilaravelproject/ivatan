@@ -34,6 +34,7 @@ class CheckoutRequest extends FormRequest
             'shipping_address.postal_code' => 'required|string|max:20',
             // optional: coupon, notes
             'notes' => 'nullable|string|max:2000',
+
         ];
     }
 }

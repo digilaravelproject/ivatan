@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Ecommerce\UserProduct;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -28,6 +29,6 @@ class OrderItem extends Model
 
     public function product()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(UserProduct::class);
     }
 }
