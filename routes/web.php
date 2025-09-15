@@ -60,6 +60,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::put('/{user}/verify', 'verify')->name('verify');
         Route::put('/{user}/unverify', 'unverify')->name('unverify');
         Route::put('/{user}/seller', 'toggleSellerStatus')->name('seller.toggle');
+        Route::put('/{user}/employer', 'toggleEmployerStatus')->name('employer.toggle');
 
         Route::delete('/{user}', 'destroy')->name('destroy');
         Route::post('/{user}/restore', 'restore')->name('restore');

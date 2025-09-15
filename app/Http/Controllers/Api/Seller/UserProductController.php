@@ -32,18 +32,18 @@ class UserProductController extends Controller
         return response()->json($products);
     }
 
-  public function show(Request $request, $id)
-{
-    $user = $request->user();
+    public function show(Request $request, $id)
+    {
+        $user = $request->user();
 
-    $product = UserProduct::where('seller_id', $user->id)->with('images', 'seller')->find($id);
+        $product = UserProduct::where('seller_id', $user->id)->with('images', 'seller')->find($id);
 
-    if (!$product) {
-        return response()->json(['message' => 'Product not found.'], 404);
+        if (!$product) {
+            return response()->json(['message' => 'Product not found.'], 404);
+        }
+
+        return response()->json($product);
     }
-
-    return response()->json($product);
-}
 
 
 
@@ -86,61 +86,61 @@ class UserProductController extends Controller
     }
 
     // update
-   public function update(UpdateUserProductRequest $request, UserProduct $product)
-{
-    $user = $request->user();
+    public function update(UpdateUserProductRequest $request, UserProduct $product)
+    {
+        $user = $request->user();
 
-    if ($product->seller_id !== $user->id) {
-        return response()->json(['error' => 'Unauthorized'], 403);
-    }
-
-    $update = $request->only(['title', 'description', 'price', 'stock']);
-
-    if (empty($update)) {
-        return response()->json(['error' => 'No valid fields provided to update.'], 422);
-    }
-
-    // if (isset($update['title'])) {
-    //     $update['slug'] = Str::slug($update['title']) . '-' . Str::random(8);
-    // }
-
-    $updated = $product->update($update);
-
-    if (!$updated) {
-        return response()->json(['error' => 'Failed to update product.'], 500);
-    }
-
-    // Cover image replace
-    if ($request->hasFile('cover_image')) {
-        ImageHelper::deleteEcomImage($product->cover_image);
-        $path = ImageHelper::uploadEcomImage($request->file('cover_image'), $user->id, 'products/cover');
-        $product->cover_image = $path;
-        $product->save();
-    }
-
-    // Add new gallery images
-    if ($request->hasFile('images')) {
-        foreach ($request->file('images') as $img) {
-            $path = ImageHelper::uploadEcomImage($img, $user->id, 'products/gallery');
-            UserProductImage::create([
-                'product_id' => $product->id,
-                'image_path' => $path,
-            ]);
+        if ($product->seller_id !== $user->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
-    }
 
-    // Remove selected images (optional)
-    if ($request->filled('remove_image_ids')) {
-        $ids = $request->input('remove_image_ids', []);
-        $images = UserProductImage::whereIn('id', $ids)->where('product_id', $product->id)->get();
-        foreach ($images as $img) {
-            ImageHelper::deleteEcomImage($img->image_path);
-            $img->delete();
+        $update = $request->only(['title', 'description', 'price', 'stock']);
+
+        if (empty($update)) {
+            return response()->json(['error' => 'No valid fields provided to update.'], 422);
         }
-    }
 
-    return response()->json(['success' => true, 'product' => $product->load('images')]);
-}
+        // if (isset($update['title'])) {
+        //     $update['slug'] = Str::slug($update['title']) . '-' . Str::random(8);
+        // }
+
+        $updated = $product->update($update);
+
+        if (!$updated) {
+            return response()->json(['error' => 'Failed to update product.'], 500);
+        }
+
+        // Cover image replace
+        if ($request->hasFile('cover_image')) {
+            ImageHelper::deleteEcomImage($product->cover_image);
+            $path = ImageHelper::uploadEcomImage($request->file('cover_image'), $user->id, 'products/cover');
+            $product->cover_image = $path;
+            $product->save();
+        }
+
+        // Add new gallery images
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $img) {
+                $path = ImageHelper::uploadEcomImage($img, $user->id, 'products/gallery');
+                UserProductImage::create([
+                    'product_id' => $product->id,
+                    'image_path' => $path,
+                ]);
+            }
+        }
+
+        // Remove selected images (optional)
+        if ($request->filled('remove_image_ids')) {
+            $ids = $request->input('remove_image_ids', []);
+            $images = UserProductImage::whereIn('id', $ids)->where('product_id', $product->id)->get();
+            foreach ($images as $img) {
+                ImageHelper::deleteEcomImage($img->image_path);
+                $img->delete();
+            }
+        }
+
+        return response()->json(['success' => true, 'product' => $product->load('images')]);
+    }
 
 
     // destroy (also delete images)

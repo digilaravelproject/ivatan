@@ -244,4 +244,19 @@ class UserController extends Controller
 
         return back()->with('success', $message);
     }
+    public function toggleEmployerStatus(User $user, Request $request)
+    {
+        $this->authorizeAdminAction();
+
+        $user->is_employer = !$user->is_employer;
+        $user->save();
+
+        $this->logAdminAction('toggle_Employer_status', $user, $request);
+
+        $message = $user->is_employer
+            ? "{$user->name} is now an Employer."
+            : "{$user->name} is no longer an Employer.";
+
+        return back()->with('success', $message);
+    }
 }

@@ -3,13 +3,14 @@
 namespace App\Models\Ecommerce;
 
 use App\Models\User;
+use App\Traits\AutoGeneratesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class UserProduct extends Model
 {
-    use HasFactory;
+    use HasFactory,AutoGeneratesUuid;
     protected $fillable = [
         'uuid',
         'seller_id',
@@ -26,15 +27,7 @@ class UserProduct extends Model
         'price' => 'decimal:2',
     ];
 
-    protected static function boot()
-    {
-        parent::boot();
 
-        static::creating(function ($product) {
-            $product->uuid = (string) Str::uuid();
-            $product->slug = Str::slug($product->title) . '-' . Str::random(8);
-        });
-    }
     public function seller()
     {
         return $this->belongsTo(User::class, 'seller_id');

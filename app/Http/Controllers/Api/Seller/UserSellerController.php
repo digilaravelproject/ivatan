@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 
 class UserSellerController extends Controller
 {
-       public function toggleSelf(Request $request)
+    public function toggleSelf(Request $request)
     {
         $user = $request->user();
         $user->is_seller = !$user->is_seller;

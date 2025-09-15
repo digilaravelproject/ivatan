@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\Ecommerce\CheckoutController;
 use App\Http\Controllers\Api\Ecommerce\PaymentController;
 use App\Http\Controllers\Api\Ecommerce\ShippingController;
 use App\Http\Controllers\Api\FollowController;
+use App\Http\Controllers\Api\Jobs\JobApplicationController;
+use App\Http\Controllers\Api\Jobs\JobPostController;
 use App\Http\Controllers\Api\Seller\UserProductController;
 use App\Http\Controllers\Api\Seller\UserServiceController;
 use App\Http\Controllers\Api\Story\StoryController;
@@ -197,6 +199,28 @@ Route::prefix('v1')->group(function () {
             Route::get('/{service}', [UserServiceController::class, 'show']);
             Route::post('/{service}', [UserServiceController::class, 'update']);
             Route::delete('/{service}', [UserServiceController::class, 'destroy']);
+        });
+
+        // ================================
+        // Jobs Routes
+        // ================================
+        // JobPostController routes
+        Route::prefix('jobs')->controller(JobPostController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::get('{job}', 'show');
+            Route::post('/', 'store');
+            Route::put('{job}', 'update');
+            Route::delete('{job}', 'destroy');
+        });
+
+        // JobApplicationController routes
+        Route::controller(JobApplicationController::class)->group(function () {
+            Route::post('jobs/apply', 'apply');
+            Route::get('jobs/{job}/applications', 'listByJob');
+            Route::post('applications/{application}/status', 'updateStatus');
+            Route::get('applications/{application}/resume', 'downloadResume');
+            // List logged-in user's applications (job seeker)
+            Route::get('/my/applications',  'myApplications');
         });
     });
 });
