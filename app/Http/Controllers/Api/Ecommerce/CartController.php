@@ -64,27 +64,27 @@ class CartController extends Controller
     }
 
     public function update(CartUpdateRequest $request, $id): JsonResponse
-    {try {
-        $item = UserCartItem::where('id', $id)
-            ->whereHas('cart', fn($q) => $q->where('user_id', $request->user()->id))
-            ->firstOrFail();
+    {
+        try {
+            $item = UserCartItem::where('id', $id)
+                ->whereHas('cart', fn($q) => $q->where('user_id', $request->user()->id))
+                ->firstOrFail();
 
-        $item->update([
-            'quantity' => $request->quantity
-        ]);
+            $item->update([
+                'quantity' => $request->quantity
+            ]);
 
-        $item->refresh(); // Ensure latest data is returned
+            $item->refresh(); // Ensure latest data is returned
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Quantity updated',
-            'item' => $item,
-        ], 200);
+            return response()->json([
+                'success' => true,
+                'message' => 'Quantity updated',
+                'item' => $item,
+            ], 200);
         } catch (\Exception $e) {
-    logger('Update error: ' . $e->getMessage());
-    return response()->json(['success' => false, 'message' => 'Something went wrong'], 500);
-}
-
+            logger('Update error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Something went wrong'], 500);
+        }
     }
 
 

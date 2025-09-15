@@ -22,6 +22,10 @@ class UserProduct extends Model
         'status'
     ];
 
+    protected $casts = [
+        'price' => 'decimal:2',
+    ];
+
     protected static function boot()
     {
         parent::boot();

@@ -1,18 +1,16 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Ecommerce;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateUserProductRequest extends FormRequest
+class UpdateUserServiceRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        // return false;
-        // controller will ensure ownership; allow if authenticated & seller
         return auth()->check() && auth()->user()->is_seller;
     }
 
@@ -24,23 +22,20 @@ class UpdateUserProductRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'            => 'sometimes|required|string|max:255',
-            'description'      => 'nullable|string',
-            'price'            => 'sometimes|numeric|min:0',
-            'stock'            => 'sometimes|integer|min:0',
-            'cover_image'      => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
-            'images.*'         => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
+            'title'             => 'sometimes|required|string|max:255',
+            'description'       => 'nullable|string',
+            'price'             => 'sometimes|numeric|min:0',
+            'status'            => 'nullable|in:pending,approved,rejected',
+            'cover_image'       => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
+            'images.*'          => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
             'remove_image_ids'  => 'nullable|array',
-            'remove_image_ids.*' => 'integer|exists:user_product_images,id',
+            'remove_image_ids.*' => 'integer|exists:user_service_images,id',
         ];
     }
-
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            $data = $this->all();
-
-            $fields = ['title', 'description', 'price', 'stock', 'cover_image', 'images', 'remove_image_ids'];
+            $fields = ['title', 'description', 'price', 'status', 'cover_image', 'images', 'remove_image_ids'];
 
             $hasAtLeastOne = false;
             foreach ($fields as $field) {

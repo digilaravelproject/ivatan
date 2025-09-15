@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Models\Ecommerce\UserOrder;
+use App\Models\Ecommerce\UserService;
 use App\Models\UserPost;
 use App\Policies\PostPolicy;
 use App\Policies\OrderPolicy;
+use App\Policies\ServicePolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -21,6 +23,7 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         UserPost::class => PostPolicy::class,
         UserOrder::class => OrderPolicy::class,
+        UserService::class => ServicePolicy::class,
     ];
 
     /**

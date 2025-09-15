@@ -13,7 +13,8 @@ use App\Http\Controllers\Admin\FollowController;
 use App\Http\Controllers\Admin\UserController;
 
 // Public Routes
-Route::get('/', fn() => view('welcome'));
+// Route::get('/', fn() => view('welcome'));
+Route::get('/', fn() => redirect('/admin'));
 Route::get('/admin', fn() => view('auth.login'));
 
 // Dashboard (User)

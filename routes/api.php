@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Ecommerce\PaymentController;
 use App\Http\Controllers\Api\Ecommerce\ShippingController;
 use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\Seller\UserProductController;
+use App\Http\Controllers\Api\Seller\UserServiceController;
 use App\Http\Controllers\Api\Story\StoryController;
 use App\Http\Controllers\Api\Story\StoryHighlightController;
 use App\Http\Controllers\Api\UserPostController;
@@ -86,27 +87,27 @@ Route::prefix('v1')->group(function () {
             // Delete comment
             Route::delete('/{comment}', [CommentController::class, 'destroy']);
         });
-    });
 
 
-    /**
-     * ================================
-     * Public Story Routes (No Authentication Required)
-     * ================================
-     */
-    Route::prefix('stories')->group(function () {
-        Route::get('/', [StoryController::class, 'index']); // Get all stories
-        Route::get('/{story}', [StoryController::class, 'show']); // Get single story by ID
-        Route::get('/user/{userId}', [StoryController::class, 'index']); // Get stories by user
-    });
+
+        /**
+         * ================================
+         * Public Story Routes (No Authentication Required)
+         * ================================
+         */
+        Route::prefix('stories')->group(function () {
+            Route::get('/', [StoryController::class, 'index']); // Get all stories
+            Route::get('/{story}', [StoryController::class, 'show']); // Get single story by ID
+            Route::get('/user/{userId}', [StoryController::class, 'index']); // Get stories by user
+        });
 
 
-    /**
-     * ================================
-     * Authenticated Story Routes
-     * ================================
-     */
-    Route::middleware('auth:sanctum')->group(function () {
+        /**
+         * ================================
+         * Authenticated Story Routes
+         * ================================
+         */
+
         Route::prefix('stories')->group(function () {
             Route::post('/', [StoryController::class, 'store']); // Create a new story
             Route::post('/{story}/like', [StoryController::class, 'like']); // Like a story
@@ -124,6 +125,10 @@ Route::prefix('v1')->group(function () {
             Route::post('/{id}/remove', [StoryHighlightController::class, 'removeStory']); // Remove story from highlight
             Route::get('/{id}', [StoryHighlightController::class, 'show']); // Get a specific highlight
         });
+
+        // ================================================================================================================================
+        // Ecommerce Routes
+        // ================================================================================================================================
 
         // ================================
         // Seller Routes
@@ -150,37 +155,48 @@ Route::prefix('v1')->group(function () {
 
         });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Checkout
-    |--------------------------------------------------------------------------
-    */
-    Route::post('/checkout', [CheckoutController::class, 'checkout']);
+        /*
+        |--------------------------------------------------------------------------
+        | Checkout
+        |--------------------------------------------------------------------------
+        */
+        Route::post('/checkout', [CheckoutController::class, 'checkout']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Razorpay Payment
-    |--------------------------------------------------------------------------
-    */
-    Route::post('/payment/razorpay/order', [PaymentController::class, 'createRazorpayOrder']);
-    Route::post('/payment/razorpay/verify', [PaymentController::class, 'verifyRazorpayPayment']);
+        /*
+        |--------------------------------------------------------------------------
+        | Razorpay Payment
+        |--------------------------------------------------------------------------
+        */
+        Route::post('/payment/razorpay/order', [PaymentController::class, 'createRazorpayOrder']);
+        Route::post('/payment/razorpay/verify', [PaymentController::class, 'verifyRazorpayPayment']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Orders
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/orders', [OrderController::class, 'index']);                // List user's orders
-    Route::get('/orders/{order}', [OrderController::class, 'show']);         // Show specific order
-    Route::delete('/orders/{order}', [OrderController::class, 'destroy']);   // Delete order (if allowed)
+        /*
+        |--------------------------------------------------------------------------
+        | Orders
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/orders', [OrderController::class, 'index']);                // List user's orders
+        Route::get('/orders/{order}', [OrderController::class, 'show']);         // Show specific order
+        Route::delete('/orders/{order}', [OrderController::class, 'destroy']);   // Delete order (if allowed)
 
-    /*
-    |--------------------------------------------------------------------------
-    | Shipping
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/orders/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
-    Route::post('/orders/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
+        /*
+        |--------------------------------------------------------------------------
+        | Shipping
+        |--------------------------------------------------------------------------
+        */
+        Route::get('/orders/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
+        Route::post('/orders/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
 
+        // ================================
+        // Services Routes
+        // ================================
+        Route::prefix('services')->group(function () {
+            // Seller services
+            Route::get('/', [UserServiceController::class, 'index']);
+            Route::post('/', [UserServiceController::class, 'store']);
+            Route::get('/{service}', [UserServiceController::class, 'show']);
+            Route::post('/{service}', [UserServiceController::class, 'update']);
+            Route::delete('/{service}', [UserServiceController::class, 'destroy']);
+        });
     });
 });
