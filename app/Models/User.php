@@ -10,6 +10,10 @@ namespace App\Models;
  */
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+
+use App\Models\Chat\UserChat;
+use App\Models\Chat\UserChatMessage;
+use App\Models\Chat\UserChatParticipant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -85,5 +89,26 @@ class User extends Authenticatable
     public function products()
     {
         return $this->hasMany(Product::class);
+    }
+
+    //
+    public function chatParticipants()
+    {
+        return $this->hasMany(UserChatParticipant::class, 'user_id');
+    }
+
+    public function chats()
+    {
+        return $this->belongsToMany(
+            UserChat::class,
+            'user_chat_participants',
+            'user_id',
+            'chat_id'
+        )->withPivot('is_admin', 'last_read_message_id')->withTimestamps();
+    }
+
+    public function chatMessages()
+    {
+        return $this->hasMany(UserChatMessage::class, 'sender_id');
     }
 }

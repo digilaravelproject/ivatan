@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Story\StoryController;
 use App\Http\Controllers\Api\Story\StoryHighlightController;
 use App\Http\Controllers\Api\UserPostController;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Api\Chat\ChatController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\CommentController;
@@ -221,6 +222,38 @@ Route::prefix('v1')->group(function () {
             Route::get('applications/{application}/resume', 'downloadResume');
             // List logged-in user's applications (job seeker)
             Route::get('/my/applications',  'myApplications');
+        });
+
+
+
+
+
+        // ================================
+        // Chats Routes
+        // ================================
+
+        // 1. All chats (list of conversations user is part of)
+        Route::get('chats', [ChatController::class, 'index']);
+
+        // 2. Create chats
+        Route::post('chats/private', [ChatController::class, 'openPrivate']); // create/open private chat
+        Route::post('chats/group', [ChatController::class, 'createGroup']);   // create group chat
+
+        // 3. Group participants management
+        Route::post('chats/{chat}/participants', [ChatController::class, 'addParticipants']);     // add members
+        Route::delete('chats/{chat}/participants/{userId}', [ChatController::class, 'removeParticipant']); // remove member
+        Route::post('chats/{chat}/leave', [ChatController::class, 'leave']); // leave group
+
+        // 4. Messaging
+        Route::post('chats/messages', [ChatController::class, 'sendMessage']); // send new message
+        Route::get('chats/{chat}/messages', [ChatController::class, 'messages']); // get all messages in chat
+
+        // 5. Read / Seen
+        Route::post('chats/read', [ChatController::class, 'markRead']); // mark messages as read
+
+        // 6. Single chat details (optional)
+        Route::get('chats/{chat}', [ChatController::class, 'show'] ?? function () {
+            return response()->json(['message' => 'Implement show if needed'], 200);
         });
     });
 });
