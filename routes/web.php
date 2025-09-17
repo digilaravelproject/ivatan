@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\Ecommerce\ProductController;
+use App\Http\Controllers\Admin\Ecommerce\ServiceController;
+use App\Http\Controllers\Admin\Ecommerce\AdminJobController;
+use App\Http\Controllers\Admin\Ecommerce\AdminApplicationController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\ProfileController;
@@ -76,13 +79,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
     // Posts Management (Admin)
     Route::prefix('posts')->controller(PostController::class)->name('post.')->group(function () {
         Route::get('/', 'index')->name('index');
-        Route::get('/{id}', 'showPostDetails')->name('show');
+        // Route::get('/{id}', 'showPostDetails')->name('show');
         Route::get('/{id}/likes', 'showLikes')->name('likes');
         Route::get('/{id}/comments', 'showComments')->name('comments');
     });
 
     // User Posts List
     Route::get('/user-posts', [AdminPostController::class, 'index'])->name('userposts.index');
+    Route::get('/user-posts/{postId}', [AdminPostController::class, 'show'])->name('userpost.details');
 
 
     // =====================
@@ -98,6 +102,51 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::post('/bulk/approve', 'bulkApprove')->name('bulk.approve');
         Route::post('/bulk/reject', 'bulkReject')->name('bulk.reject');
     });
+
+    // =====================
+    // Services Management (Admin)
+    // =====================
+
+    Route::prefix('services')->controller(ServiceController::class)->name('services.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{service}', 'show')->name('show');
+        Route::post('/{service}/approve', 'approve')->name('approve');
+        Route::post('/{services}/reject', 'reject')->name('reject');
+        Route::post('/bulk/approve', 'bulkApprove')->name('bulk.approve');
+        Route::post('/bulk/reject', 'bulkReject')->name('bulk.reject');
+    });
+
+
+    // =====================
+    // Services Management (Admin)
+    // =====================
+
+    // Route::prefix('job')->controller(JobController::class)->name('job.')->group(function () {
+    //     Route::get('/', 'index')->name('index');
+    //     Route::get('/{job}', 'show')->name('show');
+    //     Route::post('/{job}/approve', 'approve')->name('approve');
+    //     Route::post('/{job}/reject', 'reject')->name('reject');
+    //     Route::post('/bulk/approve', 'bulkApprove')->name('bulk.approve');
+    //     Route::post('/bulk/reject', 'bulkReject')->name('bulk.reject');
+    // });
+    // Job Management Routes
+    Route::prefix('jobs')->controller(AdminJobController::class)->name('jobs.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('{job}', 'show')->name('show');
+        Route::get('{job}/edit', 'edit')->name('edit');
+        Route::put('{job}', 'update')->name('update');
+        Route::delete('{job}', 'destroy')->name('destroy');
+
+        // Applications under a job
+        Route::get('{job}/applications', [AdminApplicationController::class, 'listByJob'])->name('applications');
+    });
+
+    // Application specific routes
+    Route::prefix('applications')->name('applications.')->group(function () {
+        Route::get('{application}/resume', [AdminApplicationController::class, 'downloadResume'])->name('resume');
+    });
+
+
     // =====================
     // Order Management (Admin)
     // =====================
@@ -105,7 +154,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
 
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
     Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.updateStatus');
-
 });
 
 // =====================

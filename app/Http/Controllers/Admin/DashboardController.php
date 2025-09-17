@@ -8,10 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
-use App\Models\Post;
-use App\Models\Reel;
+use App\Models\UserPost;
+// use App\Models\Reel;
 use App\Models\Story;
-use App\Models\Product;
+use App\Models\Ecommerce\UserProduct;
 use App\Models\Order;
 use App\Models\Job;
 use App\Models\Report;
@@ -50,8 +50,8 @@ class DashboardController extends Controller
         }
 
 
-        $posts = Schema::hasTable('posts') ? Post::count() : 0;
-        $reels = Schema::hasTable('reels') ? Reel::count() : 0;
+        $posts = Schema::hasTable('user_posts') ? UserPost::count() : 0;
+        $reels = Schema::hasTable('user_posts') ? UserPost::where('type', 'reel')->count() : 0;
         if (Schema::hasTable('stories')) {
             $now = Carbon::now();
 
@@ -73,7 +73,7 @@ class DashboardController extends Controller
         } else {
             $storiesActive = $storiesExpired = $storiesArchived = $storiesTotal = 0;
         }
-        $products = Schema::hasTable('products') ? Product::count() : 0;
+        $products = Schema::hasTable('user_products') ? UserProduct::count() : 0;
         $orders = Schema::hasTable('orders') ? Order::count() : 0;
         $jobs = Schema::hasTable('user_jobs') ? Job::count() : 0;
         $reportsPending = Schema::hasTable('reports') ? Report::where('status', 'pending')->count() : 0;
@@ -107,8 +107,11 @@ class DashboardController extends Controller
 
         $mapping = [
             'users' => 'users',
-            'posts' => 'posts',
-            'reels' => 'reels',
+            'user_posts' => 'user_posts',
+            'reels' => 'user_posts', // reels are stored in user_posts with type 'reel'
+            'stories' => 'stories',
+            'user_products' => 'user_products',
+            'jobs' => 'user_jobs',
             'orders' => 'orders',
             // add more mapping if needed
         ];
@@ -119,33 +122,48 @@ class DashboardController extends Controller
 
         $table = $mapping[$type];
 
-        $rows = DB::table($table)
-            ->select(DB::raw('DATE(created_at) as date'), DB::raw('COUNT(*) as count'))
-            ->where('created_at', '>=', $since)
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get()
-            ->pluck('count', 'date')
-            ->toArray();
+        if ($type === 'reels') {
+            // reels = user_posts where post_type = 'reel'
+            $rows = DB::table($table)
+                ->select(DB::raw('DATE(created_at) as date'), DB::raw('COUNT(*) as count'))
+                ->where('created_at', '>=', $since)
+                ->where('type', 'reel')  // filter reels only
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get()
+                ->pluck('count', 'date')
+                ->toArray();
+        } else {
+            // normal counting for other types
+            $rows = DB::table($table)
+                ->select(DB::raw('DATE(created_at) as date'), DB::raw('COUNT(*) as count'))
+                ->where('created_at', '>=', $since)
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get()
+                ->pluck('count', 'date')
+                ->toArray();
+        }
 
-        // prepare labels (each day) and data (fill zeros)
+        // Prepare labels and fill missing dates with zero
         $labels = [];
         $data = [];
         for ($i = 0; $i < $days; $i++) {
             $d = $since->copy()->addDays($i)->format('Y-m-d');
-            $labels[] = $since->copy()->addDays($i)->format('M j'); // nicer label
+            $labels[] = $since->copy()->addDays($i)->format('M j');
             $data[] = isset($rows[$d]) ? (int)$rows[$d] : 0;
         }
 
         return response()->json(['labels' => $labels, 'data' => $data]);
     }
+
     public function activityFeed()
     {
         $feed = [];
 
         // Latest 5 posts
         if (Schema::hasTable('posts')) {
-            $posts = Post::latest()->take(5)->get(['id', 'user_id', 'caption', 'created_at']);
+            $posts = UserPost::latest()->take(5)->get(['id', 'user_id', 'caption', 'created_at']);
             foreach ($posts as $p) {
                 $feed[] = [
                     'type' => 'post',

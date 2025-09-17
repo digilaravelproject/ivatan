@@ -1,4 +1,4 @@
-<nav class="mt-5 px-5 space-y-1">
+<nav class="px-5 mt-5 space-y-1">
     <a href="{{ route('admin.dashboard.index') }}"
         class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->routeIs('admin.dashboard.index')) bg-gray-700 text-white @endif transition-colors duration-300">
         <!-- Home Icon -->
@@ -17,11 +17,11 @@
                 d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
         <span>Users</span>
-        {{-- <span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">{{ $summary['users_total'] ?? 0 }}</span> --}}
+        {{-- <span class="px-2 ml-auto text-xs text-white bg-red-500 rounded-full">{{ $summary['users_total'] ?? 0 }}</span> --}}
     </a>
 
     <a href="{{ route('admin.userposts.index') }}"
-        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->routeIs('admin.post.index')) bg-gray-700 text-white @endif transition-colors duration-300">
+        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->routeIs('admin.userposts.index')) bg-gray-700 text-white @endif transition-colors duration-300">
         <!-- Posts Icon -->
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -31,7 +31,7 @@
     </a>
 
     <a href="{{ route('admin.products.index') }} "
-        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300">
+        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->routeIs('admin.products.index')) bg-gray-700 text-white @endif transition-colors duration-300">
         <!-- Products Icon -->
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -39,5 +39,25 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 3v4M8 3v4M3 9h18" />
         </svg>
         <span>Products</span>
+    </a>
+    <a href="{{ route('admin.services.index') }} "
+        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->routeIs('admin.services.index')) bg-gray-700 text-white @endif transition-colors duration-300">
+        <!-- Products Icon -->
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M20 21V7a2 2 0 00-2-2H6a2 2 0 00-2 2v14" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 3v4M8 3v4M3 9h18" />
+        </svg>
+        <span>Services</span>
+    </a>
+    <a href="{{ route('admin.jobs.index') }} "
+        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->routeIs('admin.jobs.index')) bg-gray-700 text-white @endif transition-colors duration-300">
+        <!-- Products Icon -->
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M20 21V7a2 2 0 00-2-2H6a2 2 0 00-2 2v14" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 3v4M8 3v4M3 9h18" />
+        </svg>
+        <span>Jobs</span>
     </a>
 </nav>

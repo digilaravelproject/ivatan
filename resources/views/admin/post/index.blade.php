@@ -7,22 +7,22 @@
 
 Image URL: {{ print_r($posts) }}
 </pre> --}}
-        <h2 class="text-2xl font-bold mb-4">All Posts</h2>
+        <h2 class="mb-4 text-2xl font-bold">All Posts</h2>
 
-        <div class="bg-white rounded-xl shadow p-6">
+        <div class="p-6 bg-white shadow rounded-xl">
             @if ($posts->count())
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
 
                     @foreach ($posts as $post)
-                        <div class="border rounded-lg overflow-hidden shadow-sm bg-white">
+                        <div class="overflow-hidden bg-white border rounded-lg shadow-sm">
                             <!-- Post Header -->
                             <div class="flex items-center p-4">
                                 <img src="{{ $post->user->profile_photo_url ?? asset('images/default-avatar.png') }}"
-                                    alt="user profile" class="w-10 h-10 rounded-full object-cover">
+                                    alt="user profile" class="object-cover w-10 h-10 rounded-full">
 
                                 <div class="ml-3">
                                     <a href="{{ route('admin.users.show', $post->user->id) }}">
-                                        <p class="font-semibold text-gray-800 text-sm">{{ $post->user->name }}</p>
+                                        <p class="text-sm font-semibold text-gray-800">{{ $post->user->name }}</p>
                                     </a>
                                     <p class="text-xs text-gray-500">
                                         {{ \Carbon\Carbon::parse($post->created_at)->diffForHumans() }}
@@ -37,7 +37,7 @@ Images Count: {{ $post->getMedia('image')->count() }}
 Image URL: {{ $post }}
 </pre> --}}
 
-                            <a href="{{ route('admin.post.show', $post->id) }}">
+                            <a href="{{ url("admin/user-posts/{$post->id}") }}">
                                 @php
                                     $imageUrl = $post->getFirstMediaUrl('images');
                                 @endphp
@@ -45,11 +45,11 @@ Image URL: {{ $post }}
                               @if (!empty($post->images) && isset($post->images[0]['original_url']))
     <img src="{{ $post->images[0]['original_url'] }}"
          alt="Post Image"
-         class="w-full h-64 object-cover" loading="lazy">
+         class="object-cover w-full h-64" loading="lazy">
 @else
     <img src="{{ asset('images/default-image.png') }}"
          alt="Default Image"
-         class="w-full h-64 object-cover" loading="lazy">
+         class="object-cover w-full h-64" loading="lazy">
 @endif
 
                             </a>
@@ -65,7 +65,7 @@ Image URL: {{ $post }}
                             </div>
 
                             <!-- Post Footer -->
-                            <div class="px-4 py-2 flex justify-between items-center text-sm text-gray-600 border-t">
+                            <div class="flex items-center justify-between px-4 py-2 text-sm text-gray-600 border-t">
                                 <!-- Likes -->
                                 <a href="{{ route('admin.post.likes', $post->id) }}"
                                     class="flex items-center space-x-1 hover:text-blue-600">
@@ -89,7 +89,7 @@ Image URL: {{ $post }}
                     {{ $posts->links('pagination::tailwind') }}
                 </div>
             @else
-                <div class="text-center text-gray-500 py-12">No posts available.</div>
+                <div class="py-12 text-center text-gray-500">No posts available.</div>
             @endif
         </div>
     </div>

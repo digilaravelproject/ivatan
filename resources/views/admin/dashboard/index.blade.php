@@ -2,14 +2,14 @@
 @section('title', 'Dashboard')
 @section('content')
 
-    <div class="max-w-7xl mx-auto space-y-6">
+    <div class="mx-auto space-y-6 max-w-7xl">
         <!-- Summary cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-6">
             <!-- Users Card -->
-            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+            <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-500">Users</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-indigo-500" viewBox="0 0 20 20"
                         fill="currentColor">
                         <path fill-rule="evenodd" d="M10 4a4 4 0 100 8 4 4 0 000-8zM2 16a8 8 0 1116 0H2z"
                             clip-rule="evenodd" />
@@ -23,10 +23,10 @@
             </div>
 
             <!-- Posts Card -->
-            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+            <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-500">Posts</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" fill="none"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-500" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M19 21H5a2 2 0 01-2-2V7a2 2 0 012-2h7l5 5v9a2 2 0 01-2 2z" />
@@ -36,11 +36,11 @@
             </div>
 
             <!-- Stories -->
-            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+            <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-500">Stories</span>
                     <!-- Play Circle Icon (Better represents "stories") -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-pink-500" fill="none" viewBox="0 0 24 24"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-pink-500" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M14.752 11.168l-4.596-2.65A1 1 0 009 9.36v5.278a1 1 0 001.156.987l4.596-1.3a1 1 0 00.748-.967V12.13a1 1 0 00-.748-.962z" />
@@ -55,10 +55,10 @@
             </div>
 
             <!-- Reels Card -->
-            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+            <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-500">Reels</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-pink-500" fill="none" viewBox="0 0 24 24"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-pink-500" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10" stroke="none" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 8l6 4-6 4V8z" />
@@ -68,10 +68,10 @@
             </div>
 
             <!-- Products Card -->
-            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+            <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-500">Products</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-500" fill="none"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-yellow-500" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v18H3V3z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v18" />
@@ -82,10 +82,10 @@
             </div>
 
             <!-- Orders Card -->
-            <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+            <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-gray-500">Orders</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24"
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24"
                     stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v6H3z" />
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 9h18v12H3z" />
@@ -95,10 +95,10 @@
         </div>
 
         <!-- Jobs Card -->
-        <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+        <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
             <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-500">Jobs</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-500" fill="none"
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-purple-500" fill="none"
                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7V4a4 4 0 00-8 0v3" />
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 10h14l-1 9H6l-1-9z" />
@@ -107,7 +107,7 @@
         <div class="text-3xl font-bold text-gray-900">{{ $summary['jobs'] ?? 0 }}</div>
     </div>
     <!-- Reports-->
-    <div class="bg-white rounded-xl shadow-md hover:shadow-lg transition p-6 flex flex-col gap-2">
+    <div class="flex flex-col gap-2 p-6 transition bg-white shadow-md rounded-xl hover:shadow-lg">
         <div class="flex items-center justify-between">
             <span class="text-sm text-gray-500">Reports Pending</span>
             <!-- Play Circle Icon (Better represents "stories") -->
@@ -124,18 +124,22 @@
 
 
         <!-- Charts -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-4 rounded shadow">
-                <h3 class="font-semibold mb-2">Users (last 7 days)</h3>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="p-4 bg-white rounded shadow">
+                <h3 class="mb-2 font-semibold">Users (last 7 days)</h3>
                 <canvas id="usersChart" width="400" height="200"></canvas>
             </div>
-            <div class="bg-white p-4 rounded shadow">
-                <h3 class="font-semibold mb-2">Posts (last 7 days)</h3>
+            <div class="p-4 bg-white rounded shadow">
+                <h3 class="mb-2 font-semibold">Posts (last 7 days)</h3>
                 <canvas id="postsChart" width="400" height="200"></canvas>
             </div>
-            <div class="bg-white p-4 rounded shadow">
-                <h3 class="font-semibold mb-2">Reels (last 7 days)</h3>
+            <div class="p-4 bg-white rounded shadow">
+                <h3 class="mb-2 font-semibold">Reels (last 7 days)</h3>
                 <canvas id="reelsChart" width="400" height="200"></canvas>
+            </div>
+            <div class="p-4 bg-white rounded shadow">
+                <h3 class="mb-2 font-semibold">Products (last 7 days)</h3>
+                <canvas id="productsChart" width="400" height="200"></canvas>
             </div>
         </div>
 
@@ -177,7 +181,7 @@
             });
 
             // Posts chart
-            const postsResp = await fetchChart('posts', 7);
+            const postsResp = await fetchChart('user_posts', 7);
             const ctxPosts = document.getElementById('postsChart').getContext('2d');
             new Chart(ctxPosts, {
                 type: 'bar',
@@ -193,7 +197,7 @@
                     responsive: true
                 }
             });
-            // Posts chart
+            // Reels chart
             const reelsResp = await fetchChart('reels', 7);
             const ctxReels = document.getElementById('reelsChart').getContext('2d');
             new Chart(ctxReels, {
@@ -203,6 +207,26 @@
                     datasets: [{
                         label: 'Reels',
                         data: reelsResp.data,
+                        fill: true,
+                        tension: 0.3,
+                        backgroundColor: 'rgba(16,185,129,0.7)',
+                        borderColor: 'rgb(99,102,241)'
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+            // Products chart
+            const productsResp = await fetchChart('user_products', 7);
+            const ctxProducts = document.getElementById('productsChart').getContext('2d');
+            new Chart(ctxProducts, {
+                type: 'line',
+                data: {
+                    labels: productsResp.labels,
+                    datasets: [{
+                        label: 'Products',
+                        data: productsResp.data,
                         fill: true,
                         tension: 0.3,
                         backgroundColor: 'rgba(16,185,129,0.7)',
