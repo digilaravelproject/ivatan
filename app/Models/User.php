@@ -21,16 +21,15 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Scout\Searchable;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Traits\HasRoles;
 
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, HasApiTokens;
-    use HasRoles;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
 
-    use SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -110,5 +109,26 @@ class User extends Authenticatable
     public function chatMessages()
     {
         return $this->hasMany(UserChatMessage::class, 'sender_id');
+    }
+
+    // This property will hold the cached unread count per instance
+    protected ?int $cachedUnreadCount = null;
+
+    /**
+     * Get the user's unread notification count (cached per request).
+     *
+     * @return int
+     */
+    public function getNotificationUnreadCountAttribute(): int
+    {
+        if ($this->cachedUnreadCount !== null) {
+            return $this->cachedUnreadCount;
+        }
+
+        $row = DB::table('notification_unread_counts')->where('user_id', $this->id)->first();
+
+        $this->cachedUnreadCount = $row ? (int) $row->unread_count : 0;
+
+        return $this->cachedUnreadCount;
     }
 }

@@ -6,11 +6,12 @@ use App\Models\User;
 use App\Traits\AutoGeneratesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 
 class UserChat extends Model
 {
-    use HasFactory,AutoGeneratesUuid;
+    use HasFactory,AutoGeneratesUuid,Notifiable;
 
     protected $table = 'user_chats';
 

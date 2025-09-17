@@ -19,10 +19,19 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Services\NotificationService;
+
 
 
 class ChatController extends Controller
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     // List user's chats
     public function index(Request $request)
     {
@@ -224,9 +233,49 @@ class ChatController extends Controller
         $chat->last_message_at = now();
         $chat->save();
 
+        // notification bhejna
+        // send notification first
+        $receivers = UserChatParticipant::where('chat_id', $chat->id)
+            ->where('user_id', '!=', $user->id)
+            ->pluck('user_id');
+
+        foreach ($receivers as $receiverId) {
+            $receiver = User::find($receiverId);
+            if (! $receiver) continue;
+
+            try {
+                $this->notificationService->sendToUser(
+                    $receiver,
+                    'chat_message',
+                    [
+                        'chat_id' => $chat->id,
+                        'message_id' => $message->id,
+                        'sender_id' => $user->id,
+                        'sender_name' => $user->name,
+                        'content' => $message->content,
+                        'type' => $messageType,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                \Log::error("Notification failed for user {$receiverId}", [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        }
+
+
         // broadcast
         // broadcast(new MessageSent($message))->toOthers();
         ProcessMessageBroadcast::dispatch($message);
+
+
+        $this->notificationService->sendToUser(
+            $user,  // jise message mila
+            'chat_message',
+            ['chat_id' => $chat->id, 'message_id' => $message->id, 'content' => $message->content]
+        );
+
 
         return response()->json(['success' => true, 'message' => $message], 201);
     }

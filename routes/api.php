@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Chat\ChatController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\CommentController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Ecommerce\OrderController;
 use App\Http\Controllers\Api\Seller\UserSellerController;
 
@@ -255,5 +256,18 @@ Route::prefix('v1')->group(function () {
         Route::get('chats/{chat}', [ChatController::class, 'show'] ?? function () {
             return response()->json(['message' => 'Implement show if needed'], 200);
         });
+
+
+
+        // ================================
+        // Notification Routes
+        // ================================
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('notifications/mark-read', [NotificationController::class, 'markRead']);
+        Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+
+        // optional test endpoint
+        Route::post('notifications/send-test', [NotificationController::class, 'sendTest']);
     });
 });
