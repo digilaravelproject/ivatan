@@ -1,6 +1,8 @@
 <?php
+
 namespace App\Models;
 
+use App\Traits\HasViews;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -8,7 +10,8 @@ use Illuminate\Support\Facades\Auth;
 
 class Post extends Model
 {
-    use SoftDeletes, HasFactory;
+    use SoftDeletes, HasFactory, HasViews;
+
 
     protected $fillable = [
         'uuid',

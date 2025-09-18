@@ -1,6 +1,8 @@
 <?php
+
 namespace App\Models;
 
+use App\Traits\HasViews;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
@@ -8,10 +10,14 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class UserStory extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia;
+    use HasFactory, InteractsWithMedia, HasViews;
 
     protected $fillable = [
-        'user_id', 'type', 'caption', 'meta', 'expires_at',
+        'user_id',
+        'type',
+        'caption',
+        'meta',
+        'expires_at',
     ];
 
     protected $casts = [

@@ -1,25 +1,44 @@
+@php
+    $type = request()->get('type', 'post'); // Default type
+    $labels = [
+        'post' => 'Posts',
+        'video' => 'Videos',
+        'reel' => 'Reels',
+    ];
+    $pageTitle = $labels[$type] ?? 'User Content';
+@endphp
+
 @extends('admin.layouts.app')
-@section('title', 'All Posts')
+@section('title', $pageTitle)
 
 @section('content')
-    <div class="max-w-6xl mx-auto space-y-6">
-                            {{-- <pre>
+    <div class="p-6 mx-auto space-y-8 bg-white rounded-lg shadow max-w-7xl">
 
-Image URL: {{ print_r($posts) }}
-</pre> --}}
-        <h2 class="mb-4 text-2xl font-bold">All Posts</h2>
+        {{-- Top Navigation --}}
+        <div class="flex justify-around mb-6 border-b">
+            @php
+                $type = request()->get('type', 'post'); // Default: post
+            @endphp
 
-        <div class="p-6 bg-white shadow rounded-xl">
+            @foreach (['post' => 'Posts', 'video' => 'Videos', 'reel' => 'Reels'] as $key => $label)
+                <a href="{{ route('admin.userposts.index', ['type' => $key]) }}" class="{{ $type === $key ? '...' : '...' }}">
+                    {{ $label }}
+                </a>
+            @endforeach
+
+        </div>
+
+        <h2 class="mb-4 text-2xl font-bold capitalize">{{ $type }}s</h2>
+
+        <div class="p-6">
             @if ($posts->count())
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-
                     @foreach ($posts as $post)
                         <div class="overflow-hidden bg-white border rounded-lg shadow-sm">
-                            <!-- Post Header -->
+                            {{-- Post Header --}}
                             <div class="flex items-center p-4">
                                 <img src="{{ $post->user->profile_photo_url ?? asset('images/default-avatar.png') }}"
                                     alt="user profile" class="object-cover w-10 h-10 rounded-full">
-
                                 <div class="ml-3">
                                     <a href="{{ route('admin.users.show', $post->user->id) }}">
                                         <p class="text-sm font-semibold text-gray-800">{{ $post->user->name }}</p>
@@ -30,50 +49,45 @@ Image URL: {{ print_r($posts) }}
                                 </div>
                             </div>
 
-                            <!-- Media Section -->
-                            <!-- Post Media -->
-                            {{-- <pre>
-Images Count: {{ $post->getMedia('image')->count() }}
-Image URL: {{ $post }}
-</pre> --}}
-
+                            {{-- Media Content --}}
                             <a href="{{ url("admin/user-posts/{$post->id}") }}">
-                                @php
-                                    $imageUrl = $post->getFirstMediaUrl('images');
-                                @endphp
+                                <div
+                                    class="relative w-full {{ $post->type === 'reel' ? 'aspect-[9/16]' : 'aspect-square' }}">
+                                    @if ($post->type === 'carousel')
+                                        <div class="swiper-container">
+                                            <div class="swiper-wrapper">
+                                                @foreach ($post['media'] as $media)
+                                                    <div class="swiper-slide">
+                                                        @include('components.admin.media-render', [
+                                                            'media' => $media,
+                                                        ])
 
-                              @if (!empty($post->images) && isset($post->images[0]['original_url']))
-    <img src="{{ $post->images[0]['original_url'] }}"
-         alt="Post Image"
-         class="object-cover w-full h-64" loading="lazy">
-@else
-    <img src="{{ asset('images/default-image.png') }}"
-         alt="Default Image"
-         class="object-cover w-full h-64" loading="lazy">
-@endif
-
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                            <!-- Add Pagination -->
+                                            <div class="swiper-pagination"></div>
+                                        </div>
+                                    @else
+                                        @foreach ($post['media'] as $media)
+                                            @include('components.admin.media-render', ['media' => $media])
+                                        @endforeach
+                                    @endif
+                                </div>
                             </a>
 
-
-                            {{-- <pre>{{ print_r($post->media->pluck('original_url'), true) }}</pre> --}}
-
-
-
-                            <!-- Caption -->
+                            {{-- Caption --}}
                             <div class="px-4 py-2">
                                 <p class="text-sm text-gray-700">{{ $post->caption }}</p>
                             </div>
 
-                            <!-- Post Footer -->
+                            {{-- Footer --}}
                             <div class="flex items-center justify-between px-4 py-2 text-sm text-gray-600 border-t">
-                                <!-- Likes -->
                                 <a href="{{ route('admin.post.likes', $post->id) }}"
                                     class="flex items-center space-x-1 hover:text-blue-600">
                                     <i class="fas fa-thumbs-up"></i>
                                     <span>{{ $post->likes_count }} Likes</span>
                                 </a>
-
-                                <!-- Comments -->
                                 <a href="{{ route('admin.post.comments', $post->id) }}"
                                     class="flex items-center space-x-1 hover:text-blue-600">
                                     <i class="fas fa-comment-dots"></i>
@@ -84,13 +98,34 @@ Image URL: {{ $post }}
                     @endforeach
                 </div>
 
-                <!-- Pagination -->
+                {{-- Pagination --}}
                 <div class="mt-6">
                     {{ $posts->links('pagination::tailwind') }}
                 </div>
             @else
-                <div class="py-12 text-center text-gray-500">No posts available.</div>
+                <div class="py-12 text-center text-gray-500">No {{ $type }}s available.</div>
             @endif
         </div>
     </div>
+@endsection
+
+@section('scripts')
+    {{-- Include SwiperJS --}}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const carousels = document.querySelectorAll('.swiper-container');
+            carousels.forEach(el => {
+                new Swiper(el, {
+                    loop: true,
+                    pagination: {
+                        el: '.swiper-pagination',
+                        clickable: true
+                    }
+                });
+            });
+        });
+    </script>
 @endsection

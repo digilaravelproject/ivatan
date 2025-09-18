@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 class Comment extends Model
 {
     protected $table = "comments";
-     protected $fillable = [
+    protected $fillable = [
         'user_id',
         'body',
         'commentable_type',
@@ -30,22 +31,25 @@ class Comment extends Model
     {
         return $this->morphMany(Like::class, 'likeable');
     }
-    public function commentable(): MorphTo {
+    public function commentable(): MorphTo
+    {
         return $this->morphTo(); // e.g., Post, Reel, etc.
     }
-     public function parent() {
+    public function parent()
+    {
         return $this->belongsTo(Comment::class, 'parent_id');
     }
 
-    public function replies(): HasMany {
-        return $this->hasMany(Comment::class, 'parent_id') ->with('user', 'likes', 'replies');
+    public function replies(): HasMany
+    {
+        return $this->hasMany(Comment::class, 'parent_id')->with('user', 'likes', 'replies');
     }
 
-      public function getLikesCountAttribute(): int
+    public function getLikesCountAttribute(): int
     {
         return $this->likes()->count();
     }
-      public function getHasLikedAttribute(): bool
+    public function getHasLikedAttribute(): bool
     {
         if (!Auth::check()) return false;
 

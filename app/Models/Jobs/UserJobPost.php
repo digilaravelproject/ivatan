@@ -4,13 +4,14 @@ namespace App\Models\Jobs;
 
 use App\Models\User;
 use App\Traits\AutoGeneratesUuid;
+use App\Traits\HasViews;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class UserJobPost extends Model
 {
-    use HasFactory,AutoGeneratesUuid;
+    use HasFactory, AutoGeneratesUuid, HasViews;
 
     protected $table = 'user_job_posts';
 

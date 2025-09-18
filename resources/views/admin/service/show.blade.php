@@ -105,7 +105,7 @@
                             </div>
                         @else
                             <div>
-                                <p class="italic text-gray-600">This product has already been <span
+                                <p class="italic text-gray-600">This Service has already been <span
                                         class="capitalize">{{ $service->status }}</span>.</p>
                             </div>
                         @endif
@@ -116,7 +116,7 @@
 
         <!-- Reject Modal -->
         <div x-show="showReject" @keydown.escape.window="showReject = false"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display: none;">
             <div class="relative w-full max-w-md p-6 bg-white rounded-lg shadow-lg"
                 x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
                 x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150"

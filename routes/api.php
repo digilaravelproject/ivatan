@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\Ad\AdController;
+use App\Http\Controllers\Api\Ad\AdPaymentController;
+use App\Http\Controllers\Api\Ad\AdServingController;
 use App\Http\Controllers\Api\Ecommerce\CartController;
 use App\Http\Controllers\Api\Ecommerce\CheckoutController;
 use App\Http\Controllers\Api\Ecommerce\PaymentController;
@@ -20,6 +23,7 @@ use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Ecommerce\OrderController;
 use App\Http\Controllers\Api\Seller\UserSellerController;
+use App\Http\Controllers\Api\ViewController;
 
 /**
  * Public Routes (No authentication required)
@@ -75,6 +79,14 @@ Route::prefix('v1')->group(function () {
             // ================================
             Route::get('/reels',  'reels');
         });
+        // ================================
+        // View Management Routes
+        // ================================
+        Route::post('/posts/{post}/view', [ViewController::class, 'trackPost']);
+        Route::post('/view/{type}/{id}', [ViewController::class, 'track']);
+        // 'post'   => UserPost::class,
+        // 'job'    => UserJobPost::class,
+        // 'story'  => UserStory::class,
 
         // ================================
         // Comment Routes
@@ -269,5 +281,33 @@ Route::prefix('v1')->group(function () {
 
         // optional test endpoint
         Route::post('notifications/send-test', [NotificationController::class, 'sendTest']);
+
+
+        // ================================
+        // Ad Routes
+        // ================================
+        Route::prefix('ads')->group(function () {
+            Route::controller(AdController::class)->group(function () {
+                Route::get('/ad-packages', 'adPackages');           // POST /ads
+                Route::post('/', 'store');           // POST /ads
+                Route::get('{ad}', 'show');          // GET /ads/{ad}
+            });
+
+            Route::controller(AdPaymentController::class)->group(function () {
+                Route::get('{ad}/pending-order', 'getPendingOrder');   // GET /ads/{ad}/pending-order
+            });
+
+            Route::prefix('payments')->controller(AdPaymentController::class)->group(function () {
+                Route::post('verify', 'verify');       // POST /ads/payments/verify
+            });
+        });
+
+        Route::prefix('my')->controller(AdController::class)->group(function () {
+            Route::get('ads', action: 'myAds');               // GET /my/ads
+        });
+        // Fetch Ads
+        Route::prefix('ads')->controller(AdServingController::class)->group(function () {
+            Route::get('serve', 'serveAd'); // GET /api/ads/serve
+        });
     });
 });

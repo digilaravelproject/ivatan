@@ -47,15 +47,15 @@ class UserPost extends Model implements HasMedia
         return $this->morphMany(Like::class, 'likeable');
     }
 
-//    public function comments()
-// {
-//     return $this->hasMany(Comment::class, 'post_id');
-// }
-// In UserPost.php
-public function comments()
-{
-    return $this->morphMany(Comment::class, 'commentable');
-}
+    //    public function comments()
+    // {
+    //     return $this->hasMany(Comment::class, 'post_id');
+    // }
+    // In UserPost.php
+    public function comments()
+    {
+        return $this->morphMany(Comment::class, 'commentable');
+    }
 
 
 
@@ -120,15 +120,15 @@ public function comments()
     }
 
     public function getImagesAttribute()
-{
-    return $this->getMedia('images')->map(function (Media $media) {
-        return [
-            'id' => $media->id,
-            'original_url' => $media->getUrl(),
-            'thumb_url' => $media->getUrl('thumb'),
-        ];
-    });
-}
+    {
+        return $this->getMedia('images')->map(function (Media $media) {
+            return [
+                'id' => $media->id,
+                'original_url' => $media->getUrl(),
+                'thumb_url' => $media->getUrl('thumb'),
+            ];
+        });
+    }
     /*
      |--------------------------------------------------------------------------
      | Optional: UUID Route Binding
@@ -140,4 +140,3 @@ public function comments()
     //     return 'uuid';
     // }
 }
-
