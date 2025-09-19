@@ -1,5 +1,5 @@
 @php
-    $type = request()->get('type', 'post'); // Default type
+    $type = request()->get('type', 'post');
     $labels = [
         'post' => 'Posts',
         'video' => 'Videos',
@@ -14,21 +14,17 @@
 @section('content')
     <div class="p-6 mx-auto space-y-8 bg-white rounded-lg shadow max-w-7xl">
 
-        {{-- Top Navigation --}}
+        {{-- Navigation Tabs --}}
         <div class="flex justify-around mb-6 border-b">
-            @php
-                $type = request()->get('type', 'post'); // Default: post
-            @endphp
-
-            @foreach (['post' => 'Posts', 'video' => 'Videos', 'reel' => 'Reels'] as $key => $label)
-                <a href="{{ route('admin.userposts.index', ['type' => $key]) }}" class="{{ $type === $key ? '...' : '...' }}">
+            @foreach ($labels as $key => $label)
+                <a href="{{ route('admin.userpost.index', ['type' => $key]) }}"
+                    class="{{ $type === $key ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-blue-500' }}">
                     {{ $label }}
                 </a>
             @endforeach
-
         </div>
 
-        <h2 class="mb-4 text-2xl font-bold capitalize">{{ $type }}s</h2>
+        <h2 class="mb-4 text-2xl font-bold capitalize">{{ $pageTitle }}</h2>
 
         <div class="p-6">
             @if ($posts->count())
@@ -40,16 +36,17 @@
                                 <img src="{{ $post->user->profile_photo_url ?? asset('images/default-avatar.png') }}"
                                     alt="user profile" class="object-cover w-10 h-10 rounded-full">
                                 <div class="ml-3">
-                                    <a href="{{ route('admin.users.show', $post->user->id) }}">
-                                        <p class="text-sm font-semibold text-gray-800">{{ $post->user->name }}</p>
+                                    <a href="{{ route('admin.users.show', $post->user->id) }}"
+                                        class="text-sm font-semibold text-gray-800">
+                                        {{ $post->user->name }}
                                     </a>
                                     <p class="text-xs text-gray-500">
-                                        {{ \Carbon\Carbon::parse($post->created_at)->diffForHumans() }}
+                                        {{ $post->created_at->diffForHumans() }}
                                     </p>
                                 </div>
                             </div>
 
-                            {{-- Media Content --}}
+                            {{-- Media --}}
                             <a href="{{ url("admin/user-posts/{$post->id}") }}">
                                 <div
                                     class="relative w-full {{ $post->type === 'reel' ? 'aspect-[9/16]' : 'aspect-square' }}">
@@ -61,11 +58,9 @@
                                                         @include('components.admin.media-render', [
                                                             'media' => $media,
                                                         ])
-
                                                     </div>
                                                 @endforeach
                                             </div>
-                                            <!-- Add Pagination -->
                                             <div class="swiper-pagination"></div>
                                         </div>
                                     @else
@@ -83,12 +78,12 @@
 
                             {{-- Footer --}}
                             <div class="flex items-center justify-between px-4 py-2 text-sm text-gray-600 border-t">
-                                <a href="{{ route('admin.post.likes', $post->id) }}"
+                                <a href="{{ route('admin.userpost.likes', $post->id) }}"
                                     class="flex items-center space-x-1 hover:text-blue-600">
                                     <i class="fas fa-thumbs-up"></i>
                                     <span>{{ $post->likes_count }} Likes</span>
                                 </a>
-                                <a href="{{ route('admin.post.comments', $post->id) }}"
+                                <a href="{{ route('admin.userpost.comments', $post->id) }}"
                                     class="flex items-center space-x-1 hover:text-blue-600">
                                     <i class="fas fa-comment-dots"></i>
                                     <span>{{ $post->comments_count }} Comments</span>
@@ -103,21 +98,19 @@
                     {{ $posts->links('pagination::tailwind') }}
                 </div>
             @else
-                <div class="py-12 text-center text-gray-500">No {{ $type }}s available.</div>
+                <div class="py-12 text-center text-gray-500">No {{ $pageTitle }} available.</div>
             @endif
         </div>
     </div>
 @endsection
 
 @section('scripts')
-    {{-- Include SwiperJS --}}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/swiper/swiper-bundle.min.js"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            const carousels = document.querySelectorAll('.swiper-container');
-            carousels.forEach(el => {
+            document.querySelectorAll('.swiper-container').forEach(el => {
                 new Swiper(el, {
                     loop: true,
                     pagination: {

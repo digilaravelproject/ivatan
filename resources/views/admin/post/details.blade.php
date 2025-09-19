@@ -1,121 +1,126 @@
 @extends('admin.layouts.app')
-
 @section('title', 'Post Details')
 
 @section('content')
-    <div class="max-w-4xl mx-auto space-y-6">
-        <!-- Post Details Section -->
-        <div class="p-6 bg-white rounded-lg shadow">
-            <!-- Profile Section -->
-            <div class="flex items-center mb-4">
-                <img src="{{ $post['user']['profile_photo_path'] ?? asset('images/default-avatar.png') }}"
-                    alt="Profile Picture" class="object-cover w-12 h-12 rounded-full">
-                <div class="ml-3">
-                    <p class="text-lg font-semibold">{{ $post['user']['name'] }}</p>
-                    <p class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($post['created_at'])->diffForHumans() }}</p>
+    <div class="max-w-2xl px-4 py-1 mx-auto space-y-10 sm:px-6 lg:px-8">
+        {{-- Back Button --}}
+        <div class="mb-4">
+            <a href="{{ url()->previous() }}"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded hover:bg-gray-300">
+                ← Back
+            </a>
+        </div>
+
+        {{-- Card --}}
+        <div class="p-4 bg-white shadow rounded-xl">
+            {{-- User Info --}}
+            <div class="flex items-center mb-6 space-x-4">
+                <img src="{{ $postDetails['profile_pic'] ?? asset('images/default-avatar.png') }}" alt="User Avatar"
+                    class="object-cover border rounded-full w-14 h-14">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ $postDetails['user']['name'] }}</h2>
+                    <p class="text-sm text-gray-500">
+                        {{ \Carbon\Carbon::parse($postDetails['created_at'])->diffForHumans() }}</p>
                 </div>
             </div>
 
-            <!-- Media Section (Images/Video) -->
-            <div class="relative">
+            @php
+                $postType = $postDetails['type'];
+                $image = $postDetails['media_metadata']['images'][0] ?? null;
+                $video = $postDetails['media_metadata']['videos'][0] ?? null;
 
+                $aspectClass = match ($postType) {
+                    'post', 'carousel' => 'aspect-[4/5]',
+                    'video' => 'aspect-video',
+                    'reel' => 'aspect-[9/16]',
+                    default => 'aspect-square',
+                };
+            @endphp
 
-
-                @if (count($post['media']) > 0)
-                    @php
-                        $media = $post['media'][0];
-                    @endphp
-
-                    @if (Str::contains($media['mime_type'], 'video'))
-                        <video controls class="object-cover w-full h-80">
-                            <source src="{{ $media['original_url'] }}" type="{{ $media['mime_type'] }}">
+            {{-- Media --}}
+            <div class="mb-6">
+                <div class="relative w-full overflow-hidden rounded-lg bg-gray-100 {{ $aspectClass }}"
+                    style="max-height: 600px;">
+                    @if ($video)
+                        <video controls controlsList="nodownload" oncontextmenu="return false"
+                            class="absolute inset-0 object-contain w-full h-full">
+                            <source src="{{ $video['original_url'] }}" type="video/mp4">
                             Your browser does not support the video tag.
                         </video>
-                    @elseif(Str::contains($media['mime_type'], 'image'))
-                        <img src="{{ $media['original_url'] }}" class="object-cover w-full h-80" alt="Post Image">
+                    @elseif ($image)
+                        <img src="{{ $image['original_url'] }}" alt="Post Image"
+                            class="absolute inset-0 object-contain w-full h-full">
+                    @else
+                        <div class="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-200">
+                            No media available
+                        </div>
                     @endif
-                @else
-                    <img src="{{ asset('images/default-image.jpg') }}" class="object-cover w-full h-80" alt="No Media">
-                @endif
+                </div>
             </div>
 
-            <!-- Admin Controls for Status and Visibility -->
-            <div class="mt-4">
-                <div class="flex justify-between mb-4">
+            {{-- Caption --}}
+            <p class="text-base leading-relaxed text-gray-800">{{ $postDetails['caption'] }}</p>
+
+            {{-- Admin Controls --}}
+            <form method="POST" action="{{ route('admin.userpost.update', $postDetails['post_id']) }}"
+                class="pt-6 mt-8 space-y-6 border-t border-gray-200">
+                @csrf
+                @method('PUT')
+
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    {{-- Status --}}
                     <div>
-                        <label for="status" class="block text-sm text-gray-700">Status</label>
-                        <select id="status" name="status" class="form-select">
+                        <label for="status" class="block text-sm font-medium text-gray-700">Post Status</label>
+                        <select id="status" name="status"
+                            class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                             @foreach ($statuses as $status)
-                                <option value="{{ $status }}" {{ $status == $post['status'] ? 'selected' : '' }}>
-                                    {{ ucfirst($status) }}</option>
+                                <option value="{{ $status }}"
+                                    {{ $status === $postDetails['status'] ? 'selected' : '' }}>
+                                    {{ ucfirst($status) }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
 
+                    {{-- Visibility --}}
                     <div>
-                        <label for="visibility" class="block text-sm text-gray-700">Visibility</label>
-                        <select id="visibility" name="visibility" class="form-select">
+                        <label for="visibility" class="block text-sm font-medium text-gray-700">Visibility</label>
+                        <select id="visibility" name="visibility"
+                            class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                             @foreach ($visibilities as $visibility)
                                 <option value="{{ $visibility }}"
-                                    {{ $visibility == $post['visibility'] ? 'selected' : '' }}>{{ ucfirst($visibility) }}
+                                    {{ $visibility === $postDetails['visibility'] ? 'selected' : '' }}>
+                                    {{ ucfirst($visibility) }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
                 </div>
-            </div>
 
-            <!-- Like and Comment Buttons (Optional) -->
-            {{-- <div class="flex items-center justify-between">
-            <a href="{{ route('admin.post.likes', $post['id']) }}" class="flex items-center space-x-2 text-blue-500 hover:text-blue-700">
-                <i class="fas fa-thumbs-up"></i>
-                <span>{{ $likes_count }} Likes</span>
-            </a>
-            <a href="{{ route('admin.post.comments', $post['id']) }}" class="flex items-center space-x-2 text-blue-500 hover:text-blue-700">
-                <i class="fas fa-comment-dots"></i>
-                <span>{{ $comments_count }} Comments</span>
-            </a>
-        </div> --}}
+                <div class="flex items-center justify-between pt-4">
+                    <button type="submit"
+                        class="inline-flex items-center px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow">
+                        Update Post
+                    </button>
 
-            <!-- Likes Section -->
-            <div class="mt-6">
-                <h3 class="text-xl font-semibold">Likes ({{ $post->likes_count }})</h3>
-                @if (count($post['likes']) > 0)
-                    <ul class="mt-2 divide-y divide-gray-200">
-                        @foreach ($post['likes'] as $like)
-                            <li class="flex items-center gap-3 py-2">
-                                <img src="{{ $like['profile_picture'] ?? asset('images/default-avatar.png') }}"
-                                    alt="Profile Picture" class="w-8 h-8 rounded-full">
-                                <span class="font-medium">{{ $like['username'] }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
-                @else
-                    <p class="mt-2 text-sm text-gray-500">No likes yet.</p>
-                @endif
-            </div>
+                    <form action="{{ route('admin.userpost.softDelete', $postDetails['post_id']) }}" method="POST"
+                        onsubmit="return confirm('Are you sure you want to soft delete this post?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit"
+                            class="ml-4 text-sm inline-flex items-center px-5 py-2.5 font-medium bg-red-500 rounded-md shadow-sm text-white hover:underline hover:bg-red-700">
+                            Delete Post
+                        </button>
+                    </form>
+                </div>
+            </form>
 
-            <!-- Comments Section -->
-            <div class="mt-6">
-                <h3 class="text-xl font-semibold">Comments ({{ $post->comments_count }})</h3>
-                @if (count($post['comments']) > 0)
-                    @foreach ($post['comments'] as $comment)
-                        <div class="flex gap-3 py-3">
-                            <img src="{{ $comment['profile_picture'] ?? asset('images/default-avatar.png') }}"
-                                alt="Profile Picture" class="w-8 h-8 rounded-full">
-                            <div class="flex-1">
-                                <div class="flex justify-between">
-                                    <span class="font-semibold">{{ $comment['username'] }}</span>
-                                    <span
-                                        class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($comment['created_at'])->diffForHumans() }}</span>
-                                </div>
-                                <p class="mt-1 text-sm text-gray-700">{{ $comment['content'] }}</p>
-                            </div>
-                        </div>
-                    @endforeach
-                @else
-                    <p class="mt-2 text-sm text-gray-500">No comments yet.</p>
-                @endif
+            {{-- Likes & Comments --}}
+            <div class="flex justify-between pt-6 mt-10 text-base text-gray-700 border-t border-gray-200">
+                <a href="{{ route('admin.userpost.likes', $postDetails['post_id']) }}"
+                    class="hover:underline"><strong>Likes:</strong> {{ $postDetails['total_likes'] }}</a>
+                <a href="{{ route('admin.userpost.comments', $postDetails['post_id']) }}"
+                    class="hover:underline"><strong>Comments:</strong> {{ $postDetails['total_comments'] }}</a>
             </div>
         </div>
     </div>

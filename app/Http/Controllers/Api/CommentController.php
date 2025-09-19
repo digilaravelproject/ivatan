@@ -12,10 +12,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Services\CommentService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Exception;
 
 class CommentController extends Controller
 {
+    use AuthorizesRequests;
 
     /**
      * ✅ List comments with replies on a post/reel/etc.
@@ -122,7 +124,8 @@ class CommentController extends Controller
     // ✅ Delete a comment
     public function destroy(Comment $comment, CommentService $commentService): JsonResponse
     {
-        $this->authorize('delete', $comment); // Optional: Restrict ownership
+        $this->authorize('delete', $comment);
+        // Optional: Restrict ownership
 
         $commentService->deleteComment($comment);
 

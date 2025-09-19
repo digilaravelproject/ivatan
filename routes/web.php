@@ -12,6 +12,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\AdminPostController;
+use App\Http\Controllers\Admin\CommentController;
 use App\Http\Controllers\Admin\Ecommerce\OrderController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FollowController;
@@ -78,25 +79,23 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::get('{userId}/following', 'getFollowing')->name('following');
     });
 
-    // Posts Management (Admin)
-    Route::prefix('posts')->controller(PostController::class)->name('post.')->group(function () {
-        Route::get('/', 'index')->name('index');
-        // Route::get('/{id}', 'showPostDetails')->name('show');
-        Route::get('/{id}/likes', 'showLikes')->name('likes');
-        Route::get('/{id}/comments', 'showComments')->name('comments');
-    });
+
 
     // User Posts List
-    Route::get('/user-posts', [AdminPostController::class, 'index'])->name('userposts.index');
-    Route::get('/user-posts/{postId}', [AdminPostController::class, 'show'])->name('userpost.details');
+
     // Posts Management (Admin)
     Route::prefix('user-posts')->controller(AdminPostController::class)->name('userpost.')->group(function () {
+        Route::put('/{postId}', 'update')->name('update');
+        Route::get('/{postId}', 'show')->name('details');
         Route::get('/', 'index')->name('index');
-        Route::get('/{postId}', 'showPostDetails')->name('show');
-        Route::get('/{postId}/likes', 'showLikes')->name('likes');
-        Route::get('/{PostId}/comments', 'showComments')->name('comments');
+        Route::get('/{postId}/likes', 'getLikes')->name('likes');
+        Route::get('/{PostId}/comments', 'getComments')->name('comments');
+        // Route::delete('/{postId}', 'destroy')->name('destroy');
+        Route::delete('/{commentId}', 'deleteComment')->name('comments.delete');
+        Route::post('/{postId}/soft-delete', 'softDelete')->name('softDelete');
     });
 
+    // route::delete('comments/{commentId}', [CommentController::class, 'destroy'])->name('comments.delete');
     // =====================
     // Product Management (Admin)
     // =====================

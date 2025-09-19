@@ -2,32 +2,27 @@
 @section('title', 'Post Comments')
 
 @section('content')
-<div class="max-w-4xl mx-auto space-y-6">
-    <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-bold mb-4">Comments ({{ $post->comments->count() }})</h2>
+    <div class="max-w-4xl mx-auto space-y-6">
+        {{-- Back Button --}}
+        <div class="mb-4">
+            <a href="{{ url()->previous() }}"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded hover:bg-gray-300">
+                ← Back
+            </a>
+        </div>
 
-        @if($post->comments->isEmpty())
-            <p class="text-gray-400">No comments yet.</p>
-        @else
-            <ul class="divide-y divide-gray-200">
-                @foreach($post->comments as $comment)
-                    <li class="flex gap-3 py-3">
-                        <img src="{{ $comment->user->profile_photo_url ?? asset('images/default-avatar.png') }}"
-                             class="w-8 h-8 rounded-full">
-                        <div class="flex-1">
-                            <div class="flex justify-between">
+        <div class="p-6 bg-white rounded-lg shadow">
+            <h2 class="mb-4 text-xl font-bold">Comments ({{ $post->comments->count() }})</h2>
 
-                                <span class="font-semibold">
-                                    <a href="{{ route('admin.users.show', $comment->user) }}">{{ $comment->user->name }}</a></span>
-                                <span class="text-xs text-gray-400">{{ $comment->created_at->diffForHumans() }}</span>
-                            </div>
-                            <p class="text-sm text-gray-700">{{ $comment->content }}</p>
-                            <p class="text-xs text-gray-500">{{ $comment->likes()->count() }} Likes</p>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
+            @if ($post->comments->isEmpty())
+                <p class="text-gray-400">No comments yet.</p>
+            @else
+                <ul class="divide-y divide-gray-200">
+                    @foreach ($post->comments->whereNull('parent_id') as $comment)
+                        @include('admin.post.partials.comment', ['comment' => $comment, 'level' => 0])
+                    @endforeach
+                </ul>
+            @endif
+        </div>
     </div>
-</div>
 @endsection

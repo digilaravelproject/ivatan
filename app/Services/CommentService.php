@@ -34,9 +34,12 @@ class CommentService
 
         $comment->delete();
 
-        // 🔄 Update comment count
-        $this->updateCommentCount($commentable);
+        // ✅ Prevent null error
+        if ($commentable) {
+            $this->updateCommentCount($commentable);
+        }
     }
+
 
     protected function updateCommentCount(Model $model): void
     {

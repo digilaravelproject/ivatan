@@ -22,9 +22,9 @@
         {{-- <span class="px-2 ml-auto text-xs text-white bg-red-500 rounded-full">{{ $summary['users_total'] ?? 0 }}</span> --}}
     </a>
 
-    <a href="{{ route('admin.userposts.index') }}"
+    <a href="{{ route('admin.userpost.index') }}"
         class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
-        @if (request()->routeIs('admin.userposts.*') || request()->routeIs('admin.post.*')) bg-gray-700 text-white @endif
+        @if (request()->routeIs('admin.userpost.*') || request()->routeIs('admin.posts.*')) bg-gray-700 text-white @endif
         transition-colors duration-300">
 
         <!-- Posts Icon -->
