@@ -4,6 +4,35 @@ namespace App\Models\Ecommerce;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property int $cart_id
+ * @property int $seller_id
+ * @property string|null $item_type
+ * @property int|null $item_id
+ * @property int $quantity
+ * @property string $price
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Ecommerce\UserCart $cart
+ * @property-read Model|\Eloquent|null $item
+ * @property-read Model|\Eloquent|null $product
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereCartId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereItemId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereItemType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem wherePrice($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereQuantity($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereSellerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserCartItem whereUuid($value)
+ * @mixin \Eloquent
+ */
 class UserCartItem extends Model
 {
     protected $fillable = [

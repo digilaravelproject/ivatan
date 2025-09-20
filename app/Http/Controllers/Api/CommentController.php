@@ -84,30 +84,7 @@ class CommentController extends Controller
     }
 
 
-    // ✅ Like / Unlike a comment
-    // public function toggleLike(Comment $comment): JsonResponse
-    // {
-    //     $user = Auth::user();
 
-    //     $like = Like::where([
-    //         'user_id' => $user->id,
-    //         'likeable_type' => Comment::class,
-    //         'likeable_id' => $comment->id,
-    //     ])->first();
-
-    //     if ($like) {
-    //         $like->delete();
-    //         $liked = false;
-    //     } else {
-    //         $comment->likes()->create(['user_id' => $user->id]);
-    //         $liked = true;
-    //     }
-
-    //     return response()->json([
-    //         'liked' => $liked,
-    //         'like_count' => $comment->likes()->count()
-    //     ]);
-    // }
 
 
     public function toggleCommentLike(Comment $comment, LikeService $likeService): JsonResponse

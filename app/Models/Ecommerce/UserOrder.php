@@ -6,6 +6,36 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property int $buyer_id
+ * @property numeric $total_amount
+ * @property string $status
+ * @property string $payment_status
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Ecommerce\UserAddress|null $address
+ * @property-read User $buyer
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Ecommerce\UserOrderItem> $items
+ * @property-read int|null $items_count
+ * @property-read \App\Models\Ecommerce\UserPayment|null $payment
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Ecommerce\UserPayment> $payments
+ * @property-read int|null $payments_count
+ * @property-read \App\Models\Ecommerce\UserShipping|null $shipping
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder whereBuyerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder wherePaymentStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder whereTotalAmount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserOrder whereUuid($value)
+ * @mixin \Eloquent
+ */
 class UserOrder extends Model
 {
     protected $table = 'user_orders';

@@ -3,79 +3,91 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Requests\Api\User\RegisterUserRequest;
+use App\Http\Requests\Api\User\LoginRequest;
+use App\Http\Requests\Api\User\UpdateUserRequest;
+use App\Services\Api\User\UserService;
+use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
-    // User Registration API
-public function register(Request $request)
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8',
-        ]);
+    use ApiResponse;
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 400);
-        }
+    protected $userService;
 
-        // Generate UUID
-        $uuid = Str::uuid();
-        \Log::info('Generated UUID: ' . $uuid); // Log UUID to check it
-
-        // Create the user
-        $user = User::create([
-            'uuid' => $uuid,
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        // Assign the default "user" role using Spatie's assignRole method
-        $user->assignRole('user');
-
-        // Create the token for the user
-        $token = $user->createToken('MyApp')->plainTextToken;
-
-        return response()->json(['token' => $token, 'user' => $user], 201);
-    } catch (\Exception $e) {
-        return response()->json(['error' => $e->getMessage()], 500);
-    }
-}
-
-
-    // User Login API
-    public function login(Request $request)
+    public function __construct(UserService $userService)
     {
-         try {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email',
-            'password' => 'required|string|min:8',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 400);
-        }
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
-        }
-
-        $token = $user->createToken('MyApp')->plainTextToken;
-        // $token = $user->createToken('MyApp')->plainTextToken;
-
-        return response()->json(['token' => $token, 'user' => $user], 200);
-         } catch (\Exception $e) {
-        return response()->json(['error' => $e->getMessage()], 500);
-    }
+        $this->userService = $userService;
     }
 
+    public function register(RegisterUserRequest $request)
+    {
+        try {
+            $result = $this->userService->register($request->validated());
+            return $this->success($result, 'User registered successfully.', 201);
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function login(LoginRequest $request)
+    {
+        try {
+            $identifier = $request->identifier();
+
+            $result = $this->userService->login($identifier, $request->password);
+
+
+            if (!$result) {
+                return $this->error('Invalid credentials.', 401);
+            }
+
+            return $this->success($result, 'Login successful');
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function checkUsernameAvailability(Request $request)
+    {
+        try {
+            $request->validate(['username' => 'required|string|max:50']);
+
+            if (!$this->userService->isUsernameAvailable($request->username)) {
+                return $this->error('Username is already taken.', 400);
+            }
+
+            return $this->success([], 'Username is available.');
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
+
+    // Add Logout
+    public function logout(Request $request)
+    {
+        try {
+            $this->userService->logout($request->user());
+            return $this->success([], 'Logged out successfully.');
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
+
+    // Add Update
+    public function update(UpdateUserRequest $request)
+    {
+        try {
+            $updatedUser = $this->userService->update($request->user(), $request->validated());
+            return $this->success(['user' => $updatedUser], 'Profile updated successfully.');
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
 }

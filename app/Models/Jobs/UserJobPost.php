@@ -9,6 +9,61 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property int $employer_id
+ * @property string $title
+ * @property string $slug
+ * @property string|null $company_name
+ * @property string|null $company_website
+ * @property string|null $company_logo
+ * @property string $description
+ * @property string|null $responsibilities
+ * @property string|null $requirements
+ * @property string|null $location
+ * @property string|null $country
+ * @property string $employment_type
+ * @property numeric|null $salary_min
+ * @property numeric|null $salary_max
+ * @property string $currency
+ * @property bool $is_remote
+ * @property string $status
+ * @property-read int|null $views_count
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Jobs\UserJobApplication> $applications
+ * @property-read int|null $applications_count
+ * @property-read User $employer
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\View> $views
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost filter(array $filters = [])
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereCompanyLogo($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereCompanyName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereCompanyWebsite($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereCountry($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereCurrency($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereEmployerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereEmploymentType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereIsRemote($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereLocation($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereRequirements($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereResponsibilities($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereSalaryMax($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereSalaryMin($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereSlug($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereTitle($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereUuid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserJobPost whereViewsCount($value)
+ * @mixin \Eloquent
+ */
 class UserJobPost extends Model
 {
     use HasFactory, AutoGeneratesUuid, HasViews;

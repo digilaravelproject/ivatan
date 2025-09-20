@@ -18,7 +18,6 @@ export default {
     },
 
     plugins: [forms],
-    plugins: [require("@tailwindcss/aspect-ratio")],
 
     // darkMode: "media",
     darkMode: "false",

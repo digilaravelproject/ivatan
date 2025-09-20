@@ -28,9 +28,9 @@ use App\Http\Controllers\Api\ViewController;
 /**
  * Public Routes (No authentication required)
  */
-Route::post('/register', [UserController::class, 'register']);
-Route::post('/login', [UserController::class, 'login']);
-
+Route::post('auth/register', [UserController::class, 'register']);
+Route::post('auth/login', [UserController::class, 'login']);
+Route::post('check-username', [UserController::class, 'checkUsernameAvailability']);
 
 /**
  * Versioned API Routes (v1)
@@ -44,6 +44,12 @@ Route::prefix('v1')->group(function () {
      */
     Route::middleware('auth:sanctum')->group(function () {
 
+        // ================================
+        // User Logout & Update
+        // ================================
+
+        Route::post('/auth/logout', [UserController::class, 'logout']);
+        Route::put('/auth/update', [UserController::class, 'update']);
         // ================================
         // Follow/Unfollow Routes
         // ================================

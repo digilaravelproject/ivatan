@@ -8,6 +8,42 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int|null $ad_package_id
+ * @property string $title
+ * @property string|null $description
+ * @property array<array-key, mixed>|null $media
+ * @property string $status
+ * @property Carbon|null $start_at
+ * @property Carbon|null $end_at
+ * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\AdImpression> $impressions
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read int|null $impressions_count
+ * @property-read \App\Models\AdPackage|null $package
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\AdPayment> $payments
+ * @property-read int|null $payments_count
+ * @property-read \App\Models\User $user
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad active()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereAdPackageId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereEndAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereImpressions($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereMedia($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereStartAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereTitle($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereUserId($value)
+ * @mixin \Eloquent
+ */
 class Ad extends Model
 {
     use HasFactory;

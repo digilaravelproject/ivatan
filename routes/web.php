@@ -24,7 +24,8 @@ Route::get('/', fn() => redirect('/admin'));
 Route::get('/admin', fn() => view('auth.login'));
 
 // Dashboard (User)
-Route::middleware(['auth', 'verified'])->get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+// Route::middleware(['auth', 'verified'])->get('/dashboard', fn() => view('dashboard'))->name('dashboard');
+Route::middleware(['auth', 'verified'])->get('/dashboard', fn() => redirect('/admin/dashboard'))->name('dashboard');
 
 // Authenticated User Profile
 Route::middleware('auth')->group(function () {
