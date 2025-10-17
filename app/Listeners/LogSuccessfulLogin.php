@@ -5,17 +5,17 @@ namespace App\Listeners;
 use Illuminate\Auth\Events\Login;
 use App\Services\ActivityService;
 use Illuminate\Support\Facades\Log;
+use App\Models\User;
 use Exception;
 
 class LogSuccessfulLogin
 {
-    protected $activity;
+    protected ActivityService $activity;
 
     /**
      * Create a new listener instance.
      *
-     * @param  \App\Services\ActivityService  $activity
-     * @return void
+     * @param  ActivityService  $activity
      */
     public function __construct(ActivityService $activity)
     {
@@ -23,29 +23,31 @@ class LogSuccessfulLogin
     }
 
     /**
-     * Handle the event.
+     * Handle the login event.
      *
-     * @param  \Illuminate\Auth\Events\Login  $event
-     * @return void
+     * @param  Login  $event
      */
-    public function handle(Login $event)
+    public function handle(Login $event): void
     {
+        /** @var User $user */
+        $user = $event->user;
+
         try {
             // Log the successful login activity
-            $this->activity->logLogin($event->user);
+            $this->activity->logLogin($user);
 
-            // Log additional information for debugging or monitoring purposes
+            // Log additional information
             Log::info('User logged in successfully.', [
-                'user_id' => $event->user->id,
-                'email' => $event->user->email,
+                'user_id'   => $user->id,
+                'email'     => $user->email,
                 'timestamp' => now(),
             ]);
         } catch (Exception $e) {
-            // Handle exceptions and log the error
-            Log::error('Failed to log successful login', [
-                'error' => $e->getMessage(),
-                'user_id' => $event->user->id ?? null,
-                'email' => $event->user->email ?? null,
+            // Log the exception details
+            Log::error('Failed to log successful login.', [
+                'error'     => $e->getMessage(),
+                'user_id'   => $user->id ?? null,
+                'email'     => $user->email ?? null,
                 'timestamp' => now(),
             ]);
         }

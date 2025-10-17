@@ -32,6 +32,7 @@ Route::post('auth/register', [UserController::class, 'register']);
 Route::post('auth/login', [UserController::class, 'login']);
 Route::post('check-username', [UserController::class, 'checkUsernameAvailability']);
 
+
 /**
  * Versioned API Routes (v1)
  */
