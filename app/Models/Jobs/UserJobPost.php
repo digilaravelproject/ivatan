@@ -3,6 +3,7 @@
 namespace App\Models\Jobs;
 
 use App\Models\User;
+use App\Models\View;
 use App\Traits\AutoGeneratesUuid;
 use App\Traits\HasViews;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -154,5 +155,11 @@ class UserJobPost extends Model
         }
 
         return $query;
+    }
+
+    // Define the views relationship
+    public function views()
+    {
+        return $this->morphMany(View::class, 'viewable');
     }
 }

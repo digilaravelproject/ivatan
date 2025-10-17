@@ -7,7 +7,7 @@ use App\Models\Ecommerce\UserOrder;
 use App\Models\Ecommerce\UserService;
 use App\Models\UserPost;
 use App\Policies\CommentPolicy;
-use App\Policies\PostPolicy;
+use App\Policies\UserPostPolicy;
 use App\Policies\OrderPolicy;
 use App\Policies\ServicePolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -23,7 +23,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        UserPost::class => PostPolicy::class,
+        UserPost::class => UserPostPolicy::class,
         UserOrder::class => OrderPolicy::class,
         UserService::class => ServicePolicy::class,
         Comment::class => CommentPolicy::class,

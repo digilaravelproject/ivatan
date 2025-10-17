@@ -33,6 +33,7 @@ Route::post('auth/login', [UserController::class, 'login']);
 Route::post('check-username', [UserController::class, 'checkUsernameAvailability']);
 
 
+
 /**
  * Versioned API Routes (v1)
  */
@@ -50,7 +51,10 @@ Route::prefix('v1')->group(function () {
         // ================================
 
         Route::post('/auth/logout', [UserController::class, 'logout']);
-        Route::put('/auth/update', [UserController::class, 'update']);
+        Route::post('/auth/update', [UserController::class, 'update']);
+        // Fetch User by Username
+        Route::get('users/{username}', [UserController::class, 'show']);
+
         // ================================
         // Follow/Unfollow Routes
         // ================================
@@ -84,7 +88,7 @@ Route::prefix('v1')->group(function () {
             // ================================
             // Reel Routes
             // ================================
-            Route::get('/reels',  'reels');
+            Route::post('/reels',  'reels');
         });
         // ================================
         // View Management Routes

@@ -7,24 +7,36 @@ use App\Http\Requests\StorePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\UserPost;
 use App\Services\LikeService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Response;
 use App\Jobs\ProcessMediaJob;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class UserPostController extends Controller
 {
-
-    public function index()
+    use AuthorizesRequests;
+    public function index(): AnonymousResourceCollection|JsonResponse
     {
-        $posts = UserPost::with(['user', 'media'])->latest()->paginate(20);
-        // return response()->json($posts);
-        return PostResource::collection($posts);
+        try {
+            $user = auth()->user();
+            $posts = UserPost::with(['user', 'media'])
+                ->visiblePosts($user)  // Visibility trait for posts
+                ->latest()
+                ->paginate(20);
+
+            return PostResource::collection($posts);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred while fetching posts.'], 500);
+        }
     }
+
     public function store(StorePostRequest $request): JsonResponse
     {
         try {
@@ -74,7 +86,16 @@ class UserPostController extends Controller
 
     public function show(UserPost $post): JsonResponse
     {
-        return response()->json($post->load('media', 'user'));
+        try {
+            // Check if the user is authorized to view the post
+            $this->authorize('view', $post);
+
+            // If authorized, return the post with associated media and user data
+            return response()->json($post->load('media', 'user'));
+        } catch (AuthorizationException $e) {
+            // If authorization fails, return a 404 Not Found response
+            return response()->json(['message' => 'Post not found.'], 404);
+        }
     }
 
     public function destroy(UserPost $post): JsonResponse
@@ -85,7 +106,7 @@ class UserPostController extends Controller
 
         return response()->json(['message' => 'Post deleted']);
     }
-    public function like($id, LikeService $likeService)
+    public function like($id, LikeService $likeService): JsonResponse
     {
         try {
             $post = UserPost::findOrFail($id);
@@ -100,7 +121,7 @@ class UserPostController extends Controller
         }
     }
 
-    public function unlike($id, LikeService $likeService)
+    public function unlike($id, LikeService $likeService): JsonResponse
     {
         try {
             $post = UserPost::findOrFail($id);
@@ -115,14 +136,18 @@ class UserPostController extends Controller
         }
     }
 
-    public function reels()
-{
-    $reels = UserPost::where('type', 'reel')
-        ->with('media','user')
-        ->latest()
-        ->paginate(20);
+    public function reels(): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $reels = UserPost::with(['user', 'media'])
+                ->visibleReels($user)  // Visibility trait for reels
+                ->latest()
+                ->paginate(20);
 
-    return PostResource::collection($reels);
-}
-
+            return PostResource::collection($reels);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred while fetching reels.'], 500);
+        }
+    }
 }

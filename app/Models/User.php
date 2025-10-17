@@ -129,12 +129,15 @@ use Laravel\Sanctum\HasApiTokens;
 use Laravel\Scout\Searchable;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Traits\HasRoles;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 
-class User extends Authenticatable
+class User extends Authenticatable implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
+    use InteractsWithMedia;
 
 
     /**
@@ -213,13 +216,20 @@ class User extends Authenticatable
 
     public function getProfilePhotoUrlAttribute()
     {
-        if ($this->profile_photo_path) {
-            return Storage::disk('s3')->url($this->profile_photo_path);
+        // First check if Spatie media exists
+        if ($this->hasMedia('profile_photo')) {
+            return $this->getFirstMediaUrl('profile_photo');
         }
 
-        // fallback default avatar
+        // Fallback to column (if you still use it)
+        if ($this->profile_photo_path) {
+            return Storage::disk(config('media-library.disk_name'))->url($this->profile_photo_path);
+        }
+
+        // Default avatar
         return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
     }
+
 
     public function posts()
     {
@@ -254,6 +264,25 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserChatMessage::class, 'sender_id');
     }
+
+    // Define the following relationship
+    public function following()
+    {
+        return $this->belongsToMany(User::class, 'followers', 'follower_id', 'following_id');
+    }
+
+    // Define the followers relationship (inverse)
+    public function followers()
+    {
+        return $this->belongsToMany(User::class, 'followers', 'following_id', 'follower_id');
+    }
+
+    // Define the isFollowing method to check if the user is following another user
+    public function isFollowing(User $user)
+    {
+        return $this->following()->where('following_id', $user->id)->exists();
+    }
+
 
     // This property will hold the cached unread count per instance
     protected ?int $cachedUnreadCount = null;

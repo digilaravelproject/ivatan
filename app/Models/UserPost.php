@@ -3,6 +3,7 @@
 
 namespace App\Models;
 
+use App\Traits\VisibilityTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,6 +11,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\MediaLibrary\MediaCollections\File;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * @property int $id
@@ -57,16 +59,20 @@ use Spatie\MediaLibrary\MediaCollections\File;
 class UserPost extends Model implements HasMedia
 {
     use HasFactory, InteractsWithMedia, SoftDeletes;
-
+    use VisibilityTrait;
 
     protected $fillable = [
         'uuid',
         'user_id',
         'type',
         'caption',
+        'like_count',
+        'comment_count',
         'status',
         'visibility',
+        'view_count',  // Include view_count here
     ];
+
 
     protected $casts = [
         'like_count' => 'integer',
@@ -173,6 +179,13 @@ class UserPost extends Model implements HasMedia
             ];
         });
     }
+
+    // Define the views relationship
+    public function views()
+    {
+        return $this->morphMany(View::class, 'viewable');
+    }
+
     /*
      |--------------------------------------------------------------------------
      | Optional: UUID Route Binding

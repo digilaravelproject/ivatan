@@ -78,4 +78,9 @@ class UserStory extends Model implements HasMedia
     {
         $this->addMediaCollection('stories')->useDisk('public')->singleFile();
     }
+    // Define the views relationship
+    public function views()
+    {
+        return $this->morphMany(View::class, 'viewable');
+    }
 }

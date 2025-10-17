@@ -90,4 +90,20 @@ class UserController extends Controller
             return $this->error($e->getMessage());
         }
     }
+    // Add Show User by Username
+    public function show($username)
+    {
+        try {
+            $user = $this->userService->findByUsername($username);
+
+            if (!$user) {
+                return $this->error('User not found.', 404);
+            }
+
+            return $this->success(['user' => $user], 'User details retrieved successfully.');
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
 }

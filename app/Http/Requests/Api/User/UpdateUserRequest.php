@@ -33,8 +33,10 @@ class UpdateUserRequest extends FormRequest
             'password' => 'sometimes|string|min:8',
             'date_of_birth' => 'sometimes|date',
             'occupation' => 'nullable|string|max:255',
+            'bio' => 'nullable|string|max:1000',
             'interests' => 'nullable|array',
             'interests.*' => 'string|max:255',
+            'profile_photo' => 'sometimes|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ];
     }
 }

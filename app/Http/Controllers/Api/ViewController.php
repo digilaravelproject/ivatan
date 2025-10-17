@@ -7,6 +7,7 @@ use App\Models\Jobs\UserJobPost;
 use App\Models\UserPost;
 use App\Models\UserStory;
 use App\Services\ViewTrackingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -20,7 +21,7 @@ class ViewController extends Controller
     }
 
 
-    public function track(Request $request, string $type, int $id)
+    public function track(Request $request, string $type, int $id): JsonResponse
     {
         try {
             // Map type → model
