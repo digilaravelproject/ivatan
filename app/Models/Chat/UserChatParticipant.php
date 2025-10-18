@@ -37,7 +37,11 @@ class UserChatParticipant extends Model
     protected $table = 'user_chat_participants';
 
     protected $fillable = [
-        'chat_id', 'user_id', 'is_admin', 'last_read_message_id', 'joined_at'
+        'chat_id',
+        'user_id',
+        'is_admin',
+        'last_read_message_id',
+        'joined_at'
     ];
 
     protected $casts = [

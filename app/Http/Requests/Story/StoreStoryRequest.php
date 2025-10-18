@@ -11,7 +11,7 @@ class StoreStoryRequest extends FormRequest
      */
     public function authorize(): bool
     {
-      return auth()->check();
+        return auth()->check();
     }
 
     /**
@@ -22,11 +22,10 @@ class StoreStoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-           'caption' => 'nullable|string|max:1000',          // text overlay / caption
-            'meta' => 'nullable|array',                       // e.g. {"text_style": {...}, "stickers": [...]}
+            'caption' => 'nullable|string|max:1000',        // text overlay / caption
+            'meta' => 'nullable|array',                     // additional meta data (stickers, filters, etc.)
             'media' => 'required|file|max:51200|mimetypes:image/jpeg,image/png,video/mp4,video/quicktime',
-            // optional: expires_at override (not recommended)
-            'expires_at' => 'nullable|date|after:now',
+            'expires_at' => 'nullable|date|after:now',      // story expiry time
         ];
     }
 }

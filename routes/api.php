@@ -50,7 +50,7 @@ Route::prefix('v1')->group(function () {
         // User Logout & Update
         // ================================
 
-        Route::post('/auth/logout', [UserController::class, 'logout']);
+        Route::delete('/auth/logout', [UserController::class, 'logout']);
         Route::post('/auth/update', [UserController::class, 'update']);
         // Fetch User by Username
         Route::get('users/{username}', [UserController::class, 'show']);
@@ -107,12 +107,15 @@ Route::prefix('v1')->group(function () {
             // Route::get('/{commentableType}/{commentableId}', [CommentController::class, 'index']);
             // Method 2
             Route::get('/{post}', [CommentController::class, 'postComments']);
-            // Post a new comment or reply
-            Route::post('/', [CommentController::class, 'store']);
+
             // Toggle like/unlike on a comment
-            Route::post('/{comment}/like', [CommentController::class, 'toggleLike']);
             // Delete comment
             Route::delete('/{comment}', [CommentController::class, 'destroy']);
+            Route::post('like/{comment}', [CommentController::class, 'toggleCommentLike']);
+            // Post a new comment or reply
+
+            // Route::post('/', [CommentController::class, 'store_old']);
+            Route::post('{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
         });
 
 
@@ -122,11 +125,11 @@ Route::prefix('v1')->group(function () {
          * Public Story Routes (No Authentication Required)
          * ================================
          */
-        Route::prefix('stories')->group(function () {
-            Route::get('/', [StoryController::class, 'index']); // Get all stories
-            Route::get('/{story}', [StoryController::class, 'show']); // Get single story by ID
-            Route::get('/user/{userId}', [StoryController::class, 'index']); // Get stories by user
-        });
+        // Route::prefix('stories')->group(function () {
+        //     Route::get('/', [StoryController::class, 'index']); // Get all stories
+        //     Route::get('/{story}', [StoryController::class, 'show']); // Get single story by ID
+        //     Route::get('/user/{userId}', [StoryController::class, 'index']); // Get stories by user
+        // });
 
 
         /**
@@ -135,22 +138,44 @@ Route::prefix('v1')->group(function () {
          * ================================
          */
 
-        Route::prefix('stories')->group(function () {
-            Route::post('/', [StoryController::class, 'store']); // Create a new story
-            Route::post('/{story}/like', [StoryController::class, 'like']); // Like a story
-            Route::delete('/{story}/like', [StoryController::class, 'unlike']); // Unlike a story
-            Route::get('me', [StoryController::class, 'myStories']); // Get logged-in user's stories
-        });
+
+        // Route::prefix('stories')->group(function () {
+        //     Route::post('/', [StoryController::class, 'store']); // Create a new story
+        //     Route::post('/{story}/like', [StoryController::class, 'like']); // Like a story
+        //     Route::delete('/{story}/like', [StoryController::class, 'unlike']); // Unlike a story
+        //     Route::get('me', [StoryController::class, 'myStories']); // Get logged-in user's stories
+        // });
 
         // ================================
         // Story Highlights Routes
         // ================================
-        Route::prefix('highlights')->group(function () {
-            Route::get('/', [StoryHighlightController::class, 'index']); // Get all highlights
-            Route::post('/', [StoryHighlightController::class, 'store']); // Create a new highlight
-            Route::post('/{id}/add', [StoryHighlightController::class, 'addStory']); // Add story to highlight
-            Route::post('/{id}/remove', [StoryHighlightController::class, 'removeStory']); // Remove story from highlight
-            Route::get('/{id}', [StoryHighlightController::class, 'show']); // Get a specific highlight
+        // Route::prefix('highlights')->group(function () {
+        //     Route::get('/', [StoryHighlightController::class, 'index']); // Get all highlights
+        //     Route::post('/', [StoryHighlightController::class, 'store']); // Create a new highlight
+        //     Route::post('/{id}/add', [StoryHighlightController::class, 'addStory']); // Add story to highlight
+        //     Route::post('/{id}/remove', [StoryHighlightController::class, 'removeStory']); // Remove story from highlight
+        //     Route::get('/{id}', [StoryHighlightController::class, 'show']); // Get a specific highlight
+        // });
+
+        Route::prefix('stories')->group(function () {
+            // Public Story Routes
+            Route::get('/', [StoryController::class, 'index']); // Get all stories
+            Route::get('/{story}', [StoryController::class, 'show']); // Get single story by ID
+            Route::get('/user/{userId}', [StoryController::class, 'index']); // Get stories by user
+            Route::post('/', [StoryController::class, 'store']); // Create a new story
+            Route::post('/{story}/like', [StoryController::class, 'like']); // Like a story
+            Route::delete('/{story}/like', [StoryController::class, 'unlike']); // Unlike a story
+            Route::get('me', [StoryController::class, 'myStories']); // Get logged-in user's stories
+
+
+            // Story Highlights Routes (Under stories prefix)
+            Route::prefix('highlights')->group(function () {
+                Route::get('/', [StoryHighlightController::class, 'index']); // Get all highlights
+                Route::post('/', [StoryHighlightController::class, 'store']); // Create a new highlight
+                Route::post('/{id}/add', [StoryHighlightController::class, 'addStory']); // Add story to highlight
+                Route::post('/{id}/remove', [StoryHighlightController::class, 'removeStory']); // Remove story from highlight
+                Route::get('/{id}', [StoryHighlightController::class, 'show']); // Get a specific highlight
+            });
         });
 
         // ================================================================================================================================
@@ -251,34 +276,52 @@ Route::prefix('v1')->group(function () {
 
 
 
-
         // ================================
         // Chats Routes
         // ================================
 
-        // 1. All chats (list of conversations user is part of)
-        Route::get('chats', [ChatController::class, 'index']);
+        Route::prefix('chats')->group(function () {
 
-        // 2. Create chats
-        Route::post('chats/private', [ChatController::class, 'openPrivate']); // create/open private chat
-        Route::post('chats/group', [ChatController::class, 'createGroup']);   // create group chat
+            /**
+             * 1. Chats - List of Conversations User is Part Of
+             */
+            Route::get('/', [ChatController::class, 'index']);  // All chats
 
-        // 3. Group participants management
-        Route::post('chats/{chat}/participants', [ChatController::class, 'addParticipants']);     // add members
-        Route::delete('chats/{chat}/participants/{userId}', [ChatController::class, 'removeParticipant']); // remove member
-        Route::post('chats/{chat}/leave', [ChatController::class, 'leave']); // leave group
+            /**
+             * 2. Create Chats
+             */
+            Route::post('private', [ChatController::class, 'openPrivate']); // Create/Open private chat
 
-        // 4. Messaging
-        Route::post('chats/messages', [ChatController::class, 'sendMessage']); // send new message
-        Route::get('chats/{chat}/messages', [ChatController::class, 'messages']); // get all messages in chat
+            // ================================
+            // Group Chat Routes
+            // ================================
+            Route::prefix('group')->group(function () {
+                /**
+                 * Group Participants Management
+                 */
+                Route::post('/', [ChatController::class, 'createGroup']);   // Create group chat
+                Route::post('{chat}/participants', [ChatController::class, 'addParticipants']);  // Add members to a group chat
+                Route::delete('{chat}/participants/{userId}', [ChatController::class, 'removeParticipant']); // Remove a member from group chat
+                Route::post('{chat}/leave', [ChatController::class, 'leaveOrRemove']); // User leaves the group chat
+            });
 
-        // 5. Read / Seen
-        Route::post('chats/read', [ChatController::class, 'markRead']); // mark messages as read
+            /**
+             * 3. Messaging
+             */
+            Route::post('{chat}/messages', [ChatController::class, 'sendMessage']); // Send a new message to a chat
+            Route::get('{chat}/messages', [ChatController::class, 'messages']); // Get all messages in a chat
 
-        // 6. Single chat details (optional)
-        Route::get('chats/{chat}', [ChatController::class, 'show'] ?? function () {
-            return response()->json(['message' => 'Implement show if needed'], 200);
+            /**
+             * 4. Read / Seen
+             */
+            Route::post('read/{chat}', [ChatController::class, 'markRead']); // Mark messages as read
+
+            /**
+             * 5. Single Chat Details (Optional)
+             */
+            Route::get('{chat}', [ChatController::class, 'show']);
         });
+
 
 
 

@@ -11,7 +11,7 @@ class CreatePrivateChatRequest extends FormRequest
      */
     public function authorize(): bool
     {
-         return auth()->check();
+        return auth()->check();
     }
 
     /**
@@ -22,7 +22,28 @@ class CreatePrivateChatRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'other_user_id' => 'required|integer|exists:users,id|different:'.auth()->id(),
+            'other_user_id' => [
+                'required',
+                'integer',
+                'exists:users,id',
+                'different:' . auth()->id(),
+                // Rule::notIn(BlockedUser::where('user_id', auth()->id())->pluck('blocked_user_id')->toArray()),
+            ],
+        ];
+    }
+    /**
+     * Get the custom validation messages.
+     *
+     * @return array
+     */
+    public function messages(): array
+    {
+        return [
+            'other_user_id.required' => 'The user ID of the person you want to chat with is required.',
+            'other_user_id.integer' => 'The user ID must be a valid integer.',
+            'other_user_id.exists' => 'The user you are trying to chat with does not exist.',
+            'other_user_id.different' => 'You cannot start a chat with yourself.',
+            'other_user_id.not_in' => 'You cannot start a chat with someone you have blocked.',
         ];
     }
 }

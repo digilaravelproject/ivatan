@@ -63,9 +63,13 @@ class UserStory extends Model implements HasMedia
         return $this->belongsTo(User::class);
     }
 
-    public function likes()
+    public function likes_old()
     {
         return $this->hasMany(UserStoryLike::class);
+    }
+    public function likes()
+    {
+        return $this->belongsToMany(User::class, 'user_story_likes', 'story_id', 'user_id');
     }
 
     public function highlights()

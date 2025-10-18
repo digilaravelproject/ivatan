@@ -11,10 +11,11 @@ class ViewTrackingService
 {
     public function track($model, Request $request): bool
     {
-        try {
-            $userId = Auth::id();
-            $ip = $request->ip();
+        // Initialize variables
+        $userId = Auth::id();  // Can be null for guests
+        $ip = $request->ip();  // Get the IP address
 
+        try {
             // Check for duplicate view
             if ($this->isDuplicateView($model, $userId, $ip)) {
                 return false;
@@ -28,6 +29,7 @@ class ViewTrackingService
 
             return true;
         } catch (\Exception $e) {
+            // Log the error details
             Log::error("View tracking failed: " . $e->getMessage(), [
                 'model' => $model,
                 'user_id' => $userId ?? 'guest',
@@ -65,5 +67,12 @@ class ViewTrackingService
         $model->increment('view_count');
         // Force reload to reflect updated view_count
         $model->refresh();
+    }
+    public function getUserLogs(int $userId, int $perPage = 15)
+    {
+        return \DB::table('activity_log')
+            ->where('causer_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
     }
 }

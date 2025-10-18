@@ -22,7 +22,7 @@ class MarkReadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'chat_id' => 'required|integer|exists:user_chats,id',
+            // 'chat_id' => 'required|integer|exists:user_chats,id',
             'last_read_message_id' => 'required|integer|exists:user_chat_messages,id',
         ];
     }

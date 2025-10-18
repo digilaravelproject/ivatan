@@ -72,7 +72,7 @@ class CommentController extends Controller
     }
 
     // ✅ Store comment or reply
-    public function store(StoreCommentRequest $request, CommentService $commentService): JsonResponse
+    public function store_old(StoreCommentRequest $request, CommentService $commentService): JsonResponse
     {
         $comment = $commentService->addComment($request->validated());
 
@@ -84,19 +84,86 @@ class CommentController extends Controller
     }
 
 
+    public function store(StoreCommentRequest $request, CommentService $commentService): JsonResponse
+    {
+        try {
+            // Validate if the required parameters exist in the route
+            $commentableType = $request->route('commentable_type');
+            $commentableId = $request->route('commentable_id');
+            $parentId = $request->route('parent_id') ?? null;
 
+            // Check if all the necessary parameters are provided
+            if (!$commentableType || !$commentableId) {
+                return response()->json([
+                    'message' => 'Commentable type or ID not found'
+                ], 404); // Return 404 if commentable_type or commentable_id is missing
+            }
+
+            // Check if parentId is invalid or not found
+            if ($parentId && !Comment::find($parentId)) {
+                return response()->json([
+                    'message' => 'Parent comment not found'
+                ], 404); // Return 404 if parent comment is not found
+            }
+
+            // Merging the validated request data with the route parameters
+            $data = array_merge($request->validated(), [
+                'commentable_type' => $commentableType,
+                'commentable_id' => $commentableId,
+                'parent_id' => $parentId,
+            ]);
+
+            // Create the comment using the merged data
+            $comment = $commentService->addComment($data);
+
+            // Return a JSON response with the created comment and related data
+            return response()->json([
+                'message' => 'Comment posted successfully',
+                'data' => $comment->load('user', 'replies', 'likes') // Include user, replies, and likes relationships
+            ], 201);
+        } catch (\Exception $e) {
+            // Handle unexpected exceptions and return a generic error message
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 400); // Return 400 for any other errors
+        }
+    }
+    // ✅ Like or unlike a comment
 
 
     public function toggleCommentLike(Comment $comment, LikeService $likeService): JsonResponse
     {
-        $result = $likeService->like($comment);
+        try {
+            // Check if the user has already liked the comment
+            if ($likeService->hasLiked($comment)) {
+                // If liked, unlike the comment
+                $likeService->unlike($comment);
+                $message = 'Unliked';
+                $liked = false;
+            } else {
+                // If not liked, like the comment
+                $likeService->like($comment);
+                $message = 'Liked';
+                $liked = true;
+            }
 
-        return response()->json([
-            'message' => $result['liked'] ? 'Liked' : 'Unliked',
-            'liked' => $result['liked'],
-            'likes_count' => $result['likes_count'],
-        ]);
+            // Get the updated like count
+            $likesCount = $likeService->likeCount($comment);
+
+            return response()->json([
+                'message' => $message,
+                'liked' => $liked,
+                'likes_count' => $likesCount,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'likes_count' => $likeService->likeCount($comment),
+            ], 400); // Handle errors (e.g., already liked, etc.)
+        }
     }
+
+
 
     // ✅ Delete a comment
     public function destroy(Comment $comment, CommentService $commentService): JsonResponse
