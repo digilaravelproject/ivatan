@@ -11,7 +11,7 @@ class CreateHighlightRequest extends FormRequest
      */
     public function authorize(): bool
     {
-           return auth()->check();
+        return auth()->check();
     }
 
     /**
@@ -22,8 +22,8 @@ class CreateHighlightRequest extends FormRequest
     public function rules(): array
     {
         return [
-           'title' => 'required|string|max:100',
-            'cover_media_id' => 'nullable|string',
+            'title' => 'required|string|max:100',
+            'cover_media' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ];
     }
 }

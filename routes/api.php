@@ -122,52 +122,18 @@ Route::prefix('v1')->group(function () {
 
         /**
          * ================================
-         * Public Story Routes (No Authentication Required)
-         * ================================
-         */
-        // Route::prefix('stories')->group(function () {
-        //     Route::get('/', [StoryController::class, 'index']); // Get all stories
-        //     Route::get('/{story}', [StoryController::class, 'show']); // Get single story by ID
-        //     Route::get('/user/{userId}', [StoryController::class, 'index']); // Get stories by user
-        // });
-
-
-        /**
-         * ================================
          * Authenticated Story Routes
          * ================================
          */
-
-
-        // Route::prefix('stories')->group(function () {
-        //     Route::post('/', [StoryController::class, 'store']); // Create a new story
-        //     Route::post('/{story}/like', [StoryController::class, 'like']); // Like a story
-        //     Route::delete('/{story}/like', [StoryController::class, 'unlike']); // Unlike a story
-        //     Route::get('me', [StoryController::class, 'myStories']); // Get logged-in user's stories
-        // });
-
-        // ================================
-        // Story Highlights Routes
-        // ================================
-        // Route::prefix('highlights')->group(function () {
-        //     Route::get('/', [StoryHighlightController::class, 'index']); // Get all highlights
-        //     Route::post('/', [StoryHighlightController::class, 'store']); // Create a new highlight
-        //     Route::post('/{id}/add', [StoryHighlightController::class, 'addStory']); // Add story to highlight
-        //     Route::post('/{id}/remove', [StoryHighlightController::class, 'removeStory']); // Remove story from highlight
-        //     Route::get('/{id}', [StoryHighlightController::class, 'show']); // Get a specific highlight
-        // });
-
         Route::prefix('stories')->group(function () {
             // Public Story Routes
             Route::get('/', [StoryController::class, 'index']); // Get all stories
-            Route::get('/{story}', [StoryController::class, 'show']); // Get single story by ID
-            Route::get('/user/{userId}', [StoryController::class, 'index']); // Get stories by user
+            Route::get('me', [StoryController::class, 'myStories']); // Get logged-in user's stories
+            Route::get('/{story}', [StoryController::class, 'show'])->where('story', '[0-9]+'); // Get single story by ID
+            Route::get('/user/{username}', [StoryController::class, 'getUserStories']); // Get stories by user
             Route::post('/', [StoryController::class, 'store']); // Create a new story
             Route::post('/{story}/like', [StoryController::class, 'like']); // Like a story
             Route::delete('/{story}/like', [StoryController::class, 'unlike']); // Unlike a story
-            Route::get('me', [StoryController::class, 'myStories']); // Get logged-in user's stories
-
-
             // Story Highlights Routes (Under stories prefix)
             Route::prefix('highlights')->group(function () {
                 Route::get('/', [StoryHighlightController::class, 'index']); // Get all highlights
