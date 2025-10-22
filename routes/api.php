@@ -136,11 +136,26 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{story}/like', [StoryController::class, 'unlike']); // Unlike a story
             // Story Highlights Routes (Under stories prefix)
             Route::prefix('highlights')->group(function () {
-                Route::get('/', [StoryHighlightController::class, 'index']); // Get all highlights
-                Route::post('/', [StoryHighlightController::class, 'store']); // Create a new highlight
-                Route::post('/{id}/add', [StoryHighlightController::class, 'addStory']); // Add story to highlight
-                Route::post('/{id}/remove', [StoryHighlightController::class, 'removeStory']); // Remove story from highlight
-                Route::get('/{id}', [StoryHighlightController::class, 'show']); // Get a specific highlight
+                // Get all highlights Logged-in users
+                Route::get('/', [StoryHighlightController::class, 'index']);
+
+                // Get highlights of a specific user
+                // If no user ID is provided, it may default to current user or all users depending on implementation
+                Route::get('/user/{user?}', [StoryHighlightController::class, 'getUserHighlights']);
+
+                // Create a new highlight for the authenticated user
+                Route::post('/', [StoryHighlightController::class, 'store']);
+
+                // Add a specific story to a highlight
+                // URL format: /highlights/{highlightId}/{storyId}/add
+                Route::post('/{highlightId}/{storyId}/add', [StoryHighlightController::class, 'addStory']);
+
+                // Remove a specific story from a highlight
+                // URL format: /highlights/{highlightId}/{storyId}/remove
+                Route::post('/{highlightId}/{storyId}/remove', [StoryHighlightController::class, 'removeStory']);
+
+                // Get detailed information for a specific highlight, including all its stories
+                Route::get('/{highlightId}', [StoryHighlightController::class, 'show']);
             });
         });
 

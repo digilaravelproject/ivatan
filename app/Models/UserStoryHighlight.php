@@ -23,7 +23,7 @@ class UserStoryHighlight extends Model implements HasMedia
 
     public function stories()
     {
-        return $this->belongsToMany(Story::class, 'highlight_story', 'highlight_id', 'story_id')->withTimestamps();
+        return $this->belongsToMany(UserStory::class, 'highlight_story', 'highlight_id', 'story_id')->withTimestamps();
     }
 
     public function registerMediaConversions(?Media $media = null): void
