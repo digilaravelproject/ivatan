@@ -175,7 +175,18 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'patch', 'post'], 'products/{product}', [UserProductController::class, 'update']);
             Route::delete('products/{product}', [UserProductController::class, 'destroy']);
         });
-
+        // ================================
+        // Services Routes
+        // ================================
+        Route::prefix('services')->group(function () {
+            // Seller services
+            Route::get('/', [UserServiceController::class, 'index']);
+            Route::get('{sellerId}/services', [UserServiceController::class, 'getSellerServices']);
+            Route::post('/', [UserServiceController::class, 'store']);
+            Route::get('/{serviceIdentifier}', [UserServiceController::class, 'show']);
+            Route::post('/{service}', [UserServiceController::class, 'update']);
+            Route::delete('/{service}', [UserServiceController::class, 'destroy']);
+        });
         // ================================
         // Cart Routes
         // ================================
@@ -221,17 +232,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/orders/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
         Route::post('/orders/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
 
-        // ================================
-        // Services Routes
-        // ================================
-        Route::prefix('services')->group(function () {
-            // Seller services
-            Route::get('/', [UserServiceController::class, 'index']);
-            Route::post('/', [UserServiceController::class, 'store']);
-            Route::get('/{service}', [UserServiceController::class, 'show']);
-            Route::post('/{service}', [UserServiceController::class, 'update']);
-            Route::delete('/{service}', [UserServiceController::class, 'destroy']);
-        });
+
 
         // ================================
         // Jobs Routes

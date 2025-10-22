@@ -58,6 +58,7 @@ class UserService extends Model
         'description',
         'price',
         'status',
+        'cover_image',
     ];
 
     protected $casts = [

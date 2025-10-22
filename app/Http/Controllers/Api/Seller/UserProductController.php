@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
@@ -157,6 +158,7 @@ class UserProductController extends Controller
      */
     public function store(StoreUserProductRequest $request): JsonResponse
     {
+        DB::beginTransaction();
         try {
             /** @var \Illuminate\Http\Request $request */
             $user = $request->user();
@@ -176,7 +178,7 @@ class UserProductController extends Controller
                 'seller_id'   => $user->id,
                 'title'       => $request->title,
                 'slug'        => $slug,
-                'description' => $request->description,
+                'description' => $request->description ?? null,
                 'price'       => $request->price,
                 'stock'       => $request->stock ?? 0,
                 'status'      => 'pending',
@@ -199,13 +201,15 @@ class UserProductController extends Controller
                     ]);
                 }
             }
-
+            // Commit the transaction after all operations are successful
+            DB::commit();
             return response()->json([
                 'success' => true,
                 'message' => 'Product created successfully.',
                 'data' => $product->load('images'),
             ], 201);
         } catch (\Throwable $e) {
+            DB::rollBack(); // Rollback in case of error
             \Log::error('Failed to store product', [
                 'user_id' => $request->user()?->id,
                 'error' => $e->getMessage(),
@@ -225,6 +229,7 @@ class UserProductController extends Controller
      */
     public function update(UpdateUserProductRequest $request, UserProduct $product): JsonResponse
     {
+        DB::beginTransaction();
         try {
             /** @var \Illuminate\Http\Request $request */
             $user = $request->user();
@@ -304,6 +309,8 @@ class UserProductController extends Controller
             // Reload the product from the database with the updated data
             $product->load(['images'])->refresh(); // This will load the images relation and refresh the model
 
+            // Commit the transaction after all operations are successful
+            DB::commit();
             // Send a response with the updated product details
             return response()->json([
                 'success' => true,
@@ -311,6 +318,7 @@ class UserProductController extends Controller
                 'data' => $product,
             ]);
         } catch (\Throwable $e) {
+            DB::rollBack(); // Rollback in case of error
             // Log error and return a failure response
             Log::error('Failed to update product', [
                 'user_id' => $request->user()?->id,
@@ -325,99 +333,6 @@ class UserProductController extends Controller
         }
     }
 
-    public function update_old(UpdateUserProductRequest $request, UserProduct $product): JsonResponse
-    {
-        try {
-            /** @var \Illuminate\Http\Request $request */
-            $user = $request->user();
-
-            // Check if the logged-in user is the seller of the product
-            if ($product->seller_id !== $user->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized access to product.',
-                ], 403);
-            }
-
-            // Only these fields are allowed to be updated
-            $updateFields = $request->only(['title', 'description', 'price', 'stock']);
-
-            // If the title is updated, generate a new unique slug
-            if (isset($updateFields['title'])) {
-                // Generate the base slug
-                $slugBase = Str::slug($updateFields['title']) . '-' . Str::random(8);
-                $slug = $slugBase;
-
-                // Check if the slug already exists and append random string if needed
-                while (UserProduct::where('slug', $slug)->exists()) {
-                    $slug = $slugBase . '-' . Str::random(4); // Add a random string if slug already exists
-                }
-
-                // Assign the unique slug to the product
-                $updateFields['slug'] = $slug;
-            }
-
-            // Perform the update on the product
-            $product->update($updateFields);
-
-            /** @var \Illuminate\Http\Request $request */
-            // Replace cover image if uploaded
-            if ($request->hasFile('cover_image')) {
-                // Delete old cover image
-                ImageHelper::deleteEcomImage($product->cover_image);
-
-                // Upload new cover image
-                $coverPath = ImageHelper::uploadEcomImage($request->file('cover_image'), $user->id, 'products/cover');
-                $product->update(['cover_image' => $coverPath]);
-            }
-
-            // Add new gallery images if any
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $img) {
-                    $galleryPath = ImageHelper::uploadEcomImage($img, $user->id, 'products/gallery');
-                    UserProductImage::create([
-                        'product_id' => $product->id,
-                        'image_path' => $galleryPath,
-                    ]);
-                }
-            }
-
-            // Remove selected gallery images if requested
-            if ($request->filled('remove_image_ids')) {
-                $ids = $request->input('remove_image_ids', []);
-                $images = UserProductImage::whereIn('id', $ids)
-                    ->where('product_id', $product->id)
-                    ->get();
-
-                foreach ($images as $img) {
-                    ImageHelper::deleteEcomImage($img->image_path);
-                    $img->delete();
-                }
-            }
-
-            // Reload the product from the database with the updated data
-            $product->load(['images'])->refresh(); // This will load the images relation and refresh the model
-
-            // Send a response with the updated product details
-            return response()->json([
-                'success' => true,
-                'message' => 'Product updated successfully.',
-                'data' => $product,
-            ]);
-        } catch (\Throwable $e) {
-            // Log error and return a failure response
-            Log::error('Failed to update product', [
-                'user_id' => $request->user()?->id,
-                'product_id' => $product->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update product. Please try again later.',
-            ], 500);
-        }
-    }
 
 
 
