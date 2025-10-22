@@ -194,9 +194,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/', [CartController::class, 'index']);            // View cart
             // Route::post('/add', [CartController::class, 'add']);          // Add item
             Route::post('/', [CartController::class, 'add']);          // Add item
-            Route::post('/update/{id}', [CartController::class, 'update']); // Update qty
-            Route::delete('/remove/{id}', [CartController::class, 'remove']); // Remove item
-            Route::delete('/clear', [CartController::class, 'clear']);    // Clear cart
+            Route::post('{id}', [CartController::class, 'update']); // Update qty
+            Route::delete('{id}', [CartController::class, 'remove']); // Remove item
+            Route::delete('/', [CartController::class, 'clear']);    // Clear cart
 
         });
 
