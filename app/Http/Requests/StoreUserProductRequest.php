@@ -3,55 +3,75 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
+
 
 class StoreUserProductRequest extends FormRequest
 {
     /**
-     * Determine if the user is authorized to make this request.
+     * Authorize only authenticated users who are sellers.
      */
     public function authorize(): bool
     {
-        return auth()->check() && auth()->user()->is_seller;
+        return Auth::check() && Auth::user()?->is_seller;
     }
 
     /**
-     * Get the validation rules that apply to the request.
+     * Define validation rules for product creation.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array|string>
      */
     public function rules(): array
     {
-        // Allowed mime types — only formats suitable for ecommerce product images
         $allowedImageMimes = ['jpeg', 'jpg', 'png', 'webp'];
 
         return [
-            'title'       => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'price'       => ['required', 'numeric', 'min:0'],
-            'stock'       => ['nullable', 'integer', 'min:0'],
+            'title'        => ['required', 'string', 'max:255'],
+            'description'  => ['nullable', 'string'],
+            'price'        => ['required', 'numeric', 'min:0'],
+            'stock'        => ['nullable', 'integer', 'min:0'],
 
-            'cover_image' => [
+            'cover_image'  => [
                 'nullable',
                 'file',
                 'mimes:' . implode(',', $allowedImageMimes),
-                'max:5120', // max 5MB
+                'max:5120', // 5MB
             ],
 
-            'images'     => ['nullable', 'array'],
-            'images.*'   => [
+            'images'       => ['nullable', 'array'],
+            'images.*'     => [
                 'file',
                 'mimes:' . implode(',', $allowedImageMimes),
-                'max:5120',
+                'max:5120', // 5MB per image
             ],
         ];
     }
+
+    /**
+     * Custom error messages for validation rules.
+     */
     public function messages(): array
     {
         return [
-            'cover_image.mimes' => 'Cover image must be a file of type: jpeg, jpg, png, or webp.',
-            'images.*.mimes'    => 'Each image must be a file of type: jpeg, jpg, png, or webp.',
-            'cover_image.max'   => 'Cover image size cannot exceed 5MB.',
-            'images.*.max'      => 'Each image size cannot exceed 5MB.',
+            'title.required'        => 'The product title is required.',
+            'title.string'          => 'The product title must be a valid string.',
+            'title.max'             => 'The title may not exceed 255 characters.',
+
+            'price.required'        => 'Please enter a price for the product.',
+            'price.numeric'         => 'The price must be a number.',
+            'price.min'             => 'The price must be at least 0.',
+
+            'stock.integer'         => 'Stock must be a whole number.',
+            'stock.min'             => 'Stock cannot be negative.',
+
+            'cover_image.file'      => 'The cover image must be a valid file.',
+            'cover_image.mimes'     => 'Cover image must be in jpeg, jpg, png, or webp format.',
+            'cover_image.max'       => 'Cover image must not exceed 5MB.',
+
+            'images.array'          => 'Images must be an array of files.',
+            'images.*.file'         => 'Each uploaded image must be a valid file.',
+            'images.*.mimes'        => 'Each image must be in jpeg, jpg, png, or webp format.',
+            'images.*.max'          => 'Each image must not exceed 5MB.',
         ];
     }
 }

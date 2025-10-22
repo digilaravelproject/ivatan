@@ -169,9 +169,10 @@ Route::prefix('v1')->group(function () {
         Route::prefix('seller')->group(function () {
             Route::post('/', [UserSellerController::class, 'toggleSelf']);
             Route::get('products', [UserProductController::class, 'index']);
+            Route::get('{sellerId}/products', [UserProductController::class, 'getSellerProducts']);
             Route::post('products', [UserProductController::class, 'store']);
-            Route::get('products/{product}', [UserProductController::class, 'show']);
-            Route::put('products/{product}', [UserProductController::class, 'update']);
+            Route::get('products/{productIdentifier}', [UserProductController::class, 'show']);
+            Route::match(['put', 'patch', 'post'], 'products/{product}', [UserProductController::class, 'update']);
             Route::delete('products/{product}', [UserProductController::class, 'destroy']);
         });
 
