@@ -12,7 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 
-class AdController extends Controller
+class AdController_old extends Controller
 {
     /**
      * Summary of adPackages

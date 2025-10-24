@@ -7,30 +7,30 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * Class StoreJobPostRequest
+ * Class UpdateJobPostRequest
  *
- * Handles validation and authorization for creating/updating job posts.
+ * Handles validation and authorization for updating existing job posts.
  *
- * @property string $title
+ * @property string|null $title
  * @property string|null $company_name
  * @property string|null $company_website
  * @property UploadedFile|null $company_logo
- * @property string $description
+ * @property string|null $description
  * @property string|null $responsibilities
  * @property string|null $requirements
  * @property string|null $location
  * @property string|null $country
- * @property string $employment_type
+ * @property string|null $employment_type
  * @property float|null $salary_min
  * @property float|null $salary_max
  * @property string|null $currency
- * @property bool $is_remote
+ * @property bool|null $is_remote
  * @property string|null $status
  *
  * @method UploadedFile|null file(string $key = null, $default = null)
  * @method bool hasFile(string $key)
  */
-class StoreJobPostRequest extends FormRequest
+class UpdateJobPostRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -48,21 +48,21 @@ class StoreJobPostRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'             => 'required|string|max:255',
-            'company_name'      => 'nullable|string|max:255',
-            'company_website'   => 'nullable|url|max:255',
-            'company_logo'      => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
-            'description'       => 'required|string',
-            'responsibilities'  => 'nullable|string',
-            'requirements'      => 'nullable|string',
-            'location'          => 'nullable|string|max:255',
-            'country'           => 'nullable|string|max:100',
-            'employment_type'   => 'required|in:full_time,part_time,contract,internship,freelance',
-            'salary_min'        => 'nullable|numeric|min:0',
-            'salary_max'        => 'nullable|numeric|min:0',
-            'currency'          => 'nullable|string|max:10',
-            'is_remote'         => 'boolean',
-            'status'            => 'nullable|in:draft,published,closed',
+            'title'             => 'sometimes|required|string|max:255',
+            'company_name'      => 'sometimes|nullable|string|max:255',
+            'company_website'   => 'sometimes|nullable|url|max:255',
+            'company_logo'      => 'sometimes|nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
+            'description'       => 'sometimes|required|string',
+            'responsibilities'  => 'sometimes|nullable|string',
+            'requirements'      => 'sometimes|nullable|string',
+            'location'          => 'sometimes|nullable|string|max:255',
+            'country'           => 'sometimes|nullable|string|max:100',
+            'employment_type'   => 'sometimes|required|in:full_time,part_time,contract,internship,freelance',
+            'salary_min'        => 'sometimes|nullable|numeric|min:0',
+            'salary_max'        => 'sometimes|nullable|numeric|min:0',
+            'currency'          => 'sometimes|nullable|string|max:10',
+            'is_remote'         => 'sometimes|boolean',
+            'status'            => 'sometimes|nullable|in:draft,published,closed',
         ];
     }
 
@@ -74,9 +74,9 @@ class StoreJobPostRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.required'            => 'The job title is required.',
+            'title.required'            => 'The job title is required when updating.',
             'title.string'              => 'The job title must be a valid string.',
-            'title.max'                 => 'The job title may not be greater than 255 characters.',
+            'title.max'                 => 'The job title may not exceed 255 characters.',
 
             'company_name.string'       => 'The company name must be a valid string.',
             'company_name.max'          => 'The company name may not exceed 255 characters.',
@@ -85,13 +85,13 @@ class StoreJobPostRequest extends FormRequest
             'company_website.max'       => 'The company website URL may not exceed 255 characters.',
 
             'company_logo.image'        => 'The company logo must be an image file.',
-            'company_logo.mimes'        => 'The company logo must be a file of type: jpeg, jpg, png, webp.',
+            'company_logo.mimes'        => 'The company logo must be one of: jpeg, jpg, png, webp.',
             'company_logo.max'          => 'The company logo size may not exceed 5MB.',
 
-            'description.required'      => 'Please provide a detailed job description.',
+            'description.required'      => 'The job description is required when updating.',
             'description.string'        => 'The job description must be valid text.',
 
-            'employment_type.required'  => 'Please select an employment type.',
+            'employment_type.required'  => 'The employment type is required when updating.',
             'employment_type.in'        => 'Invalid employment type selected.',
 
             'salary_min.numeric'        => 'Minimum salary must be a number.',

@@ -253,19 +253,21 @@ Route::prefix('v1')->group(function () {
             // JobPostController routes
             Route::controller(JobPostController::class)->group(function () {
                 Route::get('/', 'index');           // List all jobs
-                Route::get('{job}', 'show');        // Show single job
+                Route::get('{identifier}', 'show');        // Show single job
                 Route::post('/', 'store');          // Create new job
                 Route::put('{job}', 'update');      // Update job
                 Route::delete('{job}', 'destroy');  // Delete job
             });
 
+            Route::get('my/applications', [JobApplicationController::class, 'myApplications']); // List logged-in user's applications
+
             // JobApplicationController routes
             Route::controller(JobApplicationController::class)->group(function () {
-                Route::post('{job}/apply', 'apply');               // Apply to a job
+                Route::post('{jobId}/apply', 'apply');               // Apply to a job
                 Route::get('{job}/applications', 'listByJob');    // List applications for a job
                 Route::post('applications/{application}/status', 'updateStatus'); // Update application status
                 Route::get('applications/{application}/resume', 'downloadResume'); // Download resume
-                Route::get('my/applications', 'myApplications');  // List logged-in user's applications
+
             });
         });
 

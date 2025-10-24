@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Jobs;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class StoreJobApplicationRequest extends FormRequest
 {
@@ -11,20 +12,44 @@ class StoreJobApplicationRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth()->check() && !auth()->user()->is_employer;
+        // Only non-employers can apply
+        return Auth::check() && !Auth::user()->is_employer;
     }
 
     /**
      * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'job_id' => 'required|exists:user_job_posts,id',
             'cover_message' => 'nullable|string|max:2000',
-            'resume' => 'nullable|file|mimes:pdf,doc,docx|max:10240', // 10 MB
+            'resume' => 'required|file|mimes:pdf,doc,docx|max:10240', // 10 MB
+        ];
+    }
+
+    /**
+     * Custom validation messages
+     */
+    public function messages(): array
+    {
+        return [
+            'cover_message.string' => 'Cover message must be a valid text.',
+            'cover_message.max' => 'Cover message may not exceed 2000 characters.',
+            'resume.file' => 'The resume must be a valid file.',
+            'resume.required' => 'Resume is required.',
+            'resume.mimes' => 'Resume must be a PDF or Word document (doc, docx).',
+            'resume.max' => 'Resume size may not exceed 10 MB.',
+        ];
+    }
+
+    /**
+     * Attribute names for better error messages
+     */
+    public function attributes(): array
+    {
+        return [
+            'cover_message' => 'Cover Message',
+            'resume' => 'Resume',
         ];
     }
 }

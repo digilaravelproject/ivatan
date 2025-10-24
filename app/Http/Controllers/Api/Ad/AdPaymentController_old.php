@@ -9,7 +9,7 @@ use App\Services\AdPaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
-class AdPaymentController extends Controller
+class AdPaymentController_old extends Controller
 {
     /**
      * Get existing pending payment OR create a new Razorpay order if missing.
