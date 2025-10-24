@@ -18,10 +18,7 @@ class CheckoutService
 {
     public function checkout(array $data, $user)
     {
-        // In your CheckoutService
-        $cart = UserCart::with(['items.product', 'items.service'])->where('user_id', $user->id)->first();
-
-
+        $cart = UserCart::with(['items.userProduct', 'items.userService'])->where('user_id', $user->id)->first();
 
         if (!$cart || $cart->items->isEmpty()) {
             throw ValidationException::withMessages(['error' => 'Cart is empty.']);
@@ -37,11 +34,6 @@ class CheckoutService
                 // Calculate total
                 $lineTotal = bcmul((string) $ci->price, (string) $ci->quantity, 2);
                 $total = bcadd((string) $total, (string) $lineTotal, 2);
-
-                // Deduct stock if it's a product
-                if ($ci->item_type === 'user_products') {
-                    $this->deductProductStock($ci);
-                }
             }
 
             // Create order and save address
@@ -67,18 +59,15 @@ class CheckoutService
     private function validateItem($ci, &$priceChangedItems)
     {
         if ($ci->item_type === 'user_products') {
-            $product = $ci->product; // Use the relationship here
-
+            $product = UserProduct::withoutGlobalScopes()->lockForUpdate()->find($ci->item_id);
             if (!$product) {
                 throw new HttpException(404, "Product not found (ID: {$ci->item_id})");
             }
-
             if ($product->stock < $ci->quantity) {
                 throw ValidationException::withMessages([
                     'error' => "Insufficient stock for product: {$product->title}"
                 ]);
             }
-
             if ($product->price != $ci->price) {
                 $priceChangedItems[] = [
                     'type' => 'product',
@@ -89,16 +78,11 @@ class CheckoutService
                 ];
                 $ci->update(['price' => $product->price]);
             }
-
-            // Deduct product stock
-            $this->deductProductStock($ci);
         } elseif ($ci->item_type === 'user_services') {
-            $service = $ci->service; // Use the relationship here
-
+            $service = UserService::withoutGlobalScopes()->lockForUpdate()->find($ci->item_id);
             if (!$service) {
                 throw new HttpException(404, "Service not found (ID: {$ci->item_id})");
             }
-
             if ($service->price != $ci->price) {
                 $priceChangedItems[] = [
                     'type' => 'service',
@@ -115,39 +99,6 @@ class CheckoutService
             ]);
         }
     }
-
-
-    private function deductProductStock($ci)
-    {
-        if ($ci->item_type === 'user_products') {
-            // Fetch the latest product data with a row-level lock to prevent race conditions
-            $product = UserProduct::where('id', $ci->item_id)->lockForUpdate()->first();
-
-            DB::transaction(function () use ($ci, $product) {
-                if ($product) {
-                    \Log::info("Before deduction - Product ID: {$product->id}, Available Stock: {$product->stock}, Requested Quantity: {$ci->quantity}");
-
-                    // Check if the requested quantity is available
-                    if ($product->stock < $ci->quantity) {
-                        throw ValidationException::withMessages([
-                            'error' => "Not enough stock available for product: {$product->title}. Only {$product->stock} units available."
-                        ]);
-                    }
-
-                    // Deduct the stock if enough is available
-                    $product->decrement('stock', $ci->quantity);
-
-                    \Log::info("After deduction - Product ID: {$product->id}, New Stock: {$product->stock}");
-                } else {
-                    // If product is not found, throw a 404 error
-                    throw new HttpException(404, "Product not found (ID: {$ci->item_id})");
-                }
-            });
-        }
-    }
-
-
-
 
     private function createOrder($user, $total, $data)
     {
@@ -192,6 +143,7 @@ class CheckoutService
             ]);
         }
     }
+
 
     private function createPayment($order, $total, $paymentMethod)
     {

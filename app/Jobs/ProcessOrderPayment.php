@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
+use Razorpay\Api\Api;
+
 
 class ProcessOrderPayment implements ShouldQueue
 {
@@ -26,6 +28,13 @@ class ProcessOrderPayment implements ShouldQueue
     public string $razorpayOrderId;
     public string $razorpaySignature;
 
+    /** ✅ Job control properties */
+    public $timeout = 120; // Job fails if it runs more than 2 minutes
+    public $tries = 3;     // Retry up to 3 times before failing permanently
+
+    /**
+     * Create a new job instance.
+     */
     public function __construct(int $orderId, string $paymentId, string $razorpayOrderId, string $razorpaySignature)
     {
         $this->orderId = $orderId;
@@ -34,6 +43,9 @@ class ProcessOrderPayment implements ShouldQueue
         $this->razorpaySignature = $razorpaySignature;
     }
 
+    /**
+     * Execute the job.
+     */
     public function handle()
     {
         Log::info('ProcessOrderPayment job started', [
@@ -63,14 +75,19 @@ class ProcessOrderPayment implements ShouldQueue
                 if (!$payment) {
                     Log::error('Payment record not found or already processed', ['order_id' => $order->id]);
                 } else {
+                    // Get the current meta value and decode it to an array
+                    $currentMeta = json_decode($payment->meta, true) ?? [];
+                    // Add the new keys to the existing meta array
+                    $currentMeta['razorpay_order_id'] = $this->razorpayOrderId;
+                    $currentMeta['razorpay_signature'] = $this->razorpaySignature;
+
+                    // Update the payment record, keeping the existing meta values and adding new ones
                     $payment->update([
                         'status' => UserPayment::STATUS_SUCCESSFUL ?? 'successful',
                         'transaction_id' => $this->paymentId,
-                        'meta' => json_encode([
-                            'razorpay_order_id' => $this->razorpayOrderId,
-                            'razorpay_signature' => $this->razorpaySignature,
-                        ]),
+                        'meta' => json_encode($currentMeta),  // Re-encode the updated meta array
                     ]);
+
 
                     Log::info('Payment record updated successfully', ['payment_id' => $payment->id]);
                 }

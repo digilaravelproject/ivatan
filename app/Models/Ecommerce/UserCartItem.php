@@ -58,8 +58,21 @@ class UserCartItem extends Model
     // {
     //     return $this->belongsTo(UserProduct::class);
     // }
-    public function product()
+    public function product_old()
     {
         return $this->morphTo(UserProduct::class, 'item_type', 'item_id');
+    }
+    /**
+     * Get the product associated with the cart item.
+     * It checks item_type to decide whether to fetch product or service.
+     */
+    public function product()
+    {
+        return $this->belongsTo(UserProduct::class, 'item_id');  // Assuming 'item_id' is the column linking to 'user_products'
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(UserService::class, 'item_id');  // Assuming 'item_id' is the column linking to 'user_services'
     }
 }

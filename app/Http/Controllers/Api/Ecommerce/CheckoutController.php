@@ -19,6 +19,7 @@ class CheckoutController extends Controller
 
     public function checkout(CheckoutRequest $request)
     {
+        /** @var \Illuminate\Http\Request $request */
         $data = $request->validated();
         // $data = $request->all();
         $user = $request->user();

@@ -24,10 +24,14 @@ use Illuminate\Database\Eloquent\Model;
  */
 class UserCart extends Model
 {
-  protected $fillable = ['uuid', 'user_id'];
+    protected $fillable = ['uuid', 'user_id'];
 
-    public function items()
+    public function items_old()
     {
         return $this->hasMany(UserCartItem::class, 'cart_id');
+    }
+    public function items()
+    {
+        return $this->hasMany(UserCartItem::class, 'cart_id');  // Ensure the foreign key is 'cart_id'
     }
 }
