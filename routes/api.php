@@ -220,18 +220,29 @@ Route::prefix('v1')->group(function () {
         | Orders
         |--------------------------------------------------------------------------
         */
-        Route::get('/orders', [OrderController::class, 'index']);                // List user's orders
-        Route::get('/orders/{order}', [OrderController::class, 'show']);         // Show specific order
-        Route::delete('/orders/{order}', [OrderController::class, 'destroy']);   // Delete order (if allowed)
+        // Route::get('/orders', [OrderController::class, 'index']);                // List user's orders
+        // Route::get('/orders/{order}', [OrderController::class, 'show']);         // Show specific order
+        // Route::delete('/orders/{order}', [OrderController::class, 'destroy']);   // Delete order (if allowed)
 
-        /*
-        |--------------------------------------------------------------------------
-        | Shipping
-        |--------------------------------------------------------------------------
-        */
-        Route::get('/orders/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
-        Route::post('/orders/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
+        // /*
+        // |--------------------------------------------------------------------------
+        // | Shipping
+        // |--------------------------------------------------------------------------
+        // */
+        // Route::get('/orders/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
+        // Route::post('/orders/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
+        Route::prefix('orders')->group(function () {
 
+            // Orders routes
+            Route::get('/', [OrderController::class, 'index']);                // List user's orders
+            Route::get('/{order}', [OrderController::class, 'show']);         // Show specific order
+            Route::delete('/{order}', [OrderController::class, 'destroy']);   // Delete order (if allowed)
+
+            // Shipping routes
+            Route::get('/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
+            Route::post('/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
+
+        });
 
 
         // ================================

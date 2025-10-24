@@ -22,9 +22,11 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class UserPostController extends Controller
 {
     use AuthorizesRequests;
-    public function index(): AnonymousResourceCollection|JsonResponse
+    public function index(Request $request): AnonymousResourceCollection|JsonResponse
     {
+        /** @var \Illuminate\Http\Request $request */
         try {
+
             $user = auth()->user();
             $posts = UserPost::with(['user', 'media'])
                 ->visiblePosts($user)  // Visibility trait for posts
@@ -39,6 +41,7 @@ class UserPostController extends Controller
 
     public function store(StorePostRequest $request): JsonResponse
     {
+        /** @var \Illuminate\Http\Request $request */
         try {
             // Generate UUID
             $post = DB::transaction(function () use ($request) {
@@ -136,8 +139,9 @@ class UserPostController extends Controller
         }
     }
 
-    public function reels(): AnonymousResourceCollection|JsonResponse
+    public function reels(Request $request): AnonymousResourceCollection|JsonResponse
     {
+        /** @var \Illuminate\Http\Request $request */
         try {
             $user = auth()->user();
             $reels = UserPost::with(['user', 'media'])

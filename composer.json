@@ -76,6 +76,19 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "ide": [
+            "php artisan ide-helper:generate",
+            "php artisan ide-helper:models --nowrite",
+            "php artisan ide-helper:meta"
+        ],
+        "cache": [
+            "php artisan cache:clear",
+            "php artisan config:clear",
+            "php artisan route:clear",
+            "php artisan view:clear",
+            "php artisan event:clear",
+            "php artisan optimize:clear"
         ]
     },
     "extra": {

@@ -4,6 +4,7 @@ namespace App\Models\Ecommerce;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 
 /**
@@ -38,6 +39,7 @@ use Illuminate\Support\Str;
  */
 class UserOrder extends Model
 {
+    // use AuthorizesRequests;
     protected $table = 'user_orders';
     public const STATUS_PENDING = 'pending';
     public const STATUS_PROCESSING = 'processing';
