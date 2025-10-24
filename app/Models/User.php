@@ -264,6 +264,10 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->hasMany(UserChatMessage::class, 'sender_id');
     }
+    public function ads()
+    {
+        return $this->hasMany(Ad::class);
+    }
 
     // Define the following relationship
     public function following()

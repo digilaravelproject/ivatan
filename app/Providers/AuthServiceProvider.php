@@ -2,11 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\Ad;
 use App\Models\Chat\UserChat;
 use App\Models\Comment;
 use App\Models\Ecommerce\UserOrder;
 use App\Models\Ecommerce\UserService;
 use App\Models\UserPost;
+use App\Policies\AdPolicy;
 use App\Policies\ChatPolicy;
 use App\Policies\CommentPolicy;
 use App\Policies\UserPostPolicy;
@@ -30,6 +32,7 @@ class AuthServiceProvider extends ServiceProvider
         UserService::class => ServicePolicy::class,
         Comment::class => CommentPolicy::class,
         UserChat::class => ChatPolicy::class,
+        Ad::class => AdPolicy::class,
     ];
 
     /**

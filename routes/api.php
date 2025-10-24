@@ -248,23 +248,25 @@ Route::prefix('v1')->group(function () {
         // ================================
         // Jobs Routes
         // ================================
-        // JobPostController routes
-        Route::prefix('jobs')->controller(JobPostController::class)->group(function () {
-            Route::get('/', 'index');
-            Route::get('{job}', 'show');
-            Route::post('/', 'store');
-            Route::put('{job}', 'update');
-            Route::delete('{job}', 'destroy');
-        });
+        Route::prefix('jobs')->group(function () {
 
-        // JobApplicationController routes
-        Route::controller(JobApplicationController::class)->group(function () {
-            Route::post('jobs/apply', 'apply');
-            Route::get('jobs/{job}/applications', 'listByJob');
-            Route::post('applications/{application}/status', 'updateStatus');
-            Route::get('applications/{application}/resume', 'downloadResume');
-            // List logged-in user's applications (job seeker)
-            Route::get('/my/applications',  'myApplications');
+            // JobPostController routes
+            Route::controller(JobPostController::class)->group(function () {
+                Route::get('/', 'index');           // List all jobs
+                Route::get('{job}', 'show');        // Show single job
+                Route::post('/', 'store');          // Create new job
+                Route::put('{job}', 'update');      // Update job
+                Route::delete('{job}', 'destroy');  // Delete job
+            });
+
+            // JobApplicationController routes
+            Route::controller(JobApplicationController::class)->group(function () {
+                Route::post('{job}/apply', 'apply');               // Apply to a job
+                Route::get('{job}/applications', 'listByJob');    // List applications for a job
+                Route::post('applications/{application}/status', 'updateStatus'); // Update application status
+                Route::get('applications/{application}/resume', 'downloadResume'); // Download resume
+                Route::get('my/applications', 'myApplications');  // List logged-in user's applications
+            });
         });
 
 
@@ -335,27 +337,25 @@ Route::prefix('v1')->group(function () {
         // Ad Routes
         // ================================
         Route::prefix('ads')->group(function () {
+
+            // Ad routes
             Route::controller(AdController::class)->group(function () {
-                Route::get('/ad-packages', 'adPackages');           // POST /ads
-                Route::post('/', 'store');           // POST /ads
-                Route::get('{ad}', 'show');          // GET /ads/{ad}
+                Route::get('ad-packages', 'adPackages');      // GET /ads/ad-packages
+                Route::get('my', 'myAds');                    // GET /ads/my
+                Route::post('/', 'store');                    // POST /ads
+                Route::get('{ad}', 'show')->whereNumber('ad'); // GET /ads/{ad}
             });
 
+            // AdPayment routes under /ads prefix
             Route::controller(AdPaymentController::class)->group(function () {
                 Route::get('{ad}/pending-order', 'getPendingOrder');   // GET /ads/{ad}/pending-order
+                Route::post('payments/verify', 'verify');               // POST /ads/payments/verify
             });
 
-            Route::prefix('payments')->controller(AdPaymentController::class)->group(function () {
-                Route::post('verify', 'verify');       // POST /ads/payments/verify
-            });
-        });
-
-        Route::prefix('my')->controller(AdController::class)->group(function () {
-            Route::get('ads', action: 'myAds');               // GET /my/ads
-        });
-        // Fetch Ads
-        Route::prefix('ads')->controller(AdServingController::class)->group(function () {
-            Route::get('serve', 'serveAd'); // GET /api/ads/serve
+            // ================================
+            // Fetch Ads
+            // ================================
+            Route::get('serve', [AdServingController::class, 'serveAd']); // GET /api/ads/serve
         });
     });
 });

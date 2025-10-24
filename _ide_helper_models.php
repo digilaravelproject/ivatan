@@ -47,6 +47,10 @@ namespace App\Models{
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereUserId($value)
  * @mixin \Eloquent
+ * @property int|null $media_id
+ * @property int|null $interest_id
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereInterestId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereMediaId($value)
  */
 	class Ad extends \Eloquent {}
 }
@@ -685,6 +689,27 @@ namespace App\Models{
  * @mixin \Eloquent
  */
 	class Follower extends \Eloquent {}
+}
+
+namespace App\Models{
+/**
+ * @property int $id
+ * @property string $name
+ * @property string|null $description
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Ad> $ads
+ * @property-read int|null $ads_count
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Interest whereUpdatedAt($value)
+ */
+	class Interest extends \Eloquent {}
 }
 
 namespace App\Models{

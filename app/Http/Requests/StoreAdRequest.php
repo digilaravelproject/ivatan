@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class StoreAdRequest extends FormRequest
 {
@@ -11,7 +12,7 @@ class StoreAdRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth()->check();
+        return Auth::check();
     }
 
     /**
@@ -25,6 +26,10 @@ class StoreAdRequest extends FormRequest
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'ad_package_id' => 'required|exists:ad_packages,id',
+            'interest_id' => 'required|array|min:1',       // now array
+            'interest_id.*' => 'exists:interests,id',     // each id must exist
+            'start_type' => 'nullable|in:immediate,scheduled',
+            'start_at' => 'nullable|date|after_or_equal:today',
             'media' => 'nullable|array',
             'media.*' => 'file|mimes:jpg,jpeg,png,webp,mp4,mov|max:10240',
         ];

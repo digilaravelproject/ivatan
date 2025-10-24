@@ -12,11 +12,11 @@ use Illuminate\Http\Request;
 class JobApplicationController extends Controller
 {
     // Apply for a job
-    public function apply(StoreJobApplicationRequest $request)
+    public function apply(StoreJobApplicationRequest $request, $job)
     {
         $user = $request->user();
 
-        $job = UserJobPost::findOrFail($request->job_id);
+        $job = UserJobPost::findOrFail($job);
 
         // Prevent employer from applying
         if ($user->is_employer) {

@@ -43,4 +43,8 @@ class AdImpression extends Model
     {
         return $this->belongsTo(Ad::class);
     }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

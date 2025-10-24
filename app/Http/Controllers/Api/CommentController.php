@@ -86,6 +86,7 @@ class CommentController extends Controller
 
     public function store(StoreCommentRequest $request, CommentService $commentService): JsonResponse
     {
+        /** @var \Illuminate\Http\Request $request */
         try {
             // Validate if the required parameters exist in the route
             $commentableType = $request->route('commentable_type');

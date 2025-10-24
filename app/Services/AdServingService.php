@@ -1,98 +1,61 @@
 <?php
 
-
 namespace App\Services;
-
 
 use App\Models\Ad;
 use App\Models\AdImpression;
-use Illuminate\Support\Str;
-
+use Carbon\Carbon;
 
 class AdServingService
 {
     /**
-     * Get one ad to show for the user (simplified selection algorithm).
+     * Fetch one relevant ad for a user (or guest).
      */
-
     public function getAdForUser($user = null, ?string $ip = null): ?Ad
     {
-        // Start by building the base query: active ads with package having reach_limit > 0
-        $query = Ad::active()
-            ->with('package')
+        $now = Carbon::now();
+
+        // Base query: only active, scheduled ads within start & end date
+        $query = Ad::with(['package', 'interests'])
+            ->whereIn('status', ['live', 'approved'])
+            ->where('start_at', '<=', $now)
+            ->where('end_at', '>=', $now)
             ->whereHas('package', function ($q) {
                 $q->where('reach_limit', '>', 0);
             });
 
-        // Optional: Pre-filter by targeting in SQL if possible (only for basic stuff like country)
-        // We do full targeting filtering in PHP after retrieving a few random ads
-        $ads = $query->inRandomOrder()->take(10)->get(); // Fetch up to 10 random ads
+        // Interest targeting: match ad interests with user interests
+        if ($user && !empty($user->interests)) {
+            $userInterestIds = is_string($user->interests) ? json_decode($user->interests, true) : $user->interests;
 
-        $filteredAds = $ads->filter(function ($ad) use ($user) {
-            // Check reach limit
-            $reach = $ad->package?->reach_limit ?? 0;
-            if ($reach > 0 && $ad->impressions >= $reach) {
-                return false;
+            if (!empty($userInterestIds)) {
+                $query->whereHas('interests', function ($q) use ($userInterestIds) {
+                    $q->whereIn('interests.id', $userInterestIds);
+                });
             }
+        }
 
-            // Targeting logic
-            $targeting = $ad->package->targeting ?? [];
+        // Package targeting (user_ids or countries)
+        // if ($user) {
+        //     $query->whereHas('package', function ($q) use ($user) {
+        //         $q->where('reach_limit', '>', 0)
+        //             ->where(function ($q2) use ($user) {
+        //                 $q2->whereJsonContains('targeting->user_ids', $user->id)
+        //                     ->orWhereJsonContains('targeting->countries', $user->country ?? '')
+        //                     ->orWhereNull('targeting');
+        //             });
+        //     });
+        // }
 
-            // No targeting? Show ad to everyone
-            if (empty($targeting)) return true;
+        // Get 10 random ads and filter reach_limit in PHP to avoid DB complications
+        $ads = $query->inRandomOrder()->take(10)->get()
+            ->filter(fn($ad) => $ad->impressions < ($ad->package?->reach_limit ?? 0));
 
-            // Match user_ids
-            if (isset($targeting['user_ids']) && $user) {
-                if (!in_array($user->id, $targeting['user_ids'])) {
-                    return false;
-                }
-            }
-
-            // Match country
-            if (isset($targeting['countries']) && $user?->country) {
-                if (!in_array($user->country, $targeting['countries'])) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-
-        // Return a random one from valid options
-        return $filteredAds->isNotEmpty() ? $filteredAds->random() : null;
+        return $ads->isNotEmpty() ? $ads->random() : null;
     }
 
-
-    // public function getAdForUser($user = null, $ip = null): ?Ad
-    // {
-    //     // pick random live ad that still has impressions left
-    //     $ad = Ad::active()
-    //         ->with('package')
-    //         ->whereHas('package', function ($q) {
-    //             $q->where('reach_limit', '>', 0);
-    //         })
-    //         ->inRandomOrder()
-    //         ->first();
-
-
-    //     if (! $ad) {
-    //         return null;
-    //     }
-
-
-    //     // double-check reach limit
-    //     $reach = $ad->package?->reach_limit ?? 0;
-    //     if ($reach > 0 && $ad->impressions >= $reach) {
-    //         return null;
-    //     }
-
-
-    //     return $ad;
-    // }
-
-
     /**
-     * Record an impression once ad is actually shown to user.
+     * Record an impression for an ad
      */
     public function recordImpression(Ad $ad, $user = null, ?string $ip = null): AdImpression
     {
@@ -102,11 +65,26 @@ class AdServingService
             'ip_address' => $ip,
         ]);
 
-
-        // increment quick counter
+        // Increment quick counter
         $ad->increment('impressions');
 
+        // If reach_limit reached, mark ad as expired
+        if ($ad->package?->reach_limit && $ad->impressions >= $ad->package->reach_limit) {
+            $ad->status = 'expired';
+            $ad->save();
+        }
 
         return $impression;
+    }
+
+    /**
+     * Expire ads whose end date has passed
+     */
+    public function expireAds()
+    {
+        $now = Carbon::now();
+        Ad::where('status', 'live')
+            ->where('end_at', '<', $now)
+            ->update(['status' => 'expired']);
     }
 }

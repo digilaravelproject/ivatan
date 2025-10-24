@@ -7,6 +7,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property int $id
@@ -44,53 +46,53 @@ use Illuminate\Support\Carbon;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Ad whereUserId($value)
  * @mixin \Eloquent
  */
-class Ad extends Model
-{
-    use HasFactory;
 
+class Ad extends Model implements HasMedia
+{
+    use HasFactory, InteractsWithMedia;
 
     protected $fillable = [
         'user_id',
         'ad_package_id',
         'title',
         'description',
-        'media',
+        'media_ids', // remove 'media' if you want Spatie to handle it
         'status',
         'start_at',
         'end_at',
         'impressions',
     ];
 
-
     protected $casts = [
-        'media' => 'array',
         'start_at' => 'datetime',
         'end_at' => 'datetime',
+        'media_ids' => 'array',
     ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
     }
-
 
     public function package()
     {
         return $this->belongsTo(AdPackage::class, 'ad_package_id');
     }
 
-
     public function payments()
     {
         return $this->hasMany(AdPayment::class);
     }
-
 
     public function impressions()
     {
         return $this->hasMany(AdImpression::class);
     }
 
-
+    public function interests()
+    {
+        return $this->belongsToMany(Interest::class, 'ad_interest');
+    }
     public function scopeActive($query)
     {
         $now = Carbon::now();
