@@ -30,7 +30,7 @@ class RegisterUserRequest extends FormRequest
             'date_of_birth' => 'required|date',
             'occupation' => 'nullable|string|max:255',
             'interests' => 'nullable|array',
-            'interests.*' => 'string|max:255',
+            'interests.*' => 'exists:interests,id',
         ];
     }
 }

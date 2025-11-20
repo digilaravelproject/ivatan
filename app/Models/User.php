@@ -229,7 +229,10 @@ class User extends Authenticatable implements HasMedia
         // Default avatar
         return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
     }
-
+    public function interests()
+    {
+        return $this->belongsToMany(Interest::class, 'interest_user');
+    }
 
     public function posts()
     {

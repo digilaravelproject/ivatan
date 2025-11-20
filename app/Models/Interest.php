@@ -14,6 +14,11 @@ class Interest extends Model
         'description',
     ];
 
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'interest_user');
+    }
+
     public function ads()
     {
         return $this->hasMany(Ad::class);

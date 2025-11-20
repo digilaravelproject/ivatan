@@ -1,0 +1,14 @@
+{
+  "workspace": {
+    "id": "d8dbf6d1-fb54-452b-8fa7-20b76f9928ed"
+  },
+  "entities": {
+    "collections": [
+      "..\\postman\\collections\\I-Vatan API Collection 102025.postman_collection.json"
+    ],
+    "environments": [],
+    "specs": [],
+    "flows": [],
+    "globals": []
+  }
+}

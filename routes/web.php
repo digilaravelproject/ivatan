@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\Ecommerce\ProductController;
 use App\Http\Controllers\Admin\Ecommerce\ServiceController;
 use App\Http\Controllers\Admin\Ecommerce\AdminJobController;
 use App\Http\Controllers\Admin\Ecommerce\AdminApplicationController;
+use App\Http\Controllers\Admin\InterestController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\ProfileController;
@@ -48,7 +49,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::get('/chart/{type}/{days?}', 'chart')->name('chart');
         Route::get('/activity', 'activityFeed')->name('activityfeed');
     });
-
+    // ACreate interest routes
+    Route::resource('interests', InterestController::class)->only(['index', 'store', 'destroy']);
     // Admin Profile
     Route::controller(AdminProfileController::class)->prefix('profile')->name('profile.')->group(function () {
         Route::get('/', 'edit')->name('edit');

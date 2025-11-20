@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Ecommerce\CheckoutController;
 use App\Http\Controllers\Api\Ecommerce\PaymentController;
 use App\Http\Controllers\Api\Ecommerce\ShippingController;
 use App\Http\Controllers\Api\FollowController;
+use App\Http\Controllers\Api\InterestController;
 use App\Http\Controllers\Api\Jobs\JobApplicationController;
 use App\Http\Controllers\Api\Jobs\JobPostController;
 use App\Http\Controllers\Api\Seller\UserProductController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Api\ViewController;
 /**
  * Public Routes (No authentication required)
  */
+Route::get('interests', [InterestController::class, 'index']);
 Route::post('auth/register', [UserController::class, 'register']);
 Route::post('auth/login', [UserController::class, 'login']);
 Route::post('check-username', [UserController::class, 'checkUsernameAvailability']);

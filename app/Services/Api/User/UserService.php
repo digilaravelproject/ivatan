@@ -24,6 +24,9 @@ class UserService
         ]);
 
         $user->assignRole('user');
+        if (isset($data['interests']) && is_array($data['interests'])) {
+            $user->interests()->attach($data['interests']);
+        }
         $token = $user->createToken('MyApp')->plainTextToken;
 
         return compact('user', 'token');

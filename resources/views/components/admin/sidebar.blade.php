@@ -19,11 +19,22 @@
         </svg>
 
         <span>Users</span>
-        {{-- <span class="px-2 ml-auto text-xs text-white bg-red-500 rounded-full">{{ $summary['users_total'] ?? 0 }}</span> --}}
+        {{-- <span class="px-2 ml-auto text-xs text-white bg-red-500 rounded-full">{{ $summary['users_total'] ?? 0
+            }}</span> --}}
+    </a>
+    <a href="{{ route('admin.interests.index') }}"
+        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->is('admin/interests*')) bg-gray-700 text-white @endif transition-colors duration-300">
+        <!-- Users Icon -->
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+
+        <span>Interests Management</span>
+
     </a>
 
-    <a href="{{ route('admin.userpost.index') }}"
-        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
+    <a href="{{ route('admin.userpost.index') }}" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
         @if (request()->routeIs('admin.userpost.*') || request()->routeIs('admin.posts.*')) bg-gray-700 text-white @endif
         transition-colors duration-300">
 
@@ -47,8 +58,7 @@
 
         <span>Products</span>
     </a>
-    <a href="{{ route('admin.services.index') }}"
-        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
+    <a href="{{ route('admin.services.index') }}" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
    @if (request()->is('admin/services*')) bg-gray-700 text-white @endif
    transition-colors duration-300">
 
@@ -74,44 +84,45 @@
         <span>Jobs</span>
     </a>
 
-    {{-- <div x-data="{ open: {{ request()->routeIs('admin.ads.*') || request()->routeIs('admin.ad.ad-packages.*') ? 'true' : 'false' }} }" class="space-y-1"> --}}
-    <div x-data="{ open: false }" x-init="open = {{ request()->routeIs('admin.ads.*') || request()->routeIs('admin.ad.ad-packages.*') ? 'true' : 'false' }}" class="space-y-1">
+    {{-- <div
+        x-data="{ open: {{ request()->routeIs('admin.ads.*') || request()->routeIs('admin.ad.ad-packages.*') ? 'true' : 'false' }} }"
+        class="space-y-1"> --}}
+        <div x-data="{ open: false }"
+            x-init="open = {{ request()->routeIs('admin.ads.*') || request()->routeIs('admin.ad.ad-packages.*') ? 'true' : 'false' }}"
+            class="space-y-1">
 
-        <button @click="open = !open"
-            class="w-full flex items-center justify-between gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300
+            <button @click="open = !open"
+                class="w-full flex items-center justify-between gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300
         {{ request()->routeIs('admin.ads.*') || request()->routeIs('admin.ad.ad-packages.*') ? 'bg-gray-700 text-white' : '' }}">
-            <div class="flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M16 8V6a4 4 0 00-4-4H6a2 2 0 00-2 2v12a2 2 0 002 2h1l2 3v-3h5a4 4 0 004-4v-2" />
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M16 8V6a4 4 0 00-4-4H6a2 2 0 00-2 2v12a2 2 0 002 2h1l2 3v-3h5a4 4 0 004-4v-2" />
+                    </svg>
+
+                    <span>Ads Management</span>
+                </div>
+                <!-- Chevron Icon -->
+                <svg :class="{ 'rotate-90': open }" class="w-4 h-4 transition-transform transform" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
+            </button>
 
-                <span>Ads Management</span>
-            </div>
-            <!-- Chevron Icon -->
-            <svg :class="{ 'rotate-90': open }" class="w-4 h-4 transition-transform transform" fill="none"
-                stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-        </button>
-
-        <div x-show="open" x-collapse class="pl-6 space-y-1">
-            <a href="{{ route('admin.ads.index') }}"
-                class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+            <div x-show="open" x-collapse class="pl-6 space-y-1">
+                <a href="{{ route('admin.ads.index') }}" class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
             {{ request()->routeIs('admin.ads.index') ? 'bg-gray-700 text-white' : 'text-gray-500' }}">
-                All Ads
-            </a>
-            <a href="{{ route('admin.ads.pending') }}"
-                class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+                    All Ads
+                </a>
+                <a href="{{ route('admin.ads.pending') }}" class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
             {{ request()->routeIs('admin.ads.pending') ? 'bg-gray-700 text-white' : 'text-gray-500' }}">
-                Pending Approval
-            </a>
-            <a href="{{ route('admin.ad.ad-packages.index') }}"
-                class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+                    Pending Approval
+                </a>
+                <a href="{{ route('admin.ad.ad-packages.index') }}" class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
             {{ request()->routeIs('admin.ad.ad-packages.*') ? 'bg-gray-700 text-white' : 'text-gray-500' }}">
-                Ad Packages
-            </a>
+                    Ad Packages
+                </a>
+            </div>
         </div>
-    </div>
 
 </nav>
