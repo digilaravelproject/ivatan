@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Interest;
+use App\Models\InterestCategory;
 use App\Traits\ApiResponse;
 
 class InterestController extends Controller
@@ -12,9 +12,18 @@ class InterestController extends Controller
 
     public function index()
     {
-        // Change: Pass columns inside an array []
-        $interests = Interest::select(['id', 'name', 'description'])->get();
+        $categories = InterestCategory::with('interests:id,interest_category_id,name')
+            ->select('id', 'name')
+            ->get();
 
-        return $this->success($interests, 'Interests list fetched.');
+        // Convert to desired format
+        $data = $categories->map(function ($cat) {
+            return [
+                'category'  => $cat->name,
+                'interests' => $cat->interests->pluck('name')->toArray()
+            ];
+        });
+
+        return $this->success($data, "Interests grouped by category.");
     }
 }

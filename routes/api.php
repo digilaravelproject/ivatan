@@ -77,20 +77,20 @@ Route::prefix('v1')->group(function () {
         // Post Routes
         // ================================
         Route::prefix('posts')->controller(UserPostController::class)->group(function () {
-            Route::get('/', 'index');
-            Route::post('/', 'store'); // Create post
-            Route::get('/{post}', 'show'); // Show post details
-            Route::delete('/{post}', 'destroy'); // Delete post
 
-            // Like/Unlike a post
-            Route::post('/{id}/like', 'like');
-            Route::delete('/{id}/like', 'unlike');
+            // 1. Feeds (Algorithm Based)
+            Route::get('/', 'index');           // Mixed Feed
+            Route::get('/feed/images', 'postsFeed');  // Only Images/Text
+            Route::get('/feed/videos', 'videosFeed'); // Only Videos
+            Route::get('/feed/reels', 'reelsFeed');   // Only Reels
 
+            // 2. Post Operations
+            Route::post('/', 'store');
+            Route::get('/{post}', 'show');
+            Route::delete('/{post}', 'destroy');
 
-            // ================================
-            // Reel Routes
-            // ================================
-            Route::post('/reels',  'reels');
+            // 3. Toggle Like (Single Endpoint)
+            Route::post('/{id}/like', 'toggleLike');
         });
         // ================================
         // View Management Routes
@@ -280,46 +280,28 @@ Route::prefix('v1')->group(function () {
         // Chats Routes
         // ================================
 
-        Route::prefix('chats')->group(function () {
 
-            /**
-             * 1. Chats - List of Conversations User is Part Of
-             */
-            Route::get('/', [ChatController::class, 'index']);  // All chats
+        Route::prefix('chats')->controller(ChatController::class)->group(function () {
 
-            /**
-             * 2. Create Chats
-             */
-            Route::post('private', [ChatController::class, 'openPrivate']); // Create/Open private chat
+            // 1. Inbox & Single Chat
+            Route::get('/', 'index');                  // List all chats
+            Route::get('/{chat}', 'show')->whereNumber('chat'); // Chat details
 
-            // ================================
-            // Group Chat Routes
-            // ================================
+            // 2. Start Private Chat
+            Route::post('/private', 'openPrivate');    // Start/Open private chat
+
+            // 3. Group Management
             Route::prefix('group')->group(function () {
-                /**
-                 * Group Participants Management
-                 */
-                Route::post('/', [ChatController::class, 'createGroup']);   // Create group chat
-                Route::post('{chat}/participants', [ChatController::class, 'addParticipants']);  // Add members to a group chat
-                Route::delete('{chat}/participants/{userId}', [ChatController::class, 'removeParticipant']); // Remove a member from group chat
-                Route::post('{chat}/leave', [ChatController::class, 'leaveOrRemove']); // User leaves the group chat
+                Route::post('/', 'createGroup');       // Create group
+                Route::post('/{chat}/participants', 'addParticipants'); // Add members
+                Route::delete('/{chat}/participants/{userId}', 'removeParticipant'); // Remove member
+                Route::post('/{chat}/leave', 'leaveOrRemove'); // Leave or bulk remove
             });
 
-            /**
-             * 3. Messaging
-             */
-            Route::post('{chat}/messages', [ChatController::class, 'sendMessage']); // Send a new message to a chat
-            Route::get('{chat}/messages', [ChatController::class, 'messages']); // Get all messages in a chat
-
-            /**
-             * 4. Read / Seen
-             */
-            Route::post('read/{chat}', [ChatController::class, 'markRead']); // Mark messages as read
-
-            /**
-             * 5. Single Chat Details (Optional)
-             */
-            Route::get('{chat}', [ChatController::class, 'show']);
+            // 4. Messages & Interactions
+            Route::post('/{chat}/messages', 'sendMessage');  // Send message
+            Route::get('/{chat}/messages', 'messages');      // Get messages (Lazy load)
+            Route::post('/read/{chat}', 'markRead');         // Mark messages as read
         });
 
 

@@ -11,6 +11,7 @@ class UserService
 {
     public function register(array $data): array
     {
+        // 1. Create Basic User
         $user = User::create([
             'uuid' => Str::uuid(),
             'name' => $data['name'],
@@ -20,14 +21,21 @@ class UserService
             'password' => Hash::make($data['password']),
             'date_of_birth' => $data['date_of_birth'],
             'occupation' => $data['occupation'] ?? '',
-            'interests' => $data['interests'] ?? ['entertainment'],
+            // 'interests' column agar DB me nahi hai to yaha se hata sakte ho,
+            // pivot table niche handle ho rahi hai.
         ]);
 
         $user->assignRole('user');
+
+        // 2. Attach Interests (Many-to-Many)
         if (isset($data['interests']) && is_array($data['interests'])) {
             $user->interests()->attach($data['interests']);
         }
+
         $token = $user->createToken('MyApp')->plainTextToken;
+
+        // ✅ LOAD CATEGORY: Response me category name bhejne ke liye
+        $user->load('interests.category');
 
         return compact('user', 'token');
     }
@@ -48,6 +56,9 @@ class UserService
 
         $token = $user->createToken('MyApp')->plainTextToken;
 
+        // ✅ LOAD CATEGORY: Login ke time bhi full details bhejo
+        $user->load('interests.category');
+
         return compact('user', 'token');
     }
 
@@ -63,37 +74,26 @@ class UserService
 
     public function update(User $user, array $data): User
     {
-        \Log::info('Form Data:', $data);  // Check what data is being sent
+        \Log::info('Form Data:', $data);
         \Log::info('Has File?', ['has_file' => request()->hasFile('profile_photo')]);
-        if (isset($data['name'])) {
-            $user->name = $data['name'];
-        }
-        if (isset($data['email'])) {
-            $user->email = $data['email'];
-        }
-        if (isset($data['phone'])) {
-            $user->phone = $data['phone'];
-        }
-        if (isset($data['username'])) {
-            $user->username = $data['username'];
-        }
-        if (isset($data['password'])) {
-            $user->password = Hash::make($data['password']);
-        }
-        if (isset($data['date_of_birth'])) {
-            $user->date_of_birth = $data['date_of_birth'];
-        }
-        if (array_key_exists('occupation', $data)) {
-            $user->occupation = $data['occupation'] ?? '';
-        }
-        if (array_key_exists('bio', $data)) {
-            $user->bio = $data['bio'] ?? '';
-        }
-        if (array_key_exists('interests', $data)) {
-            $user->interests = $data['interests'] ?? ['entertainment'];
+
+        // Update basic fields
+        if (isset($data['name'])) $user->name = $data['name'];
+        if (isset($data['email'])) $user->email = $data['email'];
+        if (isset($data['phone'])) $user->phone = $data['phone'];
+        if (isset($data['username'])) $user->username = $data['username'];
+        if (isset($data['password'])) $user->password = Hash::make($data['password']);
+        if (isset($data['date_of_birth'])) $user->date_of_birth = $data['date_of_birth'];
+        if (array_key_exists('occupation', $data)) $user->occupation = $data['occupation'] ?? '';
+        if (array_key_exists('bio', $data)) $user->bio = $data['bio'] ?? '';
+
+        // ✅ UPDATE INTERESTS: Use sync() for pivot table
+        if (isset($data['interests']) && is_array($data['interests'])) {
+            // sync purane interests hata kar naye daal dega, jo update ke liye best hai
+            $user->interests()->sync($data['interests']);
         }
 
-
+        // Profile Photo Logic
         if (request()->hasFile('profile_photo')) {
             \Log::info('Request has file?', [
                 'hasFile' => request()->hasFile('profile_photo'),
@@ -104,32 +104,39 @@ class UserService
             $user->clearMediaCollection('profile_photo');
             \Log::info('Clearing old media for user: ' . $user->id);
 
-
             // Upload new one
             $media = $user
                 ->addMediaFromRequest('profile_photo')
                 ->usingFileName(time() . '_' . request()->file('profile_photo')->getClientOriginalName())
                 ->toMediaCollection('profile_photo', config('media-library.disk_name'));
 
-            // Save the URL to your profile_photo_path column
+            // Save the URL
             $user->profile_photo_path = $media->getUrl();
-            $user->save();
+
             \Log::info('Profile photo updated:', [
                 'user_id' => $user->id,
                 'media_url' => $media->getUrl(),
                 'disk' => config('media-library.disk_name'),
             ]);
         }
-        \Log::info('User profile updated:', ['user_id' => $user->id, 'updated_fields' => array_keys($data)]);
-        $user->save();
-        $user->refresh();
 
+        $user->save();
+
+        // ✅ REFRESH & LOAD: Naya data aur relationships wapas bhejo
+        $user->refresh();
+        $user->load('interests.category');
+
+        \Log::info('User profile updated:', ['user_id' => $user->id]);
 
         return $user;
     }
-    // Username
+
+    // Username Search
     public function findByUsername(string $username): ?User
     {
-        return User::where('username', $username)->first();
+        // ✅ EAGER LOAD: Public profile view par bhi categories dikhengi
+        return User::with('interests.category')
+            ->where('username', $username)
+            ->first();
     }
 }

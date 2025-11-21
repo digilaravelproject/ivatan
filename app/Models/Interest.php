@@ -12,6 +12,7 @@ class Interest extends Model
     protected $fillable = [
         'name',
         'description',
+        'interest_category_id',
     ];
 
     public function users()
@@ -22,5 +23,10 @@ class Interest extends Model
     public function ads()
     {
         return $this->hasMany(Ad::class);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(InterestCategory::class, 'interest_category_id');
     }
 }

@@ -50,7 +50,20 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::get('/activity', 'activityFeed')->name('activityfeed');
     });
     // ACreate interest routes
+    // Interest CRUD
     Route::resource('interests', InterestController::class)->only(['index', 'store', 'destroy']);
+
+    // Category Create
+    Route::post('interests/category', [InterestController::class, 'storeCategory'])
+        ->name('interests.category.store');
+
+    // Category Update
+    Route::put('interests/category/{category}', [InterestController::class, 'updateCategory'])
+        ->name('interests.category.update');
+
+    // Category Delete
+    Route::delete('interests/category/{category}', [InterestController::class, 'destroyCategory'])
+        ->name('interests.category.destroy');
     // Admin Profile
     Route::controller(AdminProfileController::class)->prefix('profile')->name('profile.')->group(function () {
         Route::get('/', 'edit')->name('edit');
