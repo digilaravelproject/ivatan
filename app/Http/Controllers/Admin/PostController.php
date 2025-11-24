@@ -10,102 +10,102 @@ use App\Models\Post;
 
 class PostController extends Controller
 {
-// app/Http/Controllers/PostController.php
+    // app/Http/Controllers/PostController.php
 
-public function showPostDetails($id)
-{
-    try {
-        // Fetch the post with related data (likes, comments, user)
-        $post = Post::with(['user', 'likes.user', 'comments.user'])
-            ->findOrFail($id);
+    public function showPostDetails($id)
+    {
+        try {
+            // Fetch the post with related data (likes, comments, user)
+            $post = Post::with(['user', 'likes.user', 'comments.user'])
+                ->findOrFail($id);
 
-        // Prepare the post data for the view
-        $postDetails = $this->preparePostDetails($post);
+            // Prepare the post data for the view
+            $postDetails = $this->preparePostDetails($post);
 
-        // Fetch the list of possible status and visibility options
-        $statuses = ['active', 'deleted', 'flagged'];
-        $visibilities = ['public', 'private', 'friends'];
+            // Fetch the list of possible status and visibility options
+            $statuses = ['active', 'deleted', 'flagged'];
+            $visibilities = ['public', 'private', 'friends'];
 
-        // Return the view with the post details
-        return view('admin.post.details', compact('postDetails', 'statuses', 'visibilities'));
-    } catch (\Exception $e) {
-        // Handle any exceptions and display a user-friendly error message
-        return back()->with('error', 'Post not found or an error occurred.');
+            // Return the view with the post details
+            return view('admin.post.details', compact('postDetails', 'statuses', 'visibilities'));
+        } catch (\Exception $e) {
+            // Handle any exceptions and display a user-friendly error message
+            return back()->with('error', 'Post not found or an error occurred.');
+        }
     }
-}
 
-// Method to handle updates (called when the admin updates status/visibility)
-public function updatePostDetails(Request $request, $id)
-{
-    $request->validate([
-        'status' => 'required|in:active,deleted,flagged',
-        'visibility' => 'required|in:public,private,friends',
-    ]);
+    // Method to handle updates (called when the admin updates status/visibility)
+    public function updatePostDetails(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:active,deleted,flagged',
+            'visibility' => 'required|in:public,private,friends',
+        ]);
 
-    try {
-        $post = Post::findOrFail($id);
-        $post->status = $request->status;
-        $post->visibility = $request->visibility;
-        $post->save();
+        try {
+            $post = Post::findOrFail($id);
+            $post->status = $request->status;
+            $post->visibility = $request->visibility;
+            $post->save();
 
-        return redirect()->route('admin.post.details', $id)->with('success', 'Post updated successfully.');
-    } catch (\Exception $e) {
-        return back()->with('error', 'Failed to update post.');
+            return redirect()->route('admin.post.details', $id)->with('success', 'Post updated successfully.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to update post.');
+        }
     }
-}
 
 
 
-private function preparePostDetails(Post $post)
-{
-    // Get total likes
-    $totalLikes = $post->likes()->count();
+    private function preparePostDetails(Post $post)
+    {
+        // Get total likes
+        $totalLikes = $post->likes()->count();
 
-    // Get total comments
-    $totalComments = $post->comments()->count();
+        // Get total comments
+        $totalComments = $post->comments()->count();
 
-    // Map likes to a more readable format
-    $likes = $post->likes->map(function ($like) {
-        return [
-            'user_id' => $like->user_id,
-            'username' => $like->user->name,
-            'profile_picture' => $like->user->profile_picture ?? asset('images/default-avatar.png'),
+        // Map likes to a more readable format
+        $likes = $post->likes->map(function ($like) {
+            return [
+                'user_id' => $like->user_id,
+                'username' => $like->user->name,
+                'profile_picture' => $like->user->profile_picture ?? asset('images/default-avatar.png'),
+            ];
+        });
+
+        // Map comments to a more readable format
+        $comments = $post->comments->map(function ($comment) {
+            return [
+                'comment_id' => $comment->id,
+                'content' => $comment->content,
+                'username' => $comment->user->name,
+                'profile_picture' => $comment->user->profile_picture ?? asset('images/default-avatar.png'),
+                'created_at' => $comment->created_at,
+            ];
+        });
+
+        // Check if the post has media (images or videos)
+        $media = [
+            'images' => isset($post->media_metadata['images']) ? $post->media_metadata['images'] : [],
+            'videos' => isset($post->media_metadata['videos']) ? $post->media_metadata['videos'] : []
         ];
-    });
 
-    // Map comments to a more readable format
-    $comments = $post->comments->map(function ($comment) {
+        // Return the formatted data
         return [
-            'comment_id' => $comment->id,
-            'content' => $comment->content,
-            'username' => $comment->user->name,
-            'profile_picture' => $comment->user->profile_picture ?? asset('images/default-avatar.png'),
-            'created_at' => $comment->created_at,
+            'post_id' => $post->id,
+            'caption' => $post->caption,
+            'media_metadata' => $media,
+            'type' => $post->type,
+            'status' => $post->status,
+            'visibility' => $post->visibility,
+            'created_at' => $post->created_at,
+            'total_likes' => $totalLikes,
+            'total_comments' => $totalComments,
+            'likes' => $likes,
+            'comments' => $comments,
+            'user' => $post->user,  // Pass the post's user for profile info
         ];
-    });
-
-    // Check if the post has media (images or videos)
-    $media = [
-        'images' => isset($post->media_metadata['images']) ? $post->media_metadata['images'] : [],
-        'videos' => isset($post->media_metadata['videos']) ? $post->media_metadata['videos'] : []
-    ];
-
-    // Return the formatted data
-    return [
-        'post_id' => $post->id,
-        'caption' => $post->caption,
-        'media_metadata' => $media,
-        'type' => $post->type,
-        'status' => $post->status,
-        'visibility' => $post->visibility,
-        'created_at' => $post->created_at,
-        'total_likes' => $totalLikes,
-        'total_comments' => $totalComments,
-        'likes' => $likes,
-        'comments' => $comments,
-        'user' => $post->user,  // Pass the post's user for profile info
-    ];
-}
+    }
 
 
 

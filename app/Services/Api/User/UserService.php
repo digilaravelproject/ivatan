@@ -5,39 +5,121 @@ namespace App\Services\Api\User;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
+/**
+ * Class UserService
+ * Business logic for User management (API & Admin).
+ */
 class UserService
 {
+    /**
+     * Update user profile with disk-agnostic storage handling.
+     *
+     * @param User $user
+     * @param array $data
+     * @return User
+     * @throws \Exception
+     */
+    public function update(User $user, array $data): User
+    {
+        DB::beginTransaction();
+        try {
+            Log::info("Starting profile update for User ID: {$user->id}");
+
+            // 1. Basic Fields Update
+            $fillable = ['name', 'email', 'phone', 'username', 'date_of_birth', 'occupation', 'bio'];
+            foreach ($fillable as $field) {
+                if (array_key_exists($field, $data)) {
+                    $user->$field = $data[$field];
+                }
+            }
+
+            // 2. Password Update
+            if (isset($data['password']) && !empty($data['password'])) {
+                $user->password = Hash::make($data['password']);
+            }
+
+            // 3. Interests Update
+            if (isset($data['interests']) && is_array($data['interests'])) {
+                $user->interests()->sync($data['interests']);
+            }
+
+            // 4. Profile Photo Handling
+            if (request()->hasFile('profile_photo')) {
+                $file = request()->file('profile_photo');
+
+                // Get default disk from .env (public OR s3)
+                $disk = config('filesystems.default', 'public');
+                Log::info("Uploading profile photo to disk: {$disk}");
+
+                // Remove old photo if exists and is NOT a URL
+                if ($user->profile_photo_path && !filter_var($user->profile_photo_path, FILTER_VALIDATE_URL)) {
+                    if (Storage::disk($disk)->exists($user->profile_photo_path)) {
+                        Storage::disk($disk)->delete($user->profile_photo_path);
+                    }
+                }
+
+                // Generate clean filename
+                $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+
+                // ✅ Store ONLY relative path (e.g., 'profile-photos/image.jpg')
+                $path = $file->storeAs('profile-photos', $filename, $disk);
+
+                $user->profile_photo_path = $path;
+
+                // Optional: Sync Spatie Media Library
+                $user->clearMediaCollection('profile_photo');
+                $user->addMedia($file)->toMediaCollection('profile_photo', $disk);
+            }
+
+            $user->save();
+            DB::commit();
+
+            $user->refresh();
+            $user->load('interests.category');
+
+            return $user;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("UserService Update Failed: " . $e->getMessage());
+            throw new \Exception("Failed to update profile. Please try again.");
+        }
+    }
+
     public function register(array $data): array
     {
-        // 1. Create Basic User
-        $user = User::create([
-            'uuid' => Str::uuid(),
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'],
-            'username' => $data['username'],
-            'password' => Hash::make($data['password']),
-            'date_of_birth' => $data['date_of_birth'],
-            'occupation' => $data['occupation'] ?? '',
-            // 'interests' column agar DB me nahi hai to yaha se hata sakte ho,
-            // pivot table niche handle ho rahi hai.
-        ]);
+        DB::beginTransaction();
+        try {
+            $user = User::create([
+                'uuid' => Str::uuid(),
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+                'username' => $data['username'],
+                'password' => Hash::make($data['password']),
+                'date_of_birth' => $data['date_of_birth'],
+                'occupation' => $data['occupation'] ?? '',
+            ]);
 
-        $user->assignRole('user');
+            $user->assignRole('user');
 
-        // 2. Attach Interests (Many-to-Many)
-        if (isset($data['interests']) && is_array($data['interests'])) {
-            $user->interests()->attach($data['interests']);
+            if (isset($data['interests']) && is_array($data['interests'])) {
+                $user->interests()->attach($data['interests']);
+            }
+
+            $token = $user->createToken('MyApp')->plainTextToken;
+            $user->load('interests.category');
+
+            DB::commit();
+            return compact('user', 'token');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Registration Failed: " . $e->getMessage());
+            throw $e;
         }
-
-        $token = $user->createToken('MyApp')->plainTextToken;
-
-        // ✅ LOAD CATEGORY: Response me category name bhejne ke liye
-        $user->load('interests.category');
-
-        return compact('user', 'token');
     }
 
     public function login(string $identifier, string $password): array|false
@@ -55,8 +137,6 @@ class UserService
         $user->save();
 
         $token = $user->createToken('MyApp')->plainTextToken;
-
-        // ✅ LOAD CATEGORY: Login ke time bhi full details bhejo
         $user->load('interests.category');
 
         return compact('user', 'token');
@@ -69,74 +149,17 @@ class UserService
 
     public function logout(User $user): void
     {
-        $user->currentAccessToken()->delete();
+        // ✅ Added Type Hint to fix Intelephense "Undefined method delete" error
+        /** @var \Laravel\Sanctum\PersonalAccessToken $token */
+        $token = $user->currentAccessToken();
+
+        if ($token) {
+            $token->delete();
+        }
     }
 
-    public function update(User $user, array $data): User
-    {
-        \Log::info('Form Data:', $data);
-        \Log::info('Has File?', ['has_file' => request()->hasFile('profile_photo')]);
-
-        // Update basic fields
-        if (isset($data['name'])) $user->name = $data['name'];
-        if (isset($data['email'])) $user->email = $data['email'];
-        if (isset($data['phone'])) $user->phone = $data['phone'];
-        if (isset($data['username'])) $user->username = $data['username'];
-        if (isset($data['password'])) $user->password = Hash::make($data['password']);
-        if (isset($data['date_of_birth'])) $user->date_of_birth = $data['date_of_birth'];
-        if (array_key_exists('occupation', $data)) $user->occupation = $data['occupation'] ?? '';
-        if (array_key_exists('bio', $data)) $user->bio = $data['bio'] ?? '';
-
-        // ✅ UPDATE INTERESTS: Use sync() for pivot table
-        if (isset($data['interests']) && is_array($data['interests'])) {
-            // sync purane interests hata kar naye daal dega, jo update ke liye best hai
-            $user->interests()->sync($data['interests']);
-        }
-
-        // Profile Photo Logic
-        if (request()->hasFile('profile_photo')) {
-            \Log::info('Request has file?', [
-                'hasFile' => request()->hasFile('profile_photo'),
-                'file' => request()->file('profile_photo'),
-            ]);
-
-            // Delete old photo
-            $user->clearMediaCollection('profile_photo');
-            \Log::info('Clearing old media for user: ' . $user->id);
-
-            // Upload new one
-            $media = $user
-                ->addMediaFromRequest('profile_photo')
-                ->usingFileName(time() . '_' . request()->file('profile_photo')->getClientOriginalName())
-                ->toMediaCollection('profile_photo', config('media-library.disk_name'));
-
-            // Save the URL
-            $user->profile_photo_path = $media->getUrl();
-
-            \Log::info('Profile photo updated:', [
-                'user_id' => $user->id,
-                'media_url' => $media->getUrl(),
-                'disk' => config('media-library.disk_name'),
-            ]);
-        }
-
-        $user->save();
-
-        // ✅ REFRESH & LOAD: Naya data aur relationships wapas bhejo
-        $user->refresh();
-        $user->load('interests.category');
-
-        \Log::info('User profile updated:', ['user_id' => $user->id]);
-
-        return $user;
-    }
-
-    // Username Search
     public function findByUsername(string $username): ?User
     {
-        // ✅ EAGER LOAD: Public profile view par bhi categories dikhengi
-        return User::with('interests.category')
-            ->where('username', $username)
-            ->first();
+        return User::with('interests.category')->where('username', $username)->first();
     }
 }
