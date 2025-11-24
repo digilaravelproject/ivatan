@@ -17,10 +17,17 @@ use App\Models\User;
 use App\Services\NotificationService;
 use App\Traits\ApiResponse;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
+/**
+ * Class ChatController
+ * Handles Chat Listing, Messaging, Group Management, and Real-time events.
+ */
 class ChatController extends Controller
 {
     use ApiResponse, AuthorizesRequests;
@@ -33,329 +40,213 @@ class ChatController extends Controller
     }
 
     /**
-     * 1. INBOX: List of Chats
-     * Optimized response: No duplication. Private chats use 'receiver' object. Groups use 'name'.
+     * Helper to get authenticated user.
      */
-    public function index(Request $request)
+    private function getAuthUser(): User
     {
-        $user = $request->user();
-
-        // Fetch chats where user is a participant
-        $chats = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
-            ->with([
-                'lastMessage.sender',
-                'participants.user:id,name,username,profile_photo_path,is_online,last_seen_at', // Fetch only specific user columns
-            ])
-            ->orderByDesc('last_message_at')
-            ->paginate(20);
-
-        // Transform data
-        $formattedChats = $chats->getCollection()->map(function ($chat) use ($user) {
-
-            $receiverData = null;
-            $chatName = null; // Only for groups
-            $chatImage = null; // Only for groups
-
-            // --- 1. Handle Chat Info ---
-            if ($chat->type === 'private') {
-                // Find the 'other' participant
-                $otherParticipant = $chat->participants->firstWhere('user_id', '!=', $user->id);
-                $otherUser = $otherParticipant ? $otherParticipant->user : null;
-
-                if ($otherUser) {
-                    $receiverData = [
-                        'id' => $otherUser->id,
-                        'name' => $otherUser->name,
-                        'username' => $otherUser->username,
-                        'avatar' => $otherUser->profile_photo_path, // Helper or accessor for full URL
-                        'is_online' => $otherUser->is_online ?? false,
-                    ];
-                }
-            } else {
-                // Group Chat
-                $chatName = $chat->name;
-                $chatImage = null; // Add logic if groups have avatars
-            }
-
-            // --- 2. Calculate Unread Count ---
-            $myParticipant = $chat->participants->firstWhere('user_id', $user->id);
-            $unreadCount = 0;
-
-            if ($myParticipant && $chat->lastMessage) {
-                $lastReadId = $myParticipant->last_read_message_id ?? 0;
-                if ($chat->lastMessage->id > $lastReadId) {
-                    $unreadCount = $chat->messages()->where('id', '>', $lastReadId)->count();
-                }
-            }
-
-            // --- 3. Format Last Message ---
-            $lastMsgData = null;
-            if ($chat->lastMessage) {
-                $senderName = ($chat->lastMessage->sender_id === $user->id)
-                    ? 'You'
-                    : ($chat->lastMessage->sender->name ?? 'Unknown');
-
-                $lastMsgData = [
-                    'content' => $chat->lastMessage->message_type === 'text'
-                        ? Str::limit($chat->lastMessage->content, 50)
-                        : '📷 Attachment',
-                    'type' => $chat->lastMessage->message_type,
-                    'created_at' => $chat->lastMessage->created_at,
-                    'time_ago' => $chat->lastMessage->created_at->diffForHumans(null, true, true), // Short format (e.g. 5m)
-                    'is_mine' => $chat->lastMessage->sender_id === $user->id,
-                    'sender_name' => $senderName,
-                ];
-            }
-
-            return [
-                'chat_id' => $chat->id,
-                'type' => $chat->type,
-
-                // Group Info (Null if private)
-                'group_name' => $chatName,
-                'group_image' => $chatImage,
-
-                // Private Chat Target (Null if group)
-                'receiver' => $receiverData,
-
-                // Common Data
-                'unread_count' => $unreadCount,
-                'last_message' => $lastMsgData,
-                'updated_at' => $chat->last_message_at,
-            ];
-        });
-
-        return $this->success([
-            'chats' => $formattedChats,
-            'pagination' => [
-                'current_page' => $chats->currentPage(),
-                'last_page' => $chats->lastPage(),
-                'has_more' => $chats->hasMorePages(),
-            ],
-        ], 'Inbox fetched.');
+        /** @var User $user */
+        $user = Auth::user();
+        return $user;
     }
 
     /**
-     * 2. SINGLE CHAT DETAILS
+     * List all chats (Inbox).
+     *
+     * @param Request $request
+     * @return JsonResponse
      */
-    public function show($chatId, Request $request)
+    public function index(Request $request): JsonResponse
     {
         try {
-            $chat = UserChat::with(['participants.user:id,name,username,profile_photo_path,is_online,last_seen_at'])->findOrFail($chatId);
-            $user = $request->user();
+            $user = $this->getAuthUser();
 
-            if (! $chat->participants->contains('user_id', $user->id)) {
-                return $this->error('Unauthorized', 403);
-            }
+            $chats = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
+                ->with([
+                    'lastMessage.sender',
+                    'participants.user:id,name,username,profile_photo_path,is_online,last_seen_at',
+                ])
+                ->orderByDesc('last_message_at')
+                ->paginate(20);
 
-            $participants = $chat->participants->map(function ($p) {
+            $formattedChats = $chats->getCollection()->map(function ($chat) use ($user) {
+                $receiverData = null;
+                $chatName = $chat->name;
+                $chatImage = null;
+
+                // Handle Private vs Group Display Info
+                if ($chat->type === 'private') {
+                    $otherParticipant = $chat->participants->firstWhere('user_id', '!=', $user->id);
+                    $otherUser = $otherParticipant ? $otherParticipant->user : null;
+
+                    if ($otherUser) {
+                        $receiverData = [
+                            'id' => $otherUser->id,
+                            'name' => $otherUser->name,
+                            'username' => $otherUser->username,
+                            'avatar' => $otherUser->profile_photo_path,
+                            'is_online' => (bool) $otherUser->is_online,
+                        ];
+                    }
+                }
+
+                // Calculate Unread Count
+                $myParticipant = $chat->participants->firstWhere('user_id', $user->id);
+                $unreadCount = 0;
+                if ($myParticipant && $chat->lastMessage) {
+                    $lastReadId = $myParticipant->last_read_message_id ?? 0;
+                    if ($chat->lastMessage->id > $lastReadId) {
+                        $unreadCount = $chat->messages()->where('id', '>', $lastReadId)->count();
+                    }
+                }
+
+                // Format Last Message
+                $lastMsgData = null;
+                if ($chat->lastMessage) {
+                    $lastMsgData = [
+                        'content' => $chat->lastMessage->message_type === 'text'
+                            ? Str::limit($chat->lastMessage->content, 50)
+                            : '📷 Attachment',
+                        'type' => $chat->lastMessage->message_type,
+                        'created_at' => $chat->lastMessage->created_at,
+                        'time_ago' => $chat->lastMessage->created_at->diffForHumans(null, true, true),
+                        'is_mine' => $chat->lastMessage->sender_id === $user->id,
+                    ];
+                }
+
                 return [
-                    'id' => $p->user->id,
-                    'name' => $p->user->name,
-                    'username' => $p->user->username,
-                    'avatar' => $p->user->profile_photo_path,
-                    'is_admin' => (bool) $p->is_admin,
-                    'is_online' => $p->user->is_online ?? false,
-                    'last_seen' => $p->user->last_seen_at,
+                    'chat_id' => $chat->id,
+                    'type' => $chat->type,
+                    'group_name' => $chatName,
+                    'receiver' => $receiverData,
+                    'unread_count' => $unreadCount,
+                    'last_message' => $lastMsgData,
+                    'updated_at' => $chat->last_message_at,
                 ];
             });
 
             return $this->success([
-                'id' => $chat->id,
-                'type' => $chat->type,
-                'name' => $chat->name, // Group name (null for private usually)
-                'participants' => $participants,
-                'participants_count' => $participants->count(),
-            ]);
+                'chats' => $formattedChats,
+                'pagination' => [
+                    'current_page' => $chats->currentPage(),
+                    'has_more' => $chats->hasMorePages(),
+                ],
+            ], 'Inbox fetched.');
         } catch (\Exception $e) {
-            return $this->error('Chat not found.', 404);
+            Log::error("Inbox Error: " . $e->getMessage());
+            return $this->error('Failed to load inbox.', 500);
         }
     }
 
     /**
-     * 3. START PRIVATE CHAT
+     * Fetch messages for a specific chat.
+     * Includes 'is_mine', 'status' (read/sent) and simplified sender info.
+     *
+     * @param UserChat $chat
+     * @param Request $request
+     * @return JsonResponse
      */
-    public function openPrivate(CreatePrivateChatRequest $request)
+    public function messages(UserChat $chat, Request $request): JsonResponse
     {
         try {
-            $user = $request->user();
-            $otherUserId = $request->other_user_id;
+            $user = $this->getAuthUser();
 
-            if ($user->id == $otherUserId) {
-                return $this->error('Cannot chat with yourself.', 422);
-            }
-
-            // A. Check Existing Chat
-            $chat = UserChat::where('type', 'private')
-                ->whereHas('participants', fn($q) => $q->where('user_id', $user->id))
-                ->whereHas('participants', fn($q) => $q->where('user_id', $otherUserId))
+            // 1. Authorization Check
+            $participant = UserChatParticipant::where('chat_id', $chat->id)
+                ->where('user_id', $user->id)
                 ->first();
 
-            if ($chat) {
-                // Load minimal participant data for response
-                $chat->load('participants.user:id,name,username,profile_photo_path');
-
-                return $this->success(['chat' => $chat], 'Chat retrieved.');
+            if (!$participant) {
+                return $this->error('Unauthorized.', 403);
             }
 
-            // B. PRIVACY CHECK
-            $otherUser = User::findOrFail($otherUserId);
+            // 2. Fetch Messages
+            $perPage = $request->query('per_page', 50);
+            $messages = $chat->messages()
+                ->with(['sender:id,name,username,profile_photo_path', 'replyTo'])
+                ->latest()
+                ->cursorPaginate($perPage);
 
-            if ($otherUser->account_privacy !== 'public') {
-                $isFollowing = DB::table('follows')
-                    ->where('follower_id', $user->id)
-                    ->where('following_id', $otherUserId)
-                    ->exists();
+            // 3. Auto Mark as Read Logic
+            $latestMessage = $chat->messages()->latest('id')->first();
+            if ($latestMessage && $latestMessage->id > $participant->last_read_message_id) {
+                $participant->last_read_message_id = $latestMessage->id;
+                $participant->save();
+                broadcast(new MessageRead($chat->id, $user->id, $latestMessage->id))->toOthers();
+            }
 
-                if (! $isFollowing) {
-                    return $this->error('This account is private. You must follow them to send a message.', 403);
+            // 4. Identify Other Participant (For Read Status logic in Private Chats)
+            $otherParticipant = null;
+            if ($chat->type === 'private') {
+                $otherParticipant = $chat->participants->where('user_id', '!=', $user->id)->first();
+            }
+
+            // 5. Transform Data
+            $formattedMessages = $messages->getCollection()->map(function ($msg) use ($user, $otherParticipant) {
+
+                // Determine Status (Blue Tick Logic)
+                $status = 'sent';
+                if ($otherParticipant && $otherParticipant->last_read_message_id >= $msg->id) {
+                    $status = 'read';
                 }
-            }
 
-            // C. Create Chat
-            DB::beginTransaction();
-            $chat = UserChat::create(['type' => 'private', 'last_message_at' => now()]);
+                return [
+                    'id' => $msg->id,
+                    'chat_id' => $msg->chat_id,
+                    'content' => $msg->content,
+                    'message_type' => $msg->message_type,
+                    'attachment_path' => $msg->attachment_path,
+                    'attachment_url' => $msg->attachment_path ? url('/storage/' . $msg->attachment_path) : null,
+                    'is_mine' => $msg->sender_id === $user->id, // Frontend uses this for alignment
+                    'status' => $status, // sent | read
+                    // 'meta' => $msg->meta,
+                    'created_at' => $msg->created_at,
+                    'sender' => [
+                        'id' => $msg->sender->id,
+                        'name' => $msg->sender->name,
+                        'avatar' => $msg->sender->profile_photo_path,
+                    ],
+                    'reply_to' => $msg->replyTo ? [
+                        'id' => $msg->replyTo->id,
+                        'content' => Str::limit($msg->replyTo->content, 30),
+                        'sender_name' => $msg->replyTo->sender->name ?? 'Unknown'
+                    ] : null
+                ];
+            });
 
-            UserChatParticipant::create(['chat_id' => $chat->id, 'user_id' => $user->id]);
-            UserChatParticipant::create(['chat_id' => $chat->id, 'user_id' => $otherUserId]);
-            DB::commit();
-
-            $chat->load('participants.user:id,name,username,profile_photo_path');
-
-            return $this->success(['chat' => $chat], 'Chat created.', 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return $this->error($e->getMessage(), 500);
-        }
-    }
-
-    /**
-     * 4. CREATE GROUP CHAT
-     */
-    public function createGroup(CreateGroupChatRequest $request)
-    {
-        DB::beginTransaction();
-        try {
-            $user = $request->user();
-            $chat = UserChat::create([
-                'type' => 'group',
-                'name' => $request->name,
-                'owner_id' => $user->id,
-                'last_message_at' => now(),
+            // 6. Return Clean JSON
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'data' => $formattedMessages,
+                    'next_cursor' => $messages->nextCursor() ? $messages->nextCursor()->encode() : null,
+                    'prev_cursor' => $messages->previousCursor() ? $messages->previousCursor()->encode() : null,
+                ]
             ]);
-
-            UserChatParticipant::create(['chat_id' => $chat->id, 'user_id' => $user->id, 'is_admin' => true]);
-
-            foreach ($request->member_ids as $id) {
-                if ($id != $user->id) {
-                    UserChatParticipant::firstOrCreate(['chat_id' => $chat->id, 'user_id' => $id]);
-                }
-            }
-            DB::commit();
-
-            return $this->success(['chat' => $chat->load('participants.user:id,name,username,profile_photo_path')], 'Group created.', 201);
         } catch (\Exception $e) {
-            DB::rollBack();
-
-            return $this->error('Failed to create group.', 500);
+            Log::error("Fetch Messages Error: " . $e->getMessage());
+            return $this->error('Failed to load messages.', 500);
         }
     }
 
     /**
-     * 5. ADD PARTICIPANTS
+     * Send a new message.
+     *
+     * @param SendMessageRequest $request
+     * @param UserChat $chat
+     * @return JsonResponse
      */
-    public function addParticipants(AddParticipantsRequest $request, UserChat $chat)
+    public function sendMessage(SendMessageRequest $request, UserChat $chat): JsonResponse
     {
-        $this->authorize('addParticipant', $chat);
-        if ($chat->type !== 'group') {
-            return $this->error('Not a group chat.');
-        }
-
-        $newIds = [];
-        foreach ($request->member_ids as $id) {
-            UserChatParticipant::firstOrCreate(['chat_id' => $chat->id, 'user_id' => $id]);
-            $newIds[] = $id;
-        }
-
-        $chat->load('participants.user:id,name,username,profile_photo_path');
-
-        return $this->success(['chat' => $chat, 'added_ids' => $newIds], 'Participants added.');
-    }
-
-    /**
-     * 6. REMOVE PARTICIPANT
-     */
-    public function removeParticipant(UserChat $chat, $userId, Request $request)
-    {
-        $user = $request->user();
-
-        $isOwner = $chat->owner_id === $user->id;
-        $isAdmin = UserChatParticipant::where('chat_id', $chat->id)
-            ->where('user_id', $user->id)
-            ->where('is_admin', true)
-            ->exists();
-
-        if (! $isOwner && ! $isAdmin) {
-            return $this->error('Unauthorized.', 403);
-        }
-        if ($userId == $chat->owner_id) {
-            return $this->error('Cannot remove owner.', 422);
-        }
-
-        UserChatParticipant::where('chat_id', $chat->id)->where('user_id', $userId)->delete();
-
-        return $this->success([], 'Participant removed.');
-    }
-
-    /**
-     * 7. LEAVE OR REMOVE
-     */
-    public function leaveOrRemove(UserChat $chat, Request $request)
-    {
-        $user = $request->user();
-        $action = $request->input('action');
-
-        if ($action === 'leave') {
-            if ($chat->owner_id === $user->id) {
-                return $this->error('Owner cannot leave. Transfer ownership first.');
-            }
-            UserChatParticipant::where('chat_id', $chat->id)->where('user_id', $user->id)->delete();
-
-            return $this->success([], 'You left the group.');
-        }
-
-        if ($action === 'remove') {
-            if ($chat->owner_id !== $user->id) {
-                return $this->error('Only owner can bulk remove.');
-            }
-            $ids = $request->input('member_ids', []);
-            if (empty($ids)) {
-                return $this->error('No members selected.');
-            }
-            UserChatParticipant::where('chat_id', $chat->id)->whereIn('user_id', $ids)->delete();
-
-            return $this->success([], 'Members removed.');
-        }
-
-        return $this->error('Invalid action.');
-    }
-
-    /**
-     * 8. SEND MESSAGE
-     */
-    public function sendMessage(SendMessageRequest $request, UserChat $chat)
-    {
-        $user = $request->user();
-
-        if (! $chat->participants()->where('user_id', $user->id)->exists()) {
-            return $this->error('Unauthorized.', 403);
-        }
-
         try {
+            $user = $this->getAuthUser();
+
+            if (!$chat->participants()->where('user_id', $user->id)->exists()) {
+                return $this->error('You are not a participant.', 403);
+            }
+
+            // Handle Attachment
             $attachmentPath = null;
             $meta = null;
-
             if ($request->hasFile('attachment')) {
                 $file = $request->file('attachment');
                 $name = Str::random(40) . '.' . $file->getClientOriginalExtension();
@@ -367,104 +258,139 @@ class ChatController extends Controller
                 ];
             }
 
+            // Create Message
             $message = UserChatMessage::create([
                 'chat_id' => $chat->id,
                 'sender_id' => $user->id,
-                'content' => $request->content,
-                'message_type' => $request->message_type ?? 'text',
+                'content' => $request->input('content'),
+                'message_type' => $request->input('message_type', 'text'),
                 'attachment_path' => $attachmentPath,
                 'meta' => $meta,
-                'reply_to_message_id' => $request->reply_to_message_id,
+                'reply_to_message_id' => $request->input('reply_to_message_id'),
                 'delivered_at' => now(),
             ]);
 
             $chat->touch('last_message_at');
 
+            // Broadcast & Notify
             broadcast(new MessageSent($message))->toOthers();
             $this->sendNotifications($chat, $message, $user);
 
-            return $this->success(['message' => $message], 'Message sent.', 201);
-        } catch (\Exception $e) {
-            \Log::error($e);
+            // Format Response to match listing structure
+            $message->load('sender:id,name,username,profile_photo_path');
 
+            return $this->success([
+                'message' => [
+                    'id' => $message->id,
+                    'content' => $message->content,
+                    'is_mine' => true,
+                    'status' => 'sent',
+                    'created_at' => $message->created_at,
+                    'attachment_url' => $message->attachment_path ? url('/storage/' . $message->attachment_path) : null,
+                    'sender' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'avatar' => $user->profile_photo_path
+                    ]
+                ]
+            ], 'Message sent.', 201);
+        } catch (\Exception $e) {
+            Log::error("Send Message Error: " . $e->getMessage());
             return $this->error('Failed to send message.', 500);
         }
     }
 
     /**
-     * 9. FETCH MESSAGES
+     * Start or Retrieve a Private Chat.
+     *
+     * @param CreatePrivateChatRequest $request
+     * @return JsonResponse
      */
-    public function messages(UserChat $chat, Request $request)
+    public function openPrivate(CreatePrivateChatRequest $request): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $user = $this->getAuthUser();
+            $otherUserId = $request->input('other_user_id');
 
-        if (! $chat->participants()->where('user_id', $user->id)->exists()) {
-            return $this->error('Unauthorized.', 403);
+            if ($user->id == $otherUserId) return $this->error('Cannot chat with yourself.', 422);
+
+            // Check Existing
+            $chat = UserChat::where('type', 'private')
+                ->whereHas('participants', fn($q) => $q->where('user_id', $user->id))
+                ->whereHas('participants', fn($q) => $q->where('user_id', $otherUserId))
+                ->first();
+
+            if ($chat) return $this->success(['chat' => $chat], 'Chat retrieved.');
+
+            // Create New
+            DB::beginTransaction();
+            $chat = UserChat::create(['type' => 'private', 'last_message_at' => now()]);
+            UserChatParticipant::create(['chat_id' => $chat->id, 'user_id' => $user->id]);
+            UserChatParticipant::create(['chat_id' => $chat->id, 'user_id' => $otherUserId]);
+            DB::commit();
+
+            return $this->success(['chat' => $chat], 'Chat created.', 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Open Private Error: " . $e->getMessage());
+            return $this->error('Failed to initiate chat.', 500);
         }
-
-        $perPage = $request->query('per_page', 50);
-
-        $messages = $chat->messages()
-            ->with(['sender:id,name,username,profile_photo_path', 'replyTo'])
-            ->latest()
-            ->cursorPaginate($perPage);
-
-        $other = $chat->type === 'private'
-            ? $chat->participants->firstWhere('user_id', '!=', $user->id)
-            : null;
-
-        $messages->getCollection()->transform(function ($msg) use ($other) {
-            $msg->attachment_url = $msg->attachment_path ? url('/storage/' . $msg->attachment_path) : null;
-            $msg->status = ($other && $other->last_read_message_id >= $msg->id) ? 'read' : 'sent';
-
-            return $msg;
-        });
-
-        return $this->success($messages, 'Messages fetched.');
     }
 
     /**
-     * 10. MARK READ
+     * Mark messages as read manually (Socket Trigger).
+     *
+     * @param MarkReadRequest $request
+     * @param UserChat $chat
+     * @return JsonResponse
      */
-    public function markRead(MarkReadRequest $request, UserChat $chat)
+    public function markRead(MarkReadRequest $request, UserChat $chat): JsonResponse
     {
-        $user = $request->user();
-        $lastId = $request->last_read_message_id;
+        try {
+            $user = $this->getAuthUser();
+            $lastId = $request->input('last_read_message_id');
 
-        $participant = UserChatParticipant::where('chat_id', $chat->id)
-            ->where('user_id', $user->id)
-            ->first();
+            $participant = UserChatParticipant::where('chat_id', $chat->id)
+                ->where('user_id', $user->id)
+                ->first();
 
-        if (! $participant) {
-            return $this->error('Unauthorized.', 403);
+            if ($participant && $lastId > $participant->last_read_message_id) {
+                $participant->last_read_message_id = $lastId;
+                $participant->save();
+                broadcast(new MessageRead($chat->id, $user->id, $lastId))->toOthers();
+            }
+
+            return $this->success([], 'Marked as read.');
+        } catch (\Exception $e) {
+            return $this->error('Failed to mark read.', 500);
         }
-
-        if ($lastId > $participant->last_read_message_id) {
-            $participant->last_read_message_id = $lastId;
-            $participant->save();
-            broadcast(new MessageRead($chat->id, $user->id, $lastId))->toOthers();
-        }
-
-        return $this->success([], 'Marked as read.');
     }
 
+    /**
+     * Send notifications to other participants.
+     */
     protected function sendNotifications($chat, $message, $sender)
     {
-        $recipients = $chat->participants()
-            ->where('user_id', '!=', $sender->id)
-            ->pluck('user_id');
+        try {
+            $recipients = $chat->participants()
+                ->where('user_id', '!=', $sender->id)
+                ->pluck('user_id');
 
-        $users = User::whereIn('id', $recipients)->get();
+            $users = User::whereIn('id', $recipients)->get();
 
-        foreach ($users as $user) {
-            try {
-                $this->notificationService->sendToUser($user, 'chat_message', [
-                    'chat_id' => $chat->id,
-                    'sender_name' => $sender->name,
-                    'content' => $message->message_type === 'text' ? $message->content : 'Attachment',
-                ]);
-            } catch (\Throwable $e) {
+            foreach ($users as $user) {
+                try {
+                    $this->notificationService->sendToUser($user, 'chat_message', [
+                        'chat_id' => $chat->id,
+                        'sender_name' => $sender->name,
+                        'content' => $message->message_type === 'text' ? $message->content : 'Attachment',
+                    ]);
+                } catch (\Throwable $t) {
+                    Log::warning("Notification failed for user {$user->id}: " . $t->getMessage());
+                }
             }
+        } catch (\Exception $e) {
+            Log::error("Notification Service Error: " . $e->getMessage());
         }
     }
 }

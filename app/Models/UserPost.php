@@ -1,6 +1,5 @@
 <?php
 
-
 namespace App\Models;
 
 use App\Traits\VisibilityTrait;
@@ -11,7 +10,6 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\MediaLibrary\MediaCollections\File;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
  * @property int $id
@@ -21,40 +19,12 @@ use Illuminate\Database\Eloquent\Builder;
  * @property string|null $caption
  * @property int $like_count
  * @property int $comment_count
+ * @property int $view_count
  * @property string $status
  * @property string $visibility
- * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Comment> $comments
- * @property-read int|null $comments_count
  * @property-read mixed $images
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Like> $likes
- * @property-read int|null $likes_count
- * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
- * @property-read int|null $media_count
- * @property-read \App\Models\User $user
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost active()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost ofType($type)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost onlyTrashed()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereCaption($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereCommentCount($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereDeletedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereLikeCount($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereStatus($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereType($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereUpdatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereUserId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereUuid($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost whereVisibility($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost withTrashed(bool $withTrashed = true)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|UserPost withoutTrashed()
- * @mixin \Eloquent
  */
 class UserPost extends Model implements HasMedia
 {
@@ -64,28 +34,29 @@ class UserPost extends Model implements HasMedia
     protected $fillable = [
         'uuid',
         'user_id',
-        'type',
+        'type',         // e.g., 'post', 'reel', 'video'
         'caption',
         'like_count',
         'comment_count',
-        'status',
-        'visibility',
-        'view_count',  // Include view_count here
+        'view_count',   // Code 1 se liya (Important)
+        'status',       // 'active', 'inactive'
+        'visibility',   // 'public', 'private'
     ];
 
-
+    // ✅ FIX: View count ko integer banana zaroori hai calculation ke liye
     protected $casts = [
         'like_count' => 'integer',
         'comment_count' => 'integer',
+        'view_count' => 'integer',
     ];
+
     protected $appends = ['images'];
 
-
     /*
-     |--------------------------------------------------------------------------
-     | Relationships
-     |--------------------------------------------------------------------------
-     */
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function user()
     {
@@ -97,77 +68,106 @@ class UserPost extends Model implements HasMedia
         return $this->morphMany(Like::class, 'likeable');
     }
 
-    //    public function comments()
-    // {
-    //     return $this->hasMany(Comment::class, 'post_id');
-    // }
-    // In UserPost.php
     public function comments()
     {
         return $this->morphMany(Comment::class, 'commentable');
     }
 
-
-
-    // public function media()
-    // {
-    //     return $this->morphMany(Media::class, 'model');
-    // }
+    public function views()
+    {
+        return $this->morphMany(View::class, 'viewable');
+    }
 
     /*
-     |--------------------------------------------------------------------------
-     | Scopes
-     |--------------------------------------------------------------------------
-     */
+    |--------------------------------------------------------------------------
+    | Scopes (Algorithms)
+    |--------------------------------------------------------------------------
+    */
 
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
     }
+
     public function scopeOfType($query, $type)
     {
         return $query->where('type', $type);
     }
 
+    /**
+     * Trending Algorithm:
+     * Formula: (Views * 1) + (Likes * 5) + (Comments * 10)
+     */
+    public function scopeTrending($query)
+    {
+        return $query->active()
+            ->orderByRaw('(view_count + (like_count * 5) + (comment_count * 10)) DESC')
+            ->orderBy('created_at', 'DESC');
+    }
+
+    /**
+     * For You Algorithm:
+     * Mix of Freshness (30 days) + Engagement Score + Randomness
+     */
+    public function scopeForYou($query)
+    {
+        return $query->active()
+            ->where('created_at', '>=', now()->subDays(30))
+            ->orderByRaw('(view_count + (like_count * 5) + (comment_count * 10)) DESC')
+            ->inRandomOrder();
+    }
 
     /*
-     |--------------------------------------------------------------------------
-     | Spatie Media Library
-     |--------------------------------------------------------------------------
-     */
-
+    |--------------------------------------------------------------------------
+    | Spatie Media Library (Optimized)
+    |--------------------------------------------------------------------------
+    */
 
     public function registerMediaCollections(): void
     {
+        // 1. Images Collection - Only accepts images
         $this->addMediaCollection('images')
             ->useDisk('public')
-            ->acceptsFile(function (?File $file = null) {
-                return $file && str_starts_with($file->mimeType, 'image/');
+            ->acceptsFile(function (File $file) {
+                return str_starts_with($file->mimeType, 'image/');
             });
 
+        // 2. Videos Collection - Only accepts videos (Prevents crashes)
         $this->addMediaCollection('videos')
             ->useDisk('public')
-            ->acceptsFile(function (?File $file = null) {
-                return $file && str_starts_with($file->mimeType, 'video/');
+            ->acceptsFile(function (File $file) {
+                return str_starts_with($file->mimeType, 'video/');
             });
     }
 
+    /**
+     * ✅ THUMBNAIL GENERATION LOGIC
+     * Using Code 1 logic because it works better for Reels/Videos
+     */
     public function registerMediaConversions(?Media $media = null): void
     {
-        if ($media && str_starts_with($media->mime_type, 'image/')) {
-            $this->addMediaConversion('thumb')
-                ->width(300)
-                ->height(300)
-                ->nonQueued();
-        }
+        // 1. Standard Image Thumbnail (300x300)
+        $this->addMediaConversion('thumb')
+            ->width(300)
+            ->height(300)
+            ->sharpen(10)
+            ->nonQueued(); // Images ke liye instant conversion better hai
 
-        if ($media && str_starts_with($media->mime_type, 'video/')) {
-            $this->addMediaConversion('thumb')
-                ->queued()
-                ->extractVideoFrameAtSecond(1)
-                ->performOnCollections('videos');
-        }
+        // 2. Video/Reel Poster (Using Code 1 Logic)
+        // Ye logic specific 'videos' collection pe apply hoga
+        $this->addMediaConversion('thumb')
+            ->width(480)   // Reel Aspect Ratio width
+            ->height(854)  // Reel Aspect Ratio height
+            ->extractVideoFrameAtSecond(1) // 1st second ka frame lega
+            ->performOnCollections('videos')
+            ->queued();    // Videos heavy hote hain, isliye queue me dala
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors
+    |--------------------------------------------------------------------------
+    */
 
     public function getImagesAttribute()
     {
@@ -176,24 +176,8 @@ class UserPost extends Model implements HasMedia
                 'id' => $media->id,
                 'original_url' => $media->getUrl(),
                 'thumb_url' => $media->getUrl('thumb'),
+                'mime_type' => $media->mime_type, // Added mime_type for frontend check
             ];
         });
     }
-
-    // Define the views relationship
-    public function views()
-    {
-        return $this->morphMany(View::class, 'viewable');
-    }
-
-    /*
-     |--------------------------------------------------------------------------
-     | Optional: UUID Route Binding
-     |--------------------------------------------------------------------------
-     */
-
-    // public function getRouteKeyName()
-    // {
-    //     return 'uuid';
-    // }
 }

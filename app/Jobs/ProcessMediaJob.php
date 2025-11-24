@@ -2,143 +2,122 @@
 
 namespace App\Jobs;
 
+use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
-use FFMpeg\FFProbe;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\LaravelImageOptimizer\Facades\ImageOptimizer;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class ProcessMediaJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public Media $media;
-
     /**
-     * Create a new job instance.
+     * 🔴 CRITICAL: Stop infinite loops if FFmpeg fails.
      */
+    public $tries = 3;
+    // Increase timeout to 10 minutes for large video processing
+    public $timeout = 600;
+
     public function __construct(Media $media)
     {
         $this->media = $media;
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
-        $media = $this->media->fresh();
-        if (! $media) {
+        $this->media->refresh(); // Get latest state
+
+        $path = $this->media->getPath();
+
+        if (!file_exists($path)) {
+            Log::error("Media file missing at path: {$path}");
             return;
         }
 
-        $path = $media->getPath(); // local full path
-        $mime = $media->mime_type ?? mime_content_type($path);
+        $mime = $this->media->mime_type;
 
-        // 🖼️ If image → optimize
+        // 1. Optimize Images
         if (str_starts_with($mime, 'image/')) {
             try {
                 ImageOptimizer::optimize($path);
-
-                $size = getimagesize($path);
-                if ($size) {
-                    $media->setCustomProperty('width', $size[0]);
-                    $media->setCustomProperty('height', $size[1]);
-                }
-
-                $media->setCustomProperty('processed_at', now()->toDateTimeString());
-                $media->save();
-            } catch (\Throwable $e) {
-                \Log::error('Image optimization failed: '.$e->getMessage(), [
-                    'media_id' => $media->id,
-                ]);
+                clearstatcache();
+                $this->media->size = filesize($path);
+                $this->media->save();
+            } catch (\Exception $e) {
+                Log::error("Image optimization failed: " . $e->getMessage());
             }
             return;
         }
 
-        // 🎥 If video
-        try {
-            $ffprobe = FFProbe::create();
-
-            $duration = (int) round($ffprobe->format($path)->get('duration'));
-            $streams = $ffprobe->streams($path)->videos();
-            $videoStream = $streams->first();
-            $width = $videoStream?->get('width');
-            $height = $videoStream?->get('height');
-
-            // ✅ Reels: Reject if > 60 sec
-            if ($media->model->type === 'reel' && $duration > 60) {
-                $media->delete();
-                $media->model->delete();
-                \Log::warning("Reel rejected (too long)", [
-                    'media_id' => $media->id,
-                    'duration' => $duration,
-                ]);
-                return;
-            }
-
-            // Save metadata
-            $media->setCustomProperty('duration', $duration);
-            $media->setCustomProperty('width', $width);
-            $media->setCustomProperty('height', $height);
-            $media->setCustomProperty('processed_at', now()->toDateTimeString());
-            $media->save();
-
-            // Compress video
-            $this->compressVideo($path, $media);
-
-        } catch (\Throwable $e) {
-            \Log::error('ProcessMediaJob error: '.$e->getMessage(), [
-                'media_id' => $media->id,
-            ]);
+        // 2. Process Videos (Compress & Fast Start)
+        if (str_starts_with($mime, 'video/')) {
+            $this->processVideo($path);
         }
     }
 
-    /**
-     * Compress video with FFmpeg (resize + lower bitrate).
-     */
-    protected function compressVideo(string $path, Media $media): void
+    protected function processVideo(string $path): void
     {
         try {
-            $compressedPath = storage_path("app/tmp/compressed_{$media->id}.mp4");
+            Log::info("Starting video processing for Media ID: {$this->media->id}");
 
-            // Run FFmpeg compression
-            $cmd = "ffmpeg -i " . escapeshellarg($path) .
-                " -vf scale='min(720,iw)':-2 -b:v 1500k -c:v libx264 -preset veryfast -c:a aac -b:a 128k " .
-                escapeshellarg($compressedPath) . " -y";
+            // A. Get Metadata using FFprobe
+            // Note: Ensure ffmpeg is installed on your server/local machine
+            $probeCmd = "ffprobe -v error -select_streams v:0 -show_entries stream=width,height,duration -of default=noprint_wrappers=1:nokey=1 " . escapeshellarg($path);
+            exec($probeCmd, $output, $res);
 
-            exec($cmd, $output, $returnCode);
+            if ($res === 0 && count($output) >= 3) {
+                $width = (int) $output[0];
+                $height = (int) $output[1];
+                $duration = (int) $output[2];
 
-            if ($returnCode === 0 && file_exists($compressedPath)) {
-                // Replace old media with compressed
-                $media->addMedia($compressedPath)
-                    ->withCustomProperties($media->custom_properties ?? [])
-                    ->toMediaCollection($media->collection_name);
+                // REEL CHECK: Delete if > 65 seconds
+                if ($this->media->model->type === 'reel' && $duration > 65) {
+                    Log::warning("Reel rejected (Too long: {$duration}s)");
+                    $this->media->delete();
+                    return; // Stop processing
+                }
 
-                // delete temp file
-                unlink($compressedPath);
-
-                // delete old original
-                Storage::disk($media->disk)->delete($path);
-
-                \Log::info("Video compressed successfully", [
-                    'media_id' => $media->id,
-                ]);
+                // Save Metadata
+                $this->media->setCustomProperty('width', $width);
+                $this->media->setCustomProperty('height', $height);
+                $this->media->setCustomProperty('duration', $duration);
+                $this->media->save();
             } else {
-                \Log::error("Video compression failed", [
-                    'media_id' => $media->id,
-                    'cmd' => $cmd,
-                ]);
+                Log::error("FFprobe failed. Is FFmpeg installed and in PATH? Output: " . implode(" ", $output));
+                return;
             }
+            // B. Compress & Add Fast Start Flag
+            $tempPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'compressed_' . $this->media->id . '.mp4';
 
-        } catch (\Throwable $e) {
-            \Log::error("Video compression exception: " . $e->getMessage(), [
-                'media_id' => $media->id,
-            ]);
+            // Command Logic:
+            // -crf 28: Good balance of quality vs size for mobile (lower is better quality)
+            // -preset fast: Speed of compression
+            // -movflags +faststart: CRITICAL for instant streaming
+            $cmd = "ffmpeg -i " . escapeshellarg($path) . " -vcodec libx264 -crf 28 -preset fast -movflags +faststart -acodec aac -b:a 128k " . escapeshellarg($tempPath) . " -y";
+
+            exec($cmd, $compressOutput, $compressRes);
+
+            if ($compressRes === 0 && file_exists($tempPath)) {
+                // Overwrite original file with compressed version
+                if (rename($tempPath, $path)) {
+                    clearstatcache();
+                    $this->media->size = filesize($path);
+                    $this->media->setCustomProperty('is_compressed', true);
+                    $this->media->setCustomProperty('processed_at', now()->toDateTimeString());
+                    $this->media->save();
+
+                    Log::info("Video compressed & optimized successfully.");
+                }
+            } else {
+                Log::error("FFmpeg compression failed.");
+            }
+        } catch (\Exception $e) {
+            Log::error("Video processing exception: " . $e->getMessage());
         }
     }
 }

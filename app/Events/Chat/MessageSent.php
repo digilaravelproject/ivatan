@@ -3,7 +3,6 @@
 namespace App\Events\Chat;
 
 use App\Models\Chat\UserChatMessage;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -18,8 +17,7 @@ class MessageSent implements ShouldBroadcast
 
     public function __construct(UserChatMessage $message)
     {
-        // Load sender details to avoid extra API calls on frontend when message arrives
-        $this->message = $message->load('sender:id,name,username,profile_photo_path');
+        $this->message = $message->load('sender');
     }
 
     public function broadcastOn(): array
@@ -29,10 +27,6 @@ class MessageSent implements ShouldBroadcast
         ];
     }
 
-    /**
-     * The event's broadcast name.
-     * Adding a dot (.) at the start allows listening via '.message.sent'
-     */
     public function broadcastAs(): string
     {
         return 'message.sent';
@@ -41,22 +35,20 @@ class MessageSent implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'id'              => $this->message->id,
-            'uuid'            => $this->message->uuid,
-            'chat_id'         => $this->message->chat_id,
-            'sender'          => [
-                'id'                 => $this->message->sender->id,
-                'name'               => $this->message->sender->name,
-                'username'           => $this->message->sender->username,
-                'profile_photo_path' => $this->message->sender->profile_photo_path,
+            'id' => $this->message->id,
+            'chat_id' => $this->message->chat_id,
+            'content' => $this->message->content,
+            'message_type' => $this->message->message_type,
+            'attachment_url' => $this->message->attachment_path ? url('/storage/' . $this->message->attachment_path) : null,
+            'is_mine' => false, // Dusre ke liye always false hoga
+            'status' => 'sent',
+            'created_at' => $this->message->created_at->toISOString(),
+            'sender' => [
+                'id' => $this->message->sender->id,
+                'name' => $this->message->sender->name,
+                'avatar' => $this->message->sender->profile_photo_path,
             ],
-            'content'         => $this->message->content,
-            'message_type'    => $this->message->message_type,
-            'attachment_path' => $this->message->attachment_path ? url('/storage/' . $this->message->attachment_path) : null,
-            'meta'            => $this->message->meta,
-            'reply_to_id'     => $this->message->reply_to_message_id,
-            'created_at'      => $this->message->created_at->toISOString(),
-            'status'          => 'sent', // Default status for real-time
+            'reply_to_id' => $this->message->reply_to_message_id,
         ];
     }
 }
