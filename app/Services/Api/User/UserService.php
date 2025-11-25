@@ -3,6 +3,7 @@
 namespace App\Services\Api\User;
 
 use App\Models\User;
+use App\Models\Interest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +16,31 @@ use Illuminate\Support\Facades\Log;
  */
 class UserService
 {
+    /**
+     * Helper Function: Converts Mixed (ID/Name) array to IDs only
+     * ✅ Yeh function text (names) ko IDs me convert karega
+     */
+    private function resolveInterestIds(array $interests): array
+    {
+        $resolvedIds = [];
+
+        foreach ($interests as $item) {
+            if (is_numeric($item)) {
+                // Agar number hai, to direct ID add karo
+                $resolvedIds[] = $item;
+            } elseif (is_string($item)) {
+                // Agar string hai, to DB se naam dhund kar ID nikalo
+                $interest = Interest::where('name', $item)->first();
+                if ($interest) {
+                    $resolvedIds[] = $interest->id;
+                }
+            }
+        }
+
+        // Duplicate IDs remove karke return karo
+        return array_unique($resolvedIds);
+    }
+
     /**
      * Update user profile with disk-agnostic storage handling.
      *
@@ -42,9 +68,10 @@ class UserService
                 $user->password = Hash::make($data['password']);
             }
 
-            // 3. Interests Update
+            // 3. Interests Update (✅ FIXED: Using resolveInterestIds)
             if (isset($data['interests']) && is_array($data['interests'])) {
-                $user->interests()->sync($data['interests']);
+                $interestIds = $this->resolveInterestIds($data['interests']);
+                $user->interests()->sync($interestIds);
             }
 
             // 4. Profile Photo Handling
@@ -71,8 +98,10 @@ class UserService
                 $user->profile_photo_path = $path;
 
                 // Optional: Sync Spatie Media Library
-                $user->clearMediaCollection('profile_photo');
-                $user->addMedia($file)->toMediaCollection('profile_photo', $disk);
+                if (method_exists($user, 'clearMediaCollection')) {
+                    $user->clearMediaCollection('profile_photo');
+                    $user->addMedia($file)->toMediaCollection('profile_photo', $disk);
+                }
             }
 
             $user->save();
@@ -106,8 +135,10 @@ class UserService
 
             $user->assignRole('user');
 
+            // ✅ FIXED: Using resolveInterestIds
             if (isset($data['interests']) && is_array($data['interests'])) {
-                $user->interests()->attach($data['interests']);
+                $interestIds = $this->resolveInterestIds($data['interests']);
+                $user->interests()->attach($interestIds);
             }
 
             $token = $user->createToken('MyApp')->plainTextToken;
