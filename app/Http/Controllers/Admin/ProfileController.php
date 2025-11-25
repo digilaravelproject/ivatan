@@ -5,61 +5,35 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class ProfileController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Helper to Detect Disk (S3 vs Public)
      */
-    public function index()
+    private function getStorageDisk()
     {
-        //
+        if (config('filesystems.disks.s3.key') && config('filesystems.disks.s3.secret')) {
+            return 's3';
+        }
+        return 'public';
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit()
     {
         return view('admin.profile.edit');
     }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email,' . auth()->id(),
+            'email' => 'required|email|max:255|unique:users,email,' . Auth::id(),
             'password' => 'nullable|string|min:8|confirmed',
             'profile_photo' => 'nullable|image|max:1024',
         ]);
-        $user = auth()->user();
+
+        $user = Auth::user();
         $user->name = $request->name;
         $user->email = $request->email;
 
@@ -67,30 +41,26 @@ class ProfileController extends Controller
             $user->password = bcrypt($request->password);
         }
 
-       if ($request->hasFile('profile_photo')) {
-        // Delete old photo if exists
-        if ($user->profile_photo_path  && Storage::disk('s3')->exists($user->profile_photo_path)) {
-            Storage::disk('s3')->delete($user->profile_photo_path);
+        // ✅ SMART DISK & SYNC LOGIC
+        if ($request->hasFile('profile_photo')) {
+            // 1. Detect Disk
+            $disk = $this->getStorageDisk();
+
+            // 2. Clear Old Media
+            $user->clearMediaCollection('profile_photo');
+
+            // 3. Add New Media (Spatie handles the upload to '49/name.png')
+            $media = $user->addMedia($request->file('profile_photo'))
+                ->usingFileName(time() . '_' . $request->file('profile_photo')->getClientOriginalName())
+                ->toMediaCollection('profile_photo', $disk);
+
+            // 4. Update User Table with EXACT Spatie path
+            // This ensures DB and Media are 100% synced.
+            $user->profile_photo_path = $media->id . '/' . $media->file_name;
         }
 
-        // Store new photo in S3
-        $path = $request->file('profile_photo')->store('profile-photos', 's3');
-
-        // Make it public
-        Storage::disk('s3')->setVisibility($path, 'public');
-        $user->profile_photo_path = $path;
-    }
-
-    $user->save();
+        $user->save();
 
         return redirect()->route('admin.profile.edit')->with('success', 'Profile updated successfully!');
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
     }
 }

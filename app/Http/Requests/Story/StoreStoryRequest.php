@@ -6,26 +6,19 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreStoryRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return auth()->check();
+        return true; // Auth middleware controller me handle karega
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            'caption' => 'nullable|string|max:1000',        // text overlay / caption
-            'meta' => 'nullable|array',                     // additional meta data (stickers, filters, etc.)
-            'media' => 'required|file|max:51200|mimetypes:image/jpeg,image/png,video/mp4,video/quicktime',
-            'expires_at' => 'nullable|date|after:now',      // story expiry time
+            'caption' => 'nullable|string|max:1000',
+            'meta' => 'nullable|array',
+            // Max size 50MB (51200 KB) aur specific mimes allowed
+            'media' => 'required|file|mimes:jpeg,png,jpg,mp4,mov,qt|max:51200',
+            'expires_at' => 'nullable|date|after:now',
         ];
     }
 }

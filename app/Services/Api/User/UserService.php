@@ -17,38 +17,33 @@ use Illuminate\Support\Facades\Log;
 class UserService
 {
     /**
-     * Helper Function: Converts Mixed (ID/Name) array to IDs only
-     * ✅ Yeh function text (names) ko IDs me convert karega
+     * Helper to Detect Disk (S3 vs Public)
+     * Checks if S3 keys exist in .env
      */
+    private function getStorageDisk()
+    {
+        if (config('filesystems.disks.s3.key') && config('filesystems.disks.s3.secret')) {
+            return 's3';
+        }
+        return 'public';
+    }
+
     private function resolveInterestIds(array $interests): array
     {
         $resolvedIds = [];
-
         foreach ($interests as $item) {
             if (is_numeric($item)) {
-                // Agar number hai, to direct ID add karo
                 $resolvedIds[] = $item;
             } elseif (is_string($item)) {
-                // Agar string hai, to DB se naam dhund kar ID nikalo
                 $interest = Interest::where('name', $item)->first();
                 if ($interest) {
                     $resolvedIds[] = $interest->id;
                 }
             }
         }
-
-        // Duplicate IDs remove karke return karo
         return array_unique($resolvedIds);
     }
 
-    /**
-     * Update user profile with disk-agnostic storage handling.
-     *
-     * @param User $user
-     * @param array $data
-     * @return User
-     * @throws \Exception
-     */
     public function update(User $user, array $data): User
     {
         DB::beginTransaction();
@@ -68,40 +63,33 @@ class UserService
                 $user->password = Hash::make($data['password']);
             }
 
-            // 3. Interests Update (✅ FIXED: Using resolveInterestIds)
+            // 3. Interests Update
             if (isset($data['interests']) && is_array($data['interests'])) {
                 $interestIds = $this->resolveInterestIds($data['interests']);
                 $user->interests()->sync($interestIds);
             }
 
-            // 4. Profile Photo Handling
+            // 4. Profile Photo Handling (✅ SYNC LOGIC + S3 Support)
             if (request()->hasFile('profile_photo')) {
                 $file = request()->file('profile_photo');
 
-                // Get default disk from .env (public OR s3)
-                $disk = config('filesystems.default', 'public');
+                // Detect Disk automatically
+                $disk = $this->getStorageDisk();
                 Log::info("Uploading profile photo to disk: {$disk}");
 
-                // Remove old photo if exists and is NOT a URL
-                if ($user->profile_photo_path && !filter_var($user->profile_photo_path, FILTER_VALIDATE_URL)) {
-                    if (Storage::disk($disk)->exists($user->profile_photo_path)) {
-                        Storage::disk($disk)->delete($user->profile_photo_path);
-                    }
-                }
+                // Step A: Clear Old Media (Spatie)
+                $user->clearMediaCollection('profile_photo');
 
-                // Generate clean filename
-                $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
+                // Step B: Add New Media via Spatie
+                // This saves file as: storage/app/public/{id}/{filename} OR s3://bucket/{id}/{filename}
+                $media = $user->addMedia($file)
+                    ->usingFileName(time() . '_' . $file->getClientOriginalName())
+                    ->toMediaCollection('profile_photo', $disk);
 
-                // ✅ Store ONLY relative path (e.g., 'profile-photos/image.jpg')
-                $path = $file->storeAs('profile-photos', $filename, $disk);
-
-                $user->profile_photo_path = $path;
-
-                // Optional: Sync Spatie Media Library
-                if (method_exists($user, 'clearMediaCollection')) {
-                    $user->clearMediaCollection('profile_photo');
-                    $user->addMedia($file)->toMediaCollection('profile_photo', $disk);
-                }
+                // Step C: Update User Table to match Spatie's path
+                // Hum Spatie ka ID aur Filename user table me save kar rahe hain.
+                // Example Value in DB: "49/home-filled.png"
+                $user->profile_photo_path = $media->id . '/' . $media->file_name;
             }
 
             $user->save();
@@ -135,7 +123,6 @@ class UserService
 
             $user->assignRole('user');
 
-            // ✅ FIXED: Using resolveInterestIds
             if (isset($data['interests']) && is_array($data['interests'])) {
                 $interestIds = $this->resolveInterestIds($data['interests']);
                 $user->interests()->attach($interestIds);
@@ -180,7 +167,6 @@ class UserService
 
     public function logout(User $user): void
     {
-        // ✅ Added Type Hint to fix Intelephense "Undefined method delete" error
         /** @var \Laravel\Sanctum\PersonalAccessToken $token */
         $token = $user->currentAccessToken();
 

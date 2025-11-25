@@ -77,7 +77,7 @@ class UserPostController extends Controller
         try {
             $posts = UserPost::query()
                 ->active()
-                ->whereIn('type', ['post', 'carousel'])
+                ->whereIn('type', ['post', 'carousel', 'video'])
                 ->with(['user', 'media'])
                 // 'trending' sorts purely by Engagement Score (Highest first)
                 ->trending()

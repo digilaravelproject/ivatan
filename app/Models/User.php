@@ -16,22 +16,11 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Class User
- * * Represents the application user. Handles authentication,
- * profile management, and relationships.
- * * @package App\Models
- */
 class User extends Authenticatable implements HasMedia
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
     use InteractsWithMedia;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'uuid',
         'username',
@@ -62,21 +51,11 @@ class User extends Authenticatable implements HasMedia
         'settings',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -99,55 +78,53 @@ class User extends Authenticatable implements HasMedia
     }
 
     /**
-     * Smart Accessor for Profile Photo URL.
-     * Handles: Spatie Media, Relative Paths (Local/S3), and External URLs.
-     *
-     * @return string
+     * ✅ SMART ACCESSOR
+     * Handles: External URLs, S3, Public Storage, and Spatie Media Sync.
      */
     public function getProfilePhotoUrlAttribute()
     {
-        // 1. Check if Spatie media exists (Priority 1)
+        $path = $this->profile_photo_path;
+
+        // 1. External URL Check (e.g. Google Login)
+        if ($path && filter_var($path, FILTER_VALIDATE_URL)) {
+            return $path;
+        }
+
+        // 2. Database Path Check (Highest Priority)
+        // Since we are now saving "49/filename.png" in the DB, this logic works perfect.
+        if ($path) {
+            // Detect which disk to use for generating URL
+            // If AWS keys exist, generate S3 URL. If not, generate Public URL.
+            $disk = (config('filesystems.disks.s3.key') && config('filesystems.disks.s3.secret')) ? 's3' : 'public';
+
+            // Returns: https://your-site.com/storage/49/filename.png (Public)
+            // OR: https://s3.aws.../49/filename.png (S3)
+            return Storage::disk($disk)->url($path);
+        }
+
+        // 3. Fallback: Spatie Media Library (If DB column is empty)
         if ($this->hasMedia('profile_photo')) {
             return $this->getFirstMediaUrl('profile_photo');
         }
 
-        $path = $this->profile_photo_path;
-
-        // 2. Fallback to Default Avatar if empty
-        if (empty($path)) {
-            return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
-        }
-
-        // 3. Check if it's an external URL (e.g., Google Auth image)
-        if (filter_var($path, FILTER_VALIDATE_URL)) {
-            return $path;
-        }
-
-        // 4. Return Storage URL (Dynamic based on .env FILESYSTEM_DISK)
-        // This generates https://your-site.com/storage/path OR https://s3.aws.../path
-        return Storage::url($path);
+        // 4. Default Avatar
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=7F9CF5&background=EBF4FF';
     }
 
-    /* -----------------------------------------------------------------
-     |  Relationships
-     | -----------------------------------------------------------------
-     */
+    // --- Relationships ---
 
     public function interests()
     {
         return $this->belongsToMany(Interest::class, 'interest_user');
     }
-
     public function posts()
     {
         return $this->hasMany(Post::class);
     }
-
     public function reels()
     {
         return $this->hasMany(Reel::class);
     }
-
     public function products()
     {
         return $this->hasMany(Product::class);
@@ -160,19 +137,14 @@ class User extends Authenticatable implements HasMedia
 
     public function chats()
     {
-        return $this->belongsToMany(
-            UserChat::class,
-            'user_chat_participants',
-            'user_id',
-            'chat_id'
-        )->withPivot('is_admin', 'last_read_message_id')->withTimestamps();
+        return $this->belongsToMany(UserChat::class, 'user_chat_participants', 'user_id', 'chat_id')
+            ->withPivot('is_admin', 'last_read_message_id')->withTimestamps();
     }
 
     public function chatMessages()
     {
         return $this->hasMany(UserChatMessage::class, 'sender_id');
     }
-
     public function ads()
     {
         return $this->hasMany(Ad::class);
@@ -182,7 +154,6 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->belongsToMany(User::class, 'followers', 'follower_id', 'following_id');
     }
-
     public function followers()
     {
         return $this->belongsToMany(User::class, 'followers', 'following_id', 'follower_id');
@@ -193,22 +164,13 @@ class User extends Authenticatable implements HasMedia
         return $this->following()->where('following_id', $user->id)->exists();
     }
 
-    /* -----------------------------------------------------------------
-     |  Helpers & Accessors
-     | -----------------------------------------------------------------
-     */
-
+    // --- Helpers ---
     protected ?int $cachedUnreadCount = null;
-
     public function getNotificationUnreadCountAttribute(): int
     {
-        if ($this->cachedUnreadCount !== null) {
-            return $this->cachedUnreadCount;
-        }
-
+        if ($this->cachedUnreadCount !== null) return $this->cachedUnreadCount;
         $row = DB::table('notification_unread_counts')->where('user_id', $this->id)->first();
         $this->cachedUnreadCount = $row ? (int) $row->unread_count : 0;
-
         return $this->cachedUnreadCount;
     }
 }
