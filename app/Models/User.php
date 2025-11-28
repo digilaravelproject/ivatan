@@ -71,7 +71,7 @@ class User extends Authenticatable implements HasMedia
             'two_factor_enabled' => 'boolean',
             'device_tokens' => 'array',
             'email_notification_preferences' => 'array',
-            'interests' => 'array',
+            // 'interests' => 'array',
             'settings' => 'array',
             'password' => 'hashed',
         ];
@@ -113,9 +113,10 @@ class User extends Authenticatable implements HasMedia
 
     // --- Relationships ---
 
+
     public function interests()
     {
-        return $this->belongsToMany(Interest::class, 'interest_user');
+        return $this->belongsToMany(Interest::class, 'interest_user', 'user_id', 'interest_id');
     }
     public function posts()
     {

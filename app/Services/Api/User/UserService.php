@@ -18,7 +18,6 @@ class UserService
 {
     /**
      * Helper to Detect Disk (S3 vs Public)
-     * Checks if S3 keys exist in .env
      */
     private function getStorageDisk()
     {
@@ -28,6 +27,9 @@ class UserService
         return 'public';
     }
 
+    /**
+     * Resolve Interest IDs from mixed input (IDs or Names)
+     */
     private function resolveInterestIds(array $interests): array
     {
         $resolvedIds = [];
@@ -44,14 +46,36 @@ class UserService
         return array_unique($resolvedIds);
     }
 
+    /**
+     * Update User Profile
+     */
     public function update(User $user, array $data): User
     {
         DB::beginTransaction();
         try {
             Log::info("Starting profile update for User ID: {$user->id}");
 
-            // 1. Basic Fields Update
-            $fillable = ['name', 'email', 'phone', 'username', 'date_of_birth', 'occupation', 'bio'];
+            // 1. Update Allowed Fields
+            // We include the new professional fields here
+            $fillable = [
+                // Identity
+                'name',
+                'email',
+                'phone',
+                'username',
+                // Personal
+                'date_of_birth',
+                'occupation',
+                'bio',
+                'gender',
+                'language_preference',
+                // Privacy & Settings
+                'account_privacy',
+                'messaging_privacy',
+                'settings',
+                'email_notification_preferences'
+            ];
+
             foreach ($fillable as $field) {
                 if (array_key_exists($field, $data)) {
                     $user->$field = $data[$field];
@@ -69,7 +93,7 @@ class UserService
                 $user->interests()->sync($interestIds);
             }
 
-            // 4. Profile Photo Handling (✅ SYNC LOGIC + S3 Support)
+            // 4. Profile Photo Handling
             if (request()->hasFile('profile_photo')) {
                 $file = request()->file('profile_photo');
 
@@ -77,18 +101,15 @@ class UserService
                 $disk = $this->getStorageDisk();
                 Log::info("Uploading profile photo to disk: {$disk}");
 
-                // Step A: Clear Old Media (Spatie)
+                // Step A: Clear Old Media
                 $user->clearMediaCollection('profile_photo');
 
                 // Step B: Add New Media via Spatie
-                // This saves file as: storage/app/public/{id}/{filename} OR s3://bucket/{id}/{filename}
                 $media = $user->addMedia($file)
                     ->usingFileName(time() . '_' . $file->getClientOriginalName())
                     ->toMediaCollection('profile_photo', $disk);
 
-                // Step C: Update User Table to match Spatie's path
-                // Hum Spatie ka ID aur Filename user table me save kar rahe hain.
-                // Example Value in DB: "49/home-filled.png"
+                // Step C: Update User Table Path
                 $user->profile_photo_path = $media->id . '/' . $media->file_name;
             }
 
@@ -106,6 +127,9 @@ class UserService
         }
     }
 
+    /**
+     * Register a new user
+     */
     public function register(array $data): array
     {
         DB::beginTransaction();
@@ -140,6 +164,9 @@ class UserService
         }
     }
 
+    /**
+     * Login User
+     */
     public function login(string $identifier, string $password): array|false
     {
         $user = User::where('email', $identifier)

@@ -52,7 +52,7 @@ class UserPostController extends Controller
         try {
             $posts = UserPost::query()
                 ->active() // Only Active posts
-                ->with(['user', 'media'])
+                ->with(['user.interests', 'media'])
                 // 'forYou' scope uses: (Views + Likes*5 + Comments*10) logic + Randomness
                 ->forYou()
                 ->paginate(20);
@@ -78,7 +78,7 @@ class UserPostController extends Controller
             $posts = UserPost::query()
                 ->active()
                 ->whereIn('type', ['post', 'carousel', 'video'])
-                ->with(['user', 'media'])
+                ->with(['user.interests', 'media'])
                 // 'trending' sorts purely by Engagement Score (Highest first)
                 ->trending()
                 ->paginate(20);
@@ -104,7 +104,7 @@ class UserPostController extends Controller
             $videos = UserPost::query()
                 ->active()
                 ->ofType('video')
-                ->with(['user', 'media'])
+                ->with(['user.interests', 'media'])
                 // Viral videos appear at the top
                 ->trending()
                 ->paginate(15);
@@ -130,7 +130,7 @@ class UserPostController extends Controller
             $reels = UserPost::query()
                 ->active()
                 ->ofType('reel')
-                ->with(['user', 'media'])
+                ->with(['user.interests', 'media'])
                 // Viral reels logic
                 ->trending()
                 ->paginate(10);
