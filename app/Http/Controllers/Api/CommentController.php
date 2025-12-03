@@ -4,176 +4,223 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCommentRequest;
+use App\Http\Resources\CommentResource;
 use App\Models\Comment;
-use App\Models\Like;
 use App\Models\UserPost;
+use App\Services\CommentService;
 use App\Services\LikeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use App\Services\CommentService;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CommentController extends Controller
 {
     use AuthorizesRequests;
+    protected $commentService;
+
+    public function __construct(CommentService $commentService)
+    {
+        $this->commentService = $commentService;
+    }
 
     /**
-     * ✅ List comments with replies on a post/reel/etc.
-     * Get all top-level comments for a specific model (e.g., Post, Video).
+     * ✅ List comments for a UserPost (Instagram Style)
+     * Returns top-level comments with their replies nested.
      */
-    // public function index(string $commentableType, int $commentableId): JsonResponse
-    // {
-    //     $modelClass = 'App\\Models\\' . $commentableType;
-
-    //     if (!class_exists($modelClass)) {
-    //         return response()->json(['error' => 'Invalid commentable type.'], 400);
-    //     }
-
-    //     $model = $modelClass::findOrFail($commentableId);
-
-    //     $comments = $model->comments()
-    //         ->whereNull('parent_id')
-    //         ->with(['user', 'replies.user', 'likes', 'replies.likes'])
-    //         ->latest()
-    //         ->get();
-    //     if (!$model) {
-    //         return response()->json(['error' => 'Resource not found.'], 404);
-    //     }
-    //     return response()->json($comments);
-    // }
-
-    public function postComments(UserPost $post): JsonResponse
+    public function postComments(string $postId): JsonResponse
     {
-
-        return $this->getCommentsFor($post);
-    }
-
-    // public function videoComments(Video $video): JsonResponse
-    // {
-    //     return $this->getCommentsFor($video);
-    // }
-
-    // public function productComments(Product $product): JsonResponse
-    // {
-    //     return $this->getCommentsFor($product);
-    // }
-
-    protected function getCommentsFor($model): JsonResponse
-    {
-        $comments = $model->comments()
-            ->whereNull('parent_id')
-            ->with(['user', 'replies.user', 'likes', 'replies.likes'])
-            ->latest()
-            ->get();
-
-        return response()->json($comments);
-    }
-
-    // ✅ Store comment or reply
-    public function store_old(StoreCommentRequest $request, CommentService $commentService): JsonResponse
-    {
-        $comment = $commentService->addComment($request->validated());
-
-
-        return response()->json([
-            'message' => 'Comment posted',
-            'data' => $comment->load('user', 'replies', 'likes')
-        ], 201);
-    }
-
-
-    public function store(StoreCommentRequest $request, CommentService $commentService): JsonResponse
-    {
-        /** @var \Illuminate\Http\Request $request */
         try {
-            // Validate if the required parameters exist in the route
-            $commentableType = $request->route('commentable_type');
-            $commentableId = $request->route('commentable_id');
-            $parentId = $request->route('parent_id') ?? null;
+            // 1. Find the post manually to ensure 404 handling is clean
+            $post = UserPost::find($postId);
 
-            // Check if all the necessary parameters are provided
-            if (!$commentableType || !$commentableId) {
+            if (!$post) {
                 return response()->json([
-                    'message' => 'Commentable type or ID not found'
-                ], 404); // Return 404 if commentable_type or commentable_id is missing
+                    'success' => false,
+                    'message' => 'Post not found.'
+                ], 404);
             }
 
-            // Check if parentId is invalid or not found
-            if ($parentId && !Comment::find($parentId)) {
-                return response()->json([
-                    'message' => 'Parent comment not found'
-                ], 404); // Return 404 if parent comment is not found
-            }
+            // 2. Fetch Comments
+            // We use withCount('replies') to show "View X replies" button in frontend
+            $comments = $post->comments()
+                ->whereNull('parent_id') // Top level only
+                ->with(['user', 'replies.user', 'replies.likes']) // Eager load nested data
+                ->withCount('replies') // Efficiently count replies
+                ->latest()
+                ->get(); // You can change to ->paginate(10) for infinite scroll
 
-            // Merging the validated request data with the route parameters
-            $data = array_merge($request->validated(), [
-                'commentable_type' => $commentableType,
-                'commentable_id' => $commentableId,
-                'parent_id' => $parentId,
-            ]);
-
-            // Create the comment using the merged data
-            $comment = $commentService->addComment($data);
-
-            // Return a JSON response with the created comment and related data
+            // 3. Return formatted resource
             return response()->json([
-                'message' => 'Comment posted successfully',
-                'data' => $comment->load('user', 'replies', 'likes') // Include user, replies, and likes relationships
-            ], 201);
-        } catch (\Exception $e) {
-            // Handle unexpected exceptions and return a generic error message
-            return response()->json([
-                'message' => $e->getMessage()
-            ], 400); // Return 400 for any other errors
+                'success' => true,
+                'message' => 'Comments fetched successfully.',
+                'data' => CommentResource::collection($comments)
+            ], 200);
+        } catch (Exception $e) {
+            return $this->handleError($e, 'fetching comments');
         }
     }
-    // ✅ Like or unlike a comment
 
-
-    public function toggleCommentLike(Comment $comment, LikeService $likeService): JsonResponse
+    /**
+     * ✅ Store a new comment or reply
+     */
+    public function store(StoreCommentRequest $request): JsonResponse
     {
         try {
-            // Check if the user has already liked the comment
-            if ($likeService->hasLiked($comment)) {
-                // If liked, unlike the comment
-                $likeService->unlike($comment);
-                $message = 'Unliked';
-                $liked = false;
-            } else {
-                // If not liked, like the comment
-                $likeService->like($comment);
-                $message = 'Liked';
-                $liked = true;
+            // 1. Validate inputs (Route params + Body)
+            // Note: StoreCommentRequest validates 'body'. We validate logic here.
+
+            $commentableType = $request->route('commentable_type');
+            $commentableId = $request->route('commentable_id');
+            $parentId = $request->route('parent_id');
+
+            // 2. Normalize Commentable Type (e.g., "post" -> "App\Models\UserPost")
+            $modelClass = $this->commentService->resolveModelClass($commentableType);
+
+            if (!$modelClass || !class_exists($modelClass)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid resource type provided.'
+                ], 400);
             }
 
-            // Get the updated like count
+            // 3. Verify the Target Exists
+            $targetModel = $modelClass::find($commentableId);
+            if (!$targetModel) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The post/content you are trying to comment on does not exist.'
+                ], 404);
+            }
+
+            // 4. Verify Parent Comment (if this is a reply)
+            if ($parentId) {
+                $parentComment = Comment::find($parentId);
+                if (!$parentComment) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The comment you are replying to has been deleted.'
+                    ], 404);
+                }
+            }
+
+            // 5. Prepare Data
+            $data = array_merge($request->validated(), [
+                'commentable_type' => $modelClass,
+                'commentable_id'   => $commentableId,
+                'parent_id'        => $parentId,
+            ]);
+
+            // 6. Create via Service
+            $comment = $this->commentService->addComment($data);
+
+            // 7. Load relationships for the response
+            $comment->load(['user', 'replies', 'likes']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Comment posted successfully.',
+                'data' => new CommentResource($comment)
+            ], 201);
+        } catch (Exception $e) {
+            return $this->handleError($e, 'posting comment');
+        }
+    }
+
+    /**
+     * ✅ Toggle Like/Unlike on a comment
+     */
+    public function toggleCommentLike(string $commentId, LikeService $likeService): JsonResponse
+    {
+        try {
+            $comment = Comment::find($commentId);
+
+            if (!$comment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Comment not found.'
+                ], 404);
+            }
+
+            $hasLiked = $likeService->hasLiked($comment);
+
+            if ($hasLiked) {
+                $likeService->unlike($comment);
+                $message = 'Comment unliked.';
+                $likedState = false;
+            } else {
+                $likeService->like($comment);
+                $message = 'Comment liked.';
+                $likedState = true;
+            }
+
+            // Refresh count
             $likesCount = $likeService->likeCount($comment);
 
             return response()->json([
+                'success' => true,
                 'message' => $message,
-                'liked' => $liked,
-                'likes_count' => $likesCount,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-                'likes_count' => $likeService->likeCount($comment),
-            ], 400); // Handle errors (e.g., already liked, etc.)
+                'data' => [
+                    'liked' => $likedState,
+                    'likes_count' => $likesCount
+                ]
+            ], 200);
+        } catch (Exception $e) {
+            return $this->handleError($e, 'toggling like');
         }
     }
 
-
-
-    // ✅ Delete a comment
-    public function destroy(Comment $comment, CommentService $commentService): JsonResponse
+    /**
+     * ✅ Delete a comment
+     */
+    public function destroy(string $commentId): JsonResponse
     {
-        $this->authorize('delete', $comment);
-        // Optional: Restrict ownership
+        try {
+            $comment = Comment::find($commentId);
 
-        $commentService->deleteComment($comment);
+            if (!$comment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Comment not found.'
+                ], 404);
+            }
 
-        return response()->json(['message' => 'Comment deleted']);
+            // Authorization Check
+            $this->authorize('delete', $comment);
+
+            $this->commentService->deleteComment($comment);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Comment deleted successfully.'
+            ], 200);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorized to delete this comment.'
+            ], 403);
+        } catch (Exception $e) {
+            return $this->handleError($e, 'deleting comment');
+        }
+    }
+
+    /**
+     * 🛠 Helper: Centralized Error Handler
+     */
+    private function handleError(Exception $e, string $context): JsonResponse
+    {
+        // Log the error internally
+        \Log::error("Error while {$context}: " . $e->getMessage(), [
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        // Return generic message to user for security, unless in debug mode
+        $message = config('app.debug') ? $e->getMessage() : "Something went wrong while {$context}. Please try again later.";
+
+        return response()->json([
+            'success' => false,
+            'message' => $message
+        ], 500);
     }
 }

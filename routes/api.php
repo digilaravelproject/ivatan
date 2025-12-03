@@ -104,22 +104,28 @@ Route::prefix('v1')->group(function () {
         // ================================
         // Comment Routes
         // ================================
-        Route::prefix('comments')->group(function () {
-            // ✅ View comment or reply method 1
-            // Route::get('/{commentableType}/{commentableId}', [CommentController::class, 'index']);
-            // Method 2
-            Route::get('/{post}', [CommentController::class, 'postComments']);
-
-            // Toggle like/unlike on a comment
-            // Delete comment
-            Route::delete('/{comment}', [CommentController::class, 'destroy']);
-            Route::post('like/{comment}', [CommentController::class, 'toggleCommentLike']);
-            // Post a new comment or reply
-
-            // Route::post('/', [CommentController::class, 'store_old']);
-            Route::post('{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
+        Route::prefix('comments')->middleware('auth:sanctum')->group(function () {
+            Route::get('/post/{postId}', [CommentController::class, 'postComments']);
+            Route::post('/{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
+            Route::post('/like/{commentId}', [CommentController::class, 'toggleCommentLike']);
+            Route::delete('/{commentId}', [CommentController::class, 'destroy']);
         });
 
+        // Route::prefix('comments')->group(function () {
+        //     // ✅ View comment or reply method 1
+        //     // Route::get('/{commentableType}/{commentableId}', [CommentController::class, 'index']);
+        //     // Method 2
+        //     Route::get('/{post}', [CommentController::class, 'postComments']);
+
+        //     // Toggle like/unlike on a comment
+        //     // Delete comment
+        //     Route::delete('/{comment}', [CommentController::class, 'destroy']);
+        //     Route::post('like/{comment}', [CommentController::class, 'toggleCommentLike']);
+        //     // Post a new comment or reply
+
+        //     // Route::post('/', [CommentController::class, 'store_old']);
+        //     Route::post('{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
+        // });
 
 
         /**

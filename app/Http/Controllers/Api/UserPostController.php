@@ -19,16 +19,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-/**
- * Class UserPostController
- * Handles all logic regarding Posts, Reels, and Videos with Algorithmic Feeds.
- * @package App\Http\Controllers\Api
- */
 class UserPostController extends Controller
 {
     /**
-     * Helper to get authenticated user with correct type hinting.
-     * Fixes: Intelephense(P1013)
+     * Get the authenticated user.
      */
     private function getAuthUser(): \App\Models\User
     {
@@ -38,23 +32,16 @@ class UserPostController extends Controller
     }
 
     /**
-     * 1. MIXED FEED (Home/Explore) - "For You" Logic
-     * Algorithm:
-     * - Shows active posts.
-     * - Mixes popular content (High Views/Likes/Comments) with fresh content.
-     * - Adds randomness so the feed doesn't look static.
-     *
-     * @param Request $request
-     * @return AnonymousResourceCollection|JsonResponse
+     * Mixed Feed (Home/Explore) - "For You" Logic.
+     * Shows a mix of active posts based on engagement and randomness.
      */
     public function index(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
             $posts = UserPost::query()
-                ->active() // Only Active posts
+                ->active()
                 ->with(['user.interests', 'media'])
-                // 'forYou' scope uses: (Views + Likes*5 + Comments*10) logic + Randomness
-                ->forYou()
+                ->forYou() // Algorithmic scope
                 ->paginate(20);
 
             return PostResource::collection($posts);
@@ -65,12 +52,8 @@ class UserPostController extends Controller
     }
 
     /**
-     * 2. POSTS FEED (Images/Text/Carousel)
-     * Algorithm: Trending First (High Engagement)
-     * Excludes Videos and Reels.
-     *
-     * @param Request $request
-     * @return AnonymousResourceCollection|JsonResponse
+     * Posts Feed.
+     * Shows Images, Text, and Carousels sorted by trending score.
      */
     public function postsFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
@@ -79,7 +62,6 @@ class UserPostController extends Controller
                 ->active()
                 ->whereIn('type', ['post', 'carousel', 'video'])
                 ->with(['user.interests', 'media'])
-                // 'trending' sorts purely by Engagement Score (Highest first)
                 ->trending()
                 ->paginate(20);
 
@@ -91,12 +73,8 @@ class UserPostController extends Controller
     }
 
     /**
-     * 3. VIDEO FEED
-     * Algorithm: Viral Videos (High Watch/Like Count)
-     * Shows only Long Videos.
-     *
-     * @param Request $request
-     * @return AnonymousResourceCollection|JsonResponse
+     * Videos Feed.
+     * Shows only long-form videos sorted by engagement.
      */
     public function videosFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
@@ -105,7 +83,6 @@ class UserPostController extends Controller
                 ->active()
                 ->ofType('video')
                 ->with(['user.interests', 'media'])
-                // Viral videos appear at the top
                 ->trending()
                 ->paginate(15);
 
@@ -117,12 +94,8 @@ class UserPostController extends Controller
     }
 
     /**
-     * 4. REELS FEED
-     * Algorithm: Viral Reels
-     * Shows only Reels sorted by popularity.
-     *
-     * @param Request $request
-     * @return AnonymousResourceCollection|JsonResponse
+     * Reels Feed.
+     * Shows short videos (reels) sorted by popularity.
      */
     public function reelsFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
@@ -131,7 +104,6 @@ class UserPostController extends Controller
                 ->active()
                 ->ofType('reel')
                 ->with(['user.interests', 'media'])
-                // Viral reels logic
                 ->trending()
                 ->paginate(10);
 
@@ -147,9 +119,8 @@ class UserPostController extends Controller
     // -------------------------------------------------------------------------
 
     /**
-     * Store a newly created resource in storage.
-     * @param StorePostRequest $request
-     * @return JsonResponse
+     * Create a new post and handle media uploads.
+     * Automatically sorts files into 'images' or 'videos' collections.
      */
     public function store(StorePostRequest $request): JsonResponse
     {
@@ -159,7 +130,7 @@ class UserPostController extends Controller
             $post = DB::transaction(function () use ($request, $user) {
                 $uuid = Str::uuid();
 
-                // Create Post
+                // Create Post Record
                 $post = UserPost::create([
                     'user_id'    => $user->id,
                     'uuid'       => $uuid,
@@ -167,7 +138,7 @@ class UserPostController extends Controller
                     'caption'    => $request->caption,
                     'visibility' => $request->visibility ?? 'public',
                     'status'     => 'active',
-                    'view_count' => 0, // Initialize counts for algorithm
+                    'view_count' => 0,
                     'like_count' => 0,
                     'comment_count' => 0,
                 ]);
@@ -181,17 +152,33 @@ class UserPostController extends Controller
                     }
 
                     foreach ($mediaFiles as $file) {
-                        $mimeType = $file->getClientMimeType();
-                        $collection = str_starts_with($mimeType, 'image/') ? 'images' : 'videos';
+                        // Detect MIME type on server side for accuracy
+                        $mimeType = $file->getMimeType();
 
-                        $media = $post->addMedia($file)->toMediaCollection($collection);
+                        $collection = null;
 
-                        if ($media instanceof Media) {
-                            try {
-                                ProcessMediaJob::dispatch($media);
-                            } catch (\Exception $e) {
-                                Log::error("Job Dispatch Failed: " . $e->getMessage());
+                        // Assign collection based on file content, not post type.
+                        // This matches the Model's validation rules.
+                        if (str_starts_with($mimeType, 'image/')) {
+                            $collection = 'images';
+                        } elseif (str_starts_with($mimeType, 'video/')) {
+                            $collection = 'videos';
+                        }
+
+                        // Upload if valid collection found
+                        if ($collection) {
+                            $media = $post->addMedia($file)->toMediaCollection($collection);
+
+                            // Trigger background processing
+                            if ($media instanceof Media) {
+                                try {
+                                    ProcessMediaJob::dispatch($media);
+                                } catch (\Exception $e) {
+                                    Log::error("Media Processing Job Failed: " . $e->getMessage());
+                                }
                             }
+                        } else {
+                            Log::warning("Skipped file upload: Unsupported MIME type {$mimeType}");
                         }
                     }
                 }
@@ -203,14 +190,12 @@ class UserPostController extends Controller
                 'data'    => new PostResource($post->load('media', 'user')),
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
-            // 🔴 CRITICAL: Logging the actual error
             Log::error("Store Post Error: " . $e->getMessage());
             Log::error($e->getTraceAsString());
 
-            // 🔴 CRITICAL: Returning the actual error to Postman/Frontend
             return response()->json([
                 'error' => 'Failed to create post.',
-                'debug_message' => $e->getMessage(), // Look at this field in Postman
+                'debug_message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ], 500);
@@ -218,37 +203,27 @@ class UserPostController extends Controller
     }
 
     /**
-     * Display the specified resource.
-     * @param UserPost $post
-     * @return JsonResponse
+     * Show a single post.
      */
     public function show(UserPost $post): JsonResponse
     {
         try {
-            // Increment view count for the algorithm when opened
             $post->increment('view_count');
-
-            // Optional: Authorization check
-            // $this->authorize('view', $post);
-
             return response()->json(new PostResource($post->load('media', 'user')));
         } catch (AuthorizationException $e) {
             return response()->json(['message' => 'You are not authorized to view this post.'], 403);
         } catch (\Exception $e) {
-            Log::error("Show Post Error: " . $e->getMessage());
             return response()->json(['message' => 'Post not found.'], 404);
         }
     }
 
     /**
-     * Remove the specified resource from storage.
-     * @param UserPost $post
-     * @return JsonResponse
+     * Delete a post.
      */
     public function destroy(UserPost $post): JsonResponse
     {
         try {
-            // $this->authorize('delete', $post); // Uncommented for security
+            // $this->authorize('delete', $post);
             $post->delete();
             return response()->json(['message' => 'Post deleted successfully']);
         } catch (AuthorizationException $e) {
@@ -264,10 +239,7 @@ class UserPostController extends Controller
     // -------------------------------------------------------------------------
 
     /**
-     * Toggle like status for a post.
-     * @param int $id
-     * @param LikeService $likeService
-     * @return JsonResponse
+     * Toggle Like/Unlike on a post.
      */
     public function toggleLike($id, LikeService $likeService): JsonResponse
     {
@@ -279,14 +251,10 @@ class UserPostController extends Controller
 
             if ($hasLiked) {
                 $likeService->unlike($post);
-                // Decrement count manually if LikeService doesn't handle it automatically
-                // $post->decrement('like_count');
                 $message = 'Post unliked.';
                 $isLiked = false;
             } else {
                 $likeService->like($post);
-                // Increment count manually if LikeService doesn't handle it automatically
-                // $post->increment('like_count');
                 $message = 'Post liked.';
                 $isLiked = true;
             }
@@ -299,10 +267,8 @@ class UserPostController extends Controller
                     'likes_count' => $likeService->likeCount($post)
                 ]
             ]);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json(['error' => 'Post not found.'], 404);
         } catch (\Exception $e) {
-            Log::error("Toggle Like Error: " . $e->getMessage());
+            Log::error("Like Error: " . $e->getMessage());
             return response()->json(['error' => 'Something went wrong.'], 400);
         }
     }
