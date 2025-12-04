@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Ecommerce\OrderController;
 use App\Http\Controllers\Api\Seller\UserSellerController;
 use App\Http\Controllers\Api\ViewController;
+use App\Http\Controllers\CacheClearController;
 
 /**
  * Public Routes (No authentication required)
@@ -40,7 +41,8 @@ Route::post('check-username', [UserController::class, 'checkUsernameAvailability
  * Versioned API Routes (v1)
  */
 Route::prefix('v1')->group(function () {
-
+    // clear Cache
+    Route::get('/clear-cache', [CacheClearController::class, 'clearAllCache']);
     /**
      * ================================
      * Authentication Required Routes
@@ -105,27 +107,15 @@ Route::prefix('v1')->group(function () {
         // Comment Routes
         // ================================
         Route::prefix('comments')->middleware('auth:sanctum')->group(function () {
+            // 1. Specific Actions (Must be defined BEFORE dynamic wildcards)
             Route::get('/post/{postId}', [CommentController::class, 'postComments']);
-            Route::post('/{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
             Route::post('/like/{commentId}', [CommentController::class, 'toggleCommentLike']);
             Route::delete('/{commentId}', [CommentController::class, 'destroy']);
+
+            // 2. Dynamic Route (Catches /{type}/{id}...) - Must be LAST
+            Route::post('/{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
         });
 
-        // Route::prefix('comments')->group(function () {
-        //     // ✅ View comment or reply method 1
-        //     // Route::get('/{commentableType}/{commentableId}', [CommentController::class, 'index']);
-        //     // Method 2
-        //     Route::get('/{post}', [CommentController::class, 'postComments']);
-
-        //     // Toggle like/unlike on a comment
-        //     // Delete comment
-        //     Route::delete('/{comment}', [CommentController::class, 'destroy']);
-        //     Route::post('like/{comment}', [CommentController::class, 'toggleCommentLike']);
-        //     // Post a new comment or reply
-
-        //     // Route::post('/', [CommentController::class, 'store_old']);
-        //     Route::post('{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
-        // });
 
 
         /**
@@ -134,36 +124,32 @@ Route::prefix('v1')->group(function () {
          * ================================
          */
         Route::prefix('stories')->group(function () {
-            // Public Story Routes
-            Route::get('/', [StoryController::class, 'index']); // Get all stories
-            Route::get('me', [StoryController::class, 'myStories']); // Get logged-in user's stories
-            Route::get('/{story}', [StoryController::class, 'show'])->where('story', '[0-9]+'); // Get single story by ID
-            Route::get('/user/{username}', [StoryController::class, 'getUserStories']); // Get stories by user
-            Route::post('/', [StoryController::class, 'store']); // Create a new story
-            Route::post('/{story}/like', [StoryController::class, 'like']); // Like a story
-            Route::delete('/{story}/like', [StoryController::class, 'unlike']); // Unlike a story
-            // Story Highlights Routes (Under stories prefix)
+
+            // Feed: Get Users with Active Stories (Instagram bubble style)
+            Route::get('/feed', [StoryController::class, 'index']);
+
+            // Actions
+            Route::post('/', [StoryController::class, 'store']);
+            Route::delete('/{id}', [StoryController::class, 'destroy']);
+
+            // Engagement
+            Route::post('/{id}/view', [StoryController::class, 'markAsViewed']); // Mark viewed
+            Route::post('/{id}/like', [StoryController::class, 'toggleLike']);   // Single toggle endpoint is cleaner
+
+            /* -------------------------- Highlights Sub-Routes ------------------------- */
+
             Route::prefix('highlights')->group(function () {
-                // Get all highlights Logged-in users
-                Route::get('/', [StoryHighlightController::class, 'index']);
 
-                // Get highlights of a specific user
-                // If no user ID is provided, it may default to current user or all users depending on implementation
-                Route::get('/user/{user?}', [StoryHighlightController::class, 'getUserHighlights']);
+                // Get specific user's highlights (e.g. @john_doe)
+                Route::get('/user/{username}', [StoryHighlightController::class, 'index']);
 
-                // Create a new highlight for the authenticated user
+                // Get Single Highlight Details
+                Route::get('/{id}', [StoryHighlightController::class, 'show']);
+
+                // Manage Highlights
                 Route::post('/', [StoryHighlightController::class, 'store']);
-
-                // Add a specific story to a highlight
-                // URL format: /highlights/{highlightId}/{storyId}/add
-                Route::post('/{highlightId}/{storyId}/add', [StoryHighlightController::class, 'addStory']);
-
-                // Remove a specific story from a highlight
-                // URL format: /highlights/{highlightId}/{storyId}/remove
-                Route::post('/{highlightId}/{storyId}/remove', [StoryHighlightController::class, 'removeStory']);
-
-                // Get detailed information for a specific highlight, including all its stories
-                Route::get('/{highlightId}', [StoryHighlightController::class, 'show']);
+                Route::post('/{highlightId}/{storyId}', [StoryHighlightController::class, 'addStory']); // Add
+                Route::delete('/{highlightId}/{storyId}', [StoryHighlightController::class, 'removeStory']); // Remove
             });
         });
 

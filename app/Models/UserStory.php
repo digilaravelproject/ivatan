@@ -3,8 +3,11 @@
 namespace App\Models;
 
 use App\Traits\HasViews;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -26,41 +29,52 @@ class UserStory extends Model implements HasMedia
         'meta' => 'array',
         'expires_at' => 'datetime',
         'created_at' => 'datetime',
+        'like_count' => 'integer',
     ];
 
-    // User Relationship
-    public function user()
+    /* -------------------------------------------------------------------------- */
+    /* Relationships                               */
+    /* -------------------------------------------------------------------------- */
+
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    // Likes Relationship (Using Pivot Table logic)
-    public function likes()
+    public function likes(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_story_likes', 'story_id', 'user_id')->withTimestamps();
     }
 
-    // Views Relationship
-    public function views()
+    /* -------------------------------------------------------------------------- */
+    /* Scopes                                   */
+    /* -------------------------------------------------------------------------- */
+
+    /**
+     * Scope to get only active (non-expired) stories.
+     */
+    public function scopeActive(Builder $query): Builder
     {
-        return $this->morphMany(View::class, 'viewable');
+        return $query->where('expires_at', '>', now());
     }
 
-    // Media Configuration
+    /* -------------------------------------------------------------------------- */
+    /* Media Config                                 */
+    /* -------------------------------------------------------------------------- */
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('stories')
-            ->useDisk('public') // Ya fir 's3' agar configure kiya hai
-            ->singleFile(); // Ek story me ek hi main file hogi
+            ->useDisk('public')
+            ->singleFile();
     }
 
-    // Thumbnail Conversion for Videos/Images
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
             ->width(300)
             ->height(300)
             ->sharpen(10)
-            ->nonQueued(); // Immediate generate ho, ya queue kar sakte ho performance ke liye
+            ->nonQueued();
     }
 }

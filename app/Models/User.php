@@ -126,6 +126,25 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->hasMany(Reel::class);
     }
+      /* -------------------------------------------------------------------------- */
+    /* Story System Relationships                                  */
+    /* -------------------------------------------------------------------------- */
+
+    /**
+     * A user has many stories.
+     */
+    public function stories()
+    {
+        return $this->hasMany(UserStory::class);
+    }
+
+    /**
+     * A user has many highlights.
+     */
+    public function highlights()
+    {
+        return $this->hasMany(UserStoryHighlight::class);
+    }
     public function products()
     {
         return $this->hasMany(Product::class);
@@ -153,11 +172,14 @@ class User extends Authenticatable implements HasMedia
 
     public function following()
     {
-        return $this->belongsToMany(User::class, 'followers', 'follower_id', 'following_id');
+        return $this->belongsToMany(User::class, 'followers', 'follower_id', 'following_id')
+            ->withTimestamps();
     }
+
     public function followers()
     {
-        return $this->belongsToMany(User::class, 'followers', 'following_id', 'follower_id');
+        return $this->belongsToMany(User::class, 'followers', 'following_id', 'follower_id')
+            ->withTimestamps();
     }
 
     public function isFollowing(User $user)

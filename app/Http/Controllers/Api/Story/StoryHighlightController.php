@@ -3,307 +3,152 @@
 namespace App\Http\Controllers\Api\Story;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Story\AddStoryToHighlightRequest;
 use App\Http\Requests\Story\CreateHighlightRequest;
 use App\Http\Resources\StoryHighlightResource;
 use App\Models\User;
 use App\Models\UserStory;
 use App\Models\UserStoryHighlight;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
-use Spatie\MediaLibrary\HasMedia;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Laravel\Telescope\AuthorizesRequests;
 
 class StoryHighlightController extends Controller
 {
-    // public function __construct()
-    // {
-    //     $this->middleware('auth:sanctum');
-    // }
-
-    public function index(Request $request): JsonResponse
-    {
-        $user = auth()->user();
-
-        // Optional: Cache key per user
-        $cacheKey = "user:{$user->id}:highlights";
-
-        // Optional: enable cache via query param
-        $useCache = $request->boolean('cache', true);
-
-        if ($useCache && Cache::has($cacheKey)) {
-            return response()->json(Cache::get($cacheKey));
-        }
-
-        // Get only user's highlights and exclude expired stories
-        $highlights = UserStoryHighlight::with(['stories' => function ($query) {
-            $query->where('expires_at', '>', now())->with('media');
-        }])
-            ->where('user_id', $user->id)
-            ->latest()
-            ->paginate($request->get('per_page', 10));
-
-        $response = [
-            'data' => StoryHighlightResource::collection($highlights),
-            'pagination' => [
-                'current_page' => $highlights->currentPage(),
-                'total_pages' => $highlights->lastPage(),
-                'total_items' => $highlights->total(),
-                'per_page' => $highlights->perPage(),
-            ]
-        ];
-
-        if ($useCache) {
-            Cache::put($cacheKey, $response, now()->addDay());
-        }
-
-        return response()->json($response);
-    }
-
-
-    public function getUserHighlights(Request $request, User $user = null): JsonResponse
-
+    use AuthorizesRequests;
+    /**
+     * Get Highlights for a specific User (or logged in user).
+     */
+    public function index(Request $request, string $username = null): JsonResponse
     {
         try {
-            $authUser = auth()->user();
-
-            if (! $authUser) {
-                return response()->json(['error' => 'Unauthenticated.'], 401);
+            // Determine target user
+            if ($username) {
+                $user = User::where('username', $username)->firstOrFail();
+            } else {
+                $user = Auth::user();
             }
 
-            // Use route param user if provided, else use auth user
-            $targetUser = $user ?? $authUser;
-
-            $cacheKey = "user:{$targetUser->id}:highlights";
-            $useCache = $request->boolean('cache', true);
-
-            if ($useCache && Cache::has($cacheKey)) {
-                return response()->json(Cache::get($cacheKey));
-            }
-
-            $highlights = UserStoryHighlight::with(['stories' => function ($query) {
-                $query->where('expires_at', '>', now())->with('media');
-            }])
-                ->where('user_id', $targetUser->id)
+            $highlights = UserStoryHighlight::with(['stories.media'])
+                ->where('user_id', $user->id)
                 ->latest()
-                ->paginate($request->get('per_page', 10));
-
-            $response = [
-                'data' => StoryHighlightResource::collection($highlights),
-                'pagination' => [
-                    'current_page' => $highlights->currentPage(),
-                    'total_pages' => $highlights->lastPage(),
-                    'total_items' => $highlights->total(),
-                    'per_page' => $highlights->perPage(),
-                ]
-            ];
-
-            if ($useCache) {
-                Cache::put($cacheKey, $response, now()->addDay());
-            }
-
-            return response()->json($response);
-        } catch (\Exception $e) {
-            \Log::error('Error fetching highlights: ' . $e->getMessage());
+                ->get(); // Highlights are usually limited, so paginate might not be needed strictly, but good to have if many
 
             return response()->json([
-                'error' => 'An unexpected error occurred while fetching highlights.'
-            ], 500);
+                'success' => true,
+                'data' => StoryHighlightResource::collection($highlights)
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'User not found or error loading highlights.'], 404);
         }
     }
 
-
-    public function store(CreateHighlightRequest $request): JsonResponse
+    /**
+     * Show a single highlight with its stories.
+     */
+    public function show(int $id): JsonResponse
     {
         try {
-            $user = auth()->user();
+            $highlight = UserStoryHighlight::with(['stories.media', 'user'])->findOrFail($id);
+            return response()->json(['success' => true, 'data' => new StoryHighlightResource($highlight)]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => 'Highlight not found.'], 404);
+        }
+    }
 
-            if (! $user) {
-                return response()->json(['error' => 'Unauthenticated.'], 401);
-            }
+    /**
+     * Create a Highlight.
+     */
+    public function store(CreateHighlightRequest $request): JsonResponse
+    {
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
 
-            // Pehle highlight create kar le bina cover_media_id ke
             $highlight = UserStoryHighlight::create([
                 'user_id' => $user->id,
                 'title' => $request->title,
             ]);
 
-            // Agar frontend se file upload hai to spatie media library me upload kar
+            // Handle Cover Image
             if ($request->hasFile('cover_media')) {
-                // Add media to collection, spatie media library me automatic handling hogi
                 $media = $highlight->addMedia($request->file('cover_media'))
-                    ->usingFileName(uniqid() . '.' . $request->file('cover_media')->getClientOriginalExtension())
                     ->toMediaCollection('cover_media');
 
-                // Compress and convert 1:1 aspect ratio - spatie media library me conversion use kar sakta hai
-                // Assuming media conversions configured in UserStoryHighlight model
-
-                // Update cover_media_id with saved media id
-                $highlight->cover_media_id = $media->id;
-                $highlight->save();
+                $highlight->update(['cover_media_id' => $media->id]);
             }
 
-            // Load related stories and media
-            $highlight->load('stories.media');
+            // Optionally add stories immediately during creation
+            if ($request->filled('story_ids')) {
+                // Ensure stories belong to user
+                $storyIds = UserStory::whereIn('id', $request->story_ids)
+                    ->where('user_id', $user->id)
+                    ->pluck('id');
 
-            return response()->json(new StoryHighlightResource($highlight), 201);
-        } catch (\Exception $e) {
-            \Log::error('Failed to create story highlight: ' . $e->getMessage());
+                $highlight->stories()->sync($storyIds);
+            }
+
+            DB::commit();
 
             return response()->json([
-                'error' => 'Failed to create highlight. Please try again later.'
-            ], 500);
+                'success' => true,
+                'message' => 'Highlight created.',
+                'data' => new StoryHighlightResource($highlight->load('stories'))
+            ], 201);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("Highlight Create Error: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to create highlight.'], 500);
         }
     }
 
-
-
-    public function addStory($highlightId, $storyId): JsonResponse
+    /**
+     * Add Story to Highlight.
+     */
+    public function addStory(int $highlightId, int $storyId): JsonResponse
     {
         try {
-            $user = auth()->user();
+            $user = Auth::user();
 
-            if (! $user) {
-                return response()->json(['error' => 'Unauthenticated.'], 401);
-            }
+            // Fetch Highlight
+            $highlight = UserStoryHighlight::where('id', $highlightId)->where('user_id', $user->id)->firstOrFail();
 
-            // Step 1: Find highlight belonging to the authenticated user
-            $highlight = UserStoryHighlight::where('id', $highlightId)
-                ->where('user_id', $user->id)
-                ->first();
+            // Fetch Story (Ensure ownership)
+            $story = UserStory::where('id', $storyId)->where('user_id', $user->id)->firstOrFail();
 
-            if (! $highlight) {
-                return response()->json(['error' => 'Highlight not found.'], 404);
-            }
-
-            // Step 2: Find the story by ID
-            $story = UserStory::find($storyId);
-
-            if (! $story) {
-                return response()->json(['error' => 'Story not found.'], 404);
-            }
-
-            // Step 3: Verify the story belongs to the user
-            if ($story->user_id !== $user->id) {
-                return response()->json(['error' => 'You can only add your own stories.'], 403);
-            }
-
-            // Step 4: Check if story already attached
-            if ($highlight->stories()->where('story_id', $story->id)->exists()) {
-                return response()->json([
-                    'message' => 'Story already added to highlight.',
-                    'highlight' => new StoryHighlightResource($highlight->load('stories.media')),
-                ], 200);
-            }
-
-            // Step 5: Attach the story without detaching existing ones
+            // Sync without detaching (adds if not exists)
             $highlight->stories()->syncWithoutDetaching([$story->id]);
 
-            // Step 6: Reload relations for accurate API response
-            $highlight->load('stories.media');
-
             return response()->json([
-                'message' => 'Story successfully added to highlight.',
-                'highlight' => new StoryHighlightResource($highlight),
+                'success' => true,
+                'message' => 'Story added to highlight.',
+                'data' => new StoryHighlightResource($highlight->fresh('stories.media'))
             ]);
         } catch (\Throwable $e) {
-            \Log::error('Error adding story to highlight:', [
-                'user_id' => auth()->id(),
-                'highlight_id' => $highlightId,
-                'story_id' => $storyId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'error' => 'An unexpected error occurred while adding the story to the highlight.',
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Could not add story.'], 400);
         }
     }
 
-
-
-
-    public function removeStory($highlightId, $storyId): JsonResponse
+    /**
+     * Remove Story from Highlight.
+     */
+    public function removeStory(int $highlightId, int $storyId): JsonResponse
     {
         try {
-            $user = auth()->user();
+            $user = Auth::user();
+            $highlight = UserStoryHighlight::where('id', $highlightId)->where('user_id', $user->id)->firstOrFail();
 
-            if (! $user) {
-                return response()->json(['error' => 'Unauthenticated.'], 401);
-            }
-
-            $highlight = UserStoryHighlight::where('id', $highlightId)
-                ->where('user_id', $user->id)
-                ->first();
-
-            if (! $highlight) {
-                return response()->json(['error' => 'Highlight not found.'], 404);
-            }
-
-            $story = UserStory::find($storyId);
-
-            if (! $story) {
-                return response()->json(['error' => 'Story not found.'], 404);
-            }
-
-            if ($story->user_id !== $user->id) {
-                return response()->json(['error' => 'You can only remove your own stories.'], 403);
-            }
-
-            // Detach the story from the highlight
-            $highlight->stories()->detach($story->id);
-
-            // Reload relationships to return updated data
-            $highlight->load('stories.media');
+            $highlight->stories()->detach($storyId);
 
             return response()->json([
-                'message' => 'Story successfully removed from highlight.',
-                'highlight' => new StoryHighlightResource($highlight),
+                'success' => true,
+                'message' => 'Story removed from highlight.',
+                'data' => new StoryHighlightResource($highlight->fresh('stories.media'))
             ]);
         } catch (\Throwable $e) {
-            \Log::error('Error removing story from highlight:', [
-                'user_id' => auth()->id(),
-                'highlight_id' => $highlightId,
-                'story_id' => $storyId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'error' => 'An unexpected error occurred while removing the story from the highlight.',
-            ], 500);
-        }
-    }
-    public function show($highlightId): JsonResponse
-    {
-        try {
-            $user = auth()->user();
-
-            if (! $user) {
-                return response()->json(['error' => 'Unauthenticated.'], 401);
-            }
-
-            // Fetch the highlight with stories and their media, ensuring it belongs to the user
-            $highlight = UserStoryHighlight::with('stories.media')
-                ->where('id', $highlightId)
-                ->where('user_id', $user->id)
-                ->first();
-
-            if (! $highlight) {
-                return response()->json(['error' => 'Highlight not found or access denied.'], 404);
-            }
-
-            return response()->json(new StoryHighlightResource($highlight));
-        } catch (\Throwable $e) {
-            \Log::error('Error fetching user story highlight:', [
-                'user_id' => auth()->id(),
-                'highlight_id' => $highlightId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'error' => 'An unexpected error occurred while fetching the highlight.',
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Could not remove story.'], 400);
         }
     }
 }
