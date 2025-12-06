@@ -6,177 +6,117 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Story\StoreStoryRequest;
 use App\Http\Resources\StoryFeedResource;
 use App\Http\Resources\StoryResource;
-use App\Jobs\GenerateThumbnailJob;
-use App\Models\User;
-use App\Models\UserStory;
-use App\Models\View;
+use App\Services\StoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class StoryController extends Controller
 {
-    /**
-     * Get Active Stories Grouped by User (Instagram Feed Style).
-     */
+    public function __construct(protected StoryService $storyService) {}
+
     public function index(Request $request): JsonResponse
     {
         try {
-            $perPage = $request->get('per_page', 30);
-            $authUser = Auth::user();
-
-            // Fetch Users who have active stories
-            // Optimize: Eager load stories and their media/likes/views
-            $usersWithStories = User::whereHas('stories', function ($query) {
-                $query->active();
-            })
-                ->with(['stories' => function ($query) use ($authUser) {
-                    $query->active()
-                        ->orderBy('created_at', 'asc') // Chronological order
-                        ->with(['media', 'views', 'likes']); // Eager load relations
-                }])
-                ->paginate($perPage);
+            $feed = $this->storyService->getFeed(Auth::user(), $request->get('per_page', 10));
 
             return response()->json([
                 'success' => true,
-                'data' => StoryFeedResource::collection($usersWithStories),
-                'pagination' => [
-                    'current_page' => $usersWithStories->currentPage(),
-                    'total_pages' => $usersWithStories->lastPage(),
+                'data' => StoryFeedResource::collection($feed),
+                'meta' => [
+                    'next_cursor' => $feed->nextCursor()?->encode(),
+                    'has_more' => $feed->hasMorePages(),
                 ]
             ]);
-        } catch (\Throwable $e) {
-            Log::error("Story Feed Error: " . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Unable to load stories.'], 500);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Failed to load feed.'], 500);
         }
     }
 
-    /**
-     * Create a New Story.
-     */
+    public function myStories(): JsonResponse
+    {
+        $result = $this->storyService->getUserStories(Auth::user(), Auth::user()->username);
+        return response()->json([
+            'success' => true,
+            'data' => StoryResource::collection($result['stories'])
+        ]);
+    }
+
+    public function getStoriesByUsername(string $username): JsonResponse
+    {
+        $result = $this->storyService->getUserStories(Auth::user(), $username);
+
+        if ($result['status'] === 'private') {
+            return response()->json(['success' => false, 'message' => 'Private Account.'], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'name' => $result['user']->name,
+                'username' => $result['user']->username,
+                'avatar' => $result['user']->profile_photo_url,
+                'is_mine' => Auth::id() === $result['user']->id,
+                'is_verified' => $result['user']->is_verified ?? false
+            ],
+            'data' => StoryResource::collection($result['stories'])
+        ]);
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        $story = $this->storyService->getStoryById(Auth::user(), $id);
+        if (!$story) {
+            return response()->json(['success' => false, 'message' => 'Story not found or private.'], 404);
+        }
+        return response()->json(['success' => true, 'data' => new StoryResource($story)]);
+    }
+
     public function store(StoreStoryRequest $request): JsonResponse
     {
-        DB::beginTransaction();
-
         try {
-            $user = Auth::user();
-
-            // Logic for expiration
-            $expiresAt = $request->filled('expires_at')
-                ? now()->parse($request->input('expires_at'))
-                : now()->addHours(24);
-
-            $mimeType = $request->file('media')->getMimeType();
-            $type = str_starts_with($mimeType, 'video/') ? 'video' : 'image';
-
-            $story = UserStory::create([
-                'user_id' => $user->id,
-                'caption' => $request->caption,
-                'meta' => $request->meta,
-                'type' => $type,
-                'expires_at' => $expiresAt,
-            ]);
-
-            $media = $story->addMedia($request->file('media'))->toMediaCollection('stories');
-
-            // Optional: Generate thumbnail for video in background
-            if ($type === 'video') {
-                dispatch(new GenerateThumbnailJob($story));
-            }
-
-            Cache::forget("user:{$user->id}:stories");
-
-            DB::commit();
+            $story = $this->storyService->createStory(
+                Auth::user(),
+                $request->validated(),
+                $request->file('media')
+            );
 
             return response()->json([
                 'success' => true,
-                'message' => 'Story uploaded successfully.',
+                'message' => 'Story uploaded.',
                 'data' => new StoryResource($story->load('media'))
             ], 201);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            Log::error("Story Upload Error: " . $e->getMessage());
+        } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Upload failed.'], 500);
         }
     }
 
-    /**
-     * Mark a story as viewed.
-     */
     public function markAsViewed(int $id): JsonResponse
     {
-        try {
-            $user = Auth::user();
-            $story = UserStory::findOrFail($id);
-
-            // Prevent duplicate view recording for this session/user
-            $existingView = $story->views()
-                ->where('user_id', $user->id)
-                ->exists();
-
-            if (!$existingView) {
-                $story->views()->create([
-                    'user_id' => $user->id,
-                    'ip_address' => request()->ip()
-                ]);
-            }
-
-            return response()->json(['success' => true]);
-        } catch (\Throwable $e) {
-            return response()->json(['success' => false], 500);
-        }
+        $this->storyService->markAsViewed(Auth::user(), $id);
+        return response()->json(['success' => true]);
     }
 
-    /**
-     * Toggle Like.
-     */
     public function toggleLike(int $id): JsonResponse
     {
-        DB::beginTransaction();
         try {
-            $user = Auth::user();
-            $story = UserStory::active()->findOrFail($id);
-
-            $hasLiked = $story->likes()->where('user_id', $user->id)->exists();
-
-            if ($hasLiked) {
-                $story->likes()->detach($user->id);
-                $story->decrement('like_count');
-                $message = 'Unliked';
-            } else {
-                $story->likes()->attach($user->id);
-                $story->increment('like_count');
-                $message = 'Liked';
-            }
-
-            DB::commit();
-
+            $data = $this->storyService->toggleLike(Auth::user(), $id);
             return response()->json([
                 'success' => true,
-                'message' => $message,
-                'like_count' => $story->fresh()->like_count
+                'message' => $data['is_liked'] ? 'Liked' : 'Unliked',
+                'like_count' => $data['count'],
+                'is_liked' => $data['is_liked']
             ]);
-        } catch (\Throwable $e) {
-            DB::rollBack();
+        } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Action failed.'], 500);
         }
     }
 
-    /**
-     * Delete a Story.
-     */
     public function destroy(int $id): JsonResponse
     {
-        try {
-            $story = UserStory::where('user_id', Auth::id())->findOrFail($id);
-            $story->delete();
-
-            return response()->json(['success' => true, 'message' => 'Story deleted.']);
-        } catch (\Throwable $e) {
-            return response()->json(['success' => false, 'message' => 'Failed to delete.'], 500);
-        }
+        $deleted = $this->storyService->deleteStory(Auth::user(), $id);
+        return $deleted
+            ? response()->json(['success' => true, 'message' => 'Deleted.'])
+            : response()->json(['success' => false, 'message' => 'Unauthorized or not found.'], 403);
     }
 }

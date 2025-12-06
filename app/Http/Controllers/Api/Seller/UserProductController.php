@@ -38,7 +38,7 @@ class UserProductController extends Controller
             $products = UserProduct::with('images')
                 ->where('seller_id', $user->id)
                 ->latest()
-                ->paginate(10);
+                ->simplePaginate(10);
 
 
             return response()->json([
@@ -85,7 +85,7 @@ class UserProductController extends Controller
             $products = UserProduct::with('images')
                 ->where('seller_id', $seller->id)
                 ->latest()
-                ->paginate(10);
+                ->simplePaginate(10);
 
             return response()->json([
                 'success' => true,

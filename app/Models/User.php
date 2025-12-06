@@ -120,11 +120,11 @@ class User extends Authenticatable implements HasMedia
     }
     public function posts()
     {
-        return $this->hasMany(Post::class);
+        return $this->hasMany(UserPost::class);
     }
     public function reels()
     {
-        return $this->hasMany(Reel::class);
+        return $this->hasMany(UserPost::class)->where('type', 'reel');
     }
       /* -------------------------------------------------------------------------- */
     /* Story System Relationships                                  */

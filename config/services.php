@@ -38,7 +38,10 @@ return [
         'key' => env('RAZORPAY_KEY'),
         'secret' => env('RAZORPAY_SECRET'),
     ],
-
+    'ffmpeg' => [
+        'ffmpeg_path' => env('FFMPEG_PATH'),
+        'ffprobe_path' => env('FFPROBE_PATH'),
+    ],
 
 
 ];

@@ -44,7 +44,7 @@ class UserPostController extends Controller
                 ->active()
                 ->with(['user.interests', 'media'])
                 ->forYou() // Algorithmic scope
-                ->paginate(20);
+                ->simplePaginate(15);
 
             return PostResource::collection($posts);
         } catch (\Exception $e) {
@@ -65,7 +65,7 @@ class UserPostController extends Controller
                 ->whereIn('type', ['post', 'carousel', 'video'])
                 ->with(['user.interests', 'media'])
                 ->trending()
-                ->paginate(20);
+                ->simplePaginate(15);
 
             return PostResource::collection($posts);
         } catch (\Exception $e) {
@@ -86,7 +86,7 @@ class UserPostController extends Controller
                 ->ofType('video')
                 ->with(['user.interests', 'media'])
                 ->trending()
-                ->paginate(15);
+                ->simplePaginate(15);
 
             return PostResource::collection($videos);
         } catch (\Exception $e) {
@@ -107,7 +107,7 @@ class UserPostController extends Controller
                 ->ofType('reel')
                 ->with(['user.interests', 'media'])
                 ->trending()
-                ->paginate(10);
+                ->simplePaginate(15);
 
             return PostResource::collection($reels);
         } catch (\Exception $e) {
@@ -257,7 +257,7 @@ class UserPostController extends Controller
 
             // 6. Sorting & Pagination
             $posts = $query->orderBy('created_at', 'DESC')
-                ->paginate(12);
+                ->simplePaginate(12);
 
             // 7. Return Resource
             return PostResource::collection($posts)->additional([

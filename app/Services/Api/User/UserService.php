@@ -201,7 +201,54 @@ class UserService
             $token->delete();
         }
     }
+    /**
+     * Get full user profile with relation status (following/follower)
+     */
+    public function getUserProfileDetails(string $username): ?array
+    {
+        // 1. User Fetch karein
+        $user = $this->findByUsername($username);
 
+        if (!$user) {
+            return null;
+        }
+
+        // 2. Viewer (Logged-in user) ko identify karein
+        // Hum service ke andar hi auth check kar rahe hain taaki controller clean rahe
+        $currentUser = auth('sanctum')->user();
+
+        $isMine = false;
+        $isFollowing = false;
+        $isFollower = false;
+
+        if ($currentUser) {
+            // Check: Kya ye profile meri hai?
+            $isMine = (int)$currentUser->id === (int)$user->id;
+
+            if (!$isMine) {
+                // Check relations only if it's not my own profile
+                $isFollowing = $currentUser->isFollowing($user);
+                $isFollower = $user->isFollowing($currentUser);
+            }
+        }
+
+        // 3. Extra Counts (Active Posts)
+        $postCount = $user->posts()->where('status', 'active')->count();
+
+        // 4. Data Merge & Return
+        $userData = $user->toArray();
+
+        // Custom fields inject kar rahe hain
+        $userData['posts_count'] = $postCount;
+        $userData['is_mine'] = $isMine;
+        $userData['is_following'] = $isFollowing;
+        $userData['is_follower'] = $isFollower;
+
+        return $userData;
+    }
+    /**
+     *  Find User by Username
+     */
     public function findByUsername(string $username): ?User
     {
         return User::with('interests.category')->where('username', $username)->first();

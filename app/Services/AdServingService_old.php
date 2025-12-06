@@ -9,7 +9,7 @@ use App\Models\AdImpression;
 use Illuminate\Support\Str;
 
 
-class AdServingService
+class AdServingService_old
 {
     /**
      * Get one ad to show for the user (simplified selection algorithm).

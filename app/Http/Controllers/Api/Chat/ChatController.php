@@ -45,7 +45,7 @@ class ChatController extends Controller
             $query->where('type', 'group');
         }
 
-        $chats = $query->orderByDesc('last_message_at')->paginate(20);
+        $chats = $query->orderByDesc('last_message_at')->simplePaginate(20);
 
         return $this->success([
             'chats' => ChatResource::collection($chats)->response()->getData(true)

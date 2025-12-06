@@ -126,16 +126,19 @@ Route::prefix('v1')->group(function () {
          */
         Route::prefix('stories')->group(function () {
 
-            // Feed: Get Users with Active Stories (Instagram bubble style)
+            // Feeds
             Route::get('/feed', [StoryController::class, 'index']);
+            Route::get('/me', [StoryController::class, 'myStories']);
+            Route::get('/user/{username}', [StoryController::class, 'getStoriesByUsername']);
 
-            // Actions
+            // Single Story CRUD
             Route::post('/', [StoryController::class, 'store']);
+            Route::get('/{id}', [StoryController::class, 'show']);
             Route::delete('/{id}', [StoryController::class, 'destroy']);
 
             // Engagement
-            Route::post('/{id}/view', [StoryController::class, 'markAsViewed']); // Mark viewed
-            Route::post('/{id}/like', [StoryController::class, 'toggleLike']);   // Single toggle endpoint is cleaner
+            Route::post('/{id}/view', [StoryController::class, 'markAsViewed']);
+            Route::post('/{id}/like', [StoryController::class, 'toggleLike']);
 
             /* -------------------------- Highlights Sub-Routes ------------------------- */
 

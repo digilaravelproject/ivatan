@@ -33,7 +33,7 @@ class UserServiceController extends Controller
             $services = UserService::with('images')
                 ->where('seller_id', $user->id)
                 ->latest()
-                ->paginate(10);
+                ->simplePaginate(10);
 
             return $this->successResponse('Services fetched successfully.', $services);
         } catch (\Throwable $e) {
@@ -63,7 +63,7 @@ class UserServiceController extends Controller
             $services = UserService::with('images')
                 ->where('seller_id', $seller->id)
                 ->latest()
-                ->paginate(10);
+                ->simplePaginate(10);
 
             return $this->successResponse('Seller services fetched successfully.', $services);
         } catch (\Throwable $e) {

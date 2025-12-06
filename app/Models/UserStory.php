@@ -32,10 +32,13 @@ class UserStory extends Model implements HasMedia
         'like_count' => 'integer',
     ];
 
-    /* -------------------------------------------------------------------------- */
-    /* Relationships                               */
-    /* -------------------------------------------------------------------------- */
+    // Scopes
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('expires_at', '>', now());
+    }
 
+    // Relationships
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -43,38 +46,29 @@ class UserStory extends Model implements HasMedia
 
     public function likes(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'user_story_likes', 'story_id', 'user_id')->withTimestamps();
+        return $this->belongsToMany(User::class, 'user_story_likes', 'story_id', 'user_id')
+            ->withTimestamps();
     }
 
-    /* -------------------------------------------------------------------------- */
-    /* Scopes                                   */
-    /* -------------------------------------------------------------------------- */
-
-    /**
-     * Scope to get only active (non-expired) stories.
-     */
-    public function scopeActive(Builder $query): Builder
-    {
-        return $query->where('expires_at', '>', now());
-    }
-
-    /* -------------------------------------------------------------------------- */
-    /* Media Config                                 */
-    /* -------------------------------------------------------------------------- */
-
+    // Media Config
     public function registerMediaCollections(): void
     {
+        $disk = config('media-library.disk_name', 'public');
         $this->addMediaCollection('stories')
-            ->useDisk('public')
+            ->useDisk($disk)
+            ->singleFile();
+        // Generated Thumbnail (Sirf Video ke liye use hoga)
+        $this->addMediaCollection('thumbnail')
+            ->useDisk($disk) // Ye bhi S3 par jayega
             ->singleFile();
     }
 
+    // Handles IMAGE thumbnails automatically
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
             ->width(300)
             ->height(300)
-            ->sharpen(10)
-            ->nonQueued();
+            ->sharpen(10);
     }
 }

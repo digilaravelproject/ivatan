@@ -94,15 +94,14 @@ class UserController extends Controller
     public function show($username)
     {
         try {
-            $user = $this->userService->findByUsername($username);
+            // Saara logic service handle karega
+            $userData = $this->userService->getUserProfileDetails($username);
 
-            if (!$user) {
+            if (!$userData) {
                 return $this->error('User not found.', 404);
             }
-            $postCount = $user->posts()->where('status', 'active')->count();
-            $userData = $user->toArray();
-            $userData['posts_count'] = $postCount;
-            return $this->success(['user' => $user], 'User details retrieved successfully.');
+
+            return $this->success(['user' => $userData], 'User details retrieved successfully.');
         } catch (\Exception $e) {
             \Log::error($e);
             return $this->error($e->getMessage());

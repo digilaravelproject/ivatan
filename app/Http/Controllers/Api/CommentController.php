@@ -43,7 +43,7 @@ class CommentController extends Controller
                 ->with(['user', 'replies.user', 'replies.likes'])
                 ->withCount('replies')
                 ->latest()
-                ->get();
+                ->simplePaginate(30);
 
             return response()->json([
                 'success' => true,
