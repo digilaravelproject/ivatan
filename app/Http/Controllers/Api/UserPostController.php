@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Response;
 use App\Jobs\ProcessMediaJob;
+use App\Models\User;
+use App\Services\ViewTrackingService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -202,13 +204,85 @@ class UserPostController extends Controller
         }
     }
 
+    public function getPostsByUser(Request $request, $username): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            // 1. Target User ko find karo
+            $targetUser = User::where('username', $username)->first();
+
+            if (!$targetUser) {
+                return response()->json(['message' => 'User not found.'], 404);
+            }
+
+            // 2. Current Logged-in User (Check karo kaun dekh raha hai)
+            /** @var \App\Models\User|null $currentUser */
+            $currentUser = Auth::guard('sanctum')->user();
+
+            // 3. Privacy Check Logic
+            $isMine = $currentUser && $currentUser->id === $targetUser->id;
+
+            // Check following status
+            $isFollowing = false;
+            if ($currentUser && !$isMine) {
+                $isFollowing = $currentUser->isFollowing($targetUser);
+            }
+
+            // AGAR Account Private hai AND (Na main khud hu, Na main follower hu) -> ACCESS DENIED
+            if ($targetUser->account_privacy === 'private' && !$isMine && !$isFollowing) {
+                return response()->json([
+                    'message' => 'This account is private. Follow to see their posts.',
+                    'is_private' => true,
+                    'posts' => []
+                ], 403);
+            }
+
+            // 4. Query Build Karo
+            $query = UserPost::query()
+                ->where('user_id', $targetUser->id)
+                ->active() // Sirf Active posts
+                ->with(['media', 'user']); // Eager load relations
+
+            // ✅ 5. APPLY FILTER LOGIC HERE
+            // Frontend bhejega: ?filter=posts YA ?filter=videos YA ?filter=all
+            $filter = $request->get('filter', 'all');
+
+            if ($filter === 'posts') {
+                // Filter 1: Sirf Images aur Carousels
+                $query->whereIn('type', ['post', 'carousel']);
+            } elseif ($filter === 'videos') {
+                // Filter 2: Sirf Videos aur Reels
+                $query->whereIn('type', ['video', 'reel']);
+            }
+            // else case 'all' hai, usme koi where clause nahi lagega (sab aayega)
+
+            // 6. Sorting & Pagination
+            $posts = $query->orderBy('created_at', 'DESC')
+                ->paginate(12);
+
+            // 7. Return Resource
+            return PostResource::collection($posts)->additional([
+                'meta' => [
+                    'user_stats' => [
+                        'post_count' => $targetUser->posts()->active()->count(), // Total count hamesha full dikhana chahiye
+                        'is_private' => $targetUser->account_privacy === 'private',
+                        'is_following' => $isFollowing,
+                        'current_filter' => $filter // Frontend ko batao kaunsa filter laga hai
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error("User Posts Error: " . $e->getMessage());
+            return response()->json(['error' => 'An error occurred.'], 500);
+        }
+    }
     /**
      * Show a single post.
      */
-    public function show(UserPost $post): JsonResponse
+    public function show(Request $request, UserPost $post, ViewTrackingService $viewService): JsonResponse
     {
         try {
-            $post->increment('view_count');
+            // $post->increment('view_count');
+            $viewService->track($post, $request);
             return response()->json(new PostResource($post->load('media', 'user')));
         } catch (AuthorizationException $e) {
             return response()->json(['message' => 'You are not authorized to view this post.'], 403);

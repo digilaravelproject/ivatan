@@ -6,30 +6,18 @@ use App\Models\User;
 use App\Traits\AutoGeneratesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Notifications\Notifiable;
 
-/**
- * Class UserChat
- * Represents a conversation (Private or Group).
- *
- * @property int $id
- * @property string $uuid
- * @property string $type 'private' or 'group'
- * @property string|null $name
- * @property int|null $owner_id
- * @property array|null $meta
- * @property string|null $last_message_at
- */
 class UserChat extends Model
 {
-    use HasFactory, AutoGeneratesUuid, Notifiable;
+    use HasFactory, AutoGeneratesUuid;
 
     protected $table = 'user_chats';
 
     protected $fillable = [
         'uuid',
-        'type',
+        'type', // private, group
         'name',
+        'avatar_path', // New Column
         'owner_id',
         'meta',
         'last_message_at'
@@ -40,6 +28,14 @@ class UserChat extends Model
         'last_message_at' => 'datetime',
     ];
 
+    // --- Accessor ---
+    public function getAvatarUrlAttribute()
+    {
+        return $this->avatar_path ? url('storage/' . $this->avatar_path) : null;
+    }
+
+    // --- Relations ---
+
     public function participants()
     {
         return $this->hasMany(UserChatParticipant::class, 'chat_id');
@@ -47,16 +43,11 @@ class UserChat extends Model
 
     public function messages()
     {
-        return $this->hasMany(UserChatMessage::class, 'chat_id')->orderBy('created_at', 'asc');
+        return $this->hasMany(UserChatMessage::class, 'chat_id');
     }
 
     public function lastMessage()
     {
         return $this->hasOne(UserChatMessage::class, 'chat_id')->latestOfMany();
-    }
-
-    public function owner()
-    {
-        return $this->belongsTo(User::class, 'owner_id');
     }
 }

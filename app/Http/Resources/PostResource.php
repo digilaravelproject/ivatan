@@ -9,6 +9,7 @@ class PostResource extends JsonResource
 {
     public function toArray($request): array
     {
+
         // 1. Logged-in User
         // ✅ FIX: DocBlock add kiya taaki IDE ko pata chale ye App\Models\User hai
         /** @var \App\Models\User|null $authUser */
@@ -88,6 +89,7 @@ class PostResource extends JsonResource
             'stats' => [
                 'like_count' => $this->like_count,
                 'comment_count' => $this->comment_count,
+                'share_count' => 0, // Placeholder for future
                 'view_count' => $this->view_count,
                 'is_liked' => $authUser ? (bool) $this->likes()->where('user_id', $authUser->id)->exists() : false,
                 'is_saved' => false,

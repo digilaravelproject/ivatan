@@ -11,7 +11,7 @@ class AddParticipantsRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth()->check();
+        return true;
     }
 
     /**
@@ -21,7 +21,7 @@ class AddParticipantsRequest extends FormRequest
      */
     public function rules(): array
     {
-       return [
+        return [
             'member_ids' => 'required|array|min:1',
             'member_ids.*' => 'integer|exists:users,id|distinct',
         ];

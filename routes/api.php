@@ -93,6 +93,7 @@ Route::prefix('v1')->group(function () {
 
             // 3. Toggle Like (Single Endpoint)
             Route::post('/{id}/like', 'toggleLike');
+            Route::get('/user/{username}', 'getPostsByUser');
         });
         // ================================
         // View Management Routes
@@ -272,29 +273,53 @@ Route::prefix('v1')->group(function () {
         // Chats Routes
         // ================================
 
+        Route::middleware('auth:sanctum')->prefix('chats')->controller(ChatController::class)->group(function () {
 
-        Route::prefix('chats')->controller(ChatController::class)->group(function () {
+            // Inbox
+            Route::get('/', 'index'); // ?filter=groups
 
-            // 1. Inbox & Single Chat
-            Route::get('/', 'index');                  // List all chats
-            Route::get('/{chat}', 'show')->whereNumber('chat'); // Chat details
+            // Create/Open
+            Route::post('/private', 'openPrivate');
+            Route::post('/group', 'createGroup'); // Needs CreateGroupChatRequest
 
-            // 2. Start Private Chat
-            Route::post('/private', 'openPrivate');    // Start/Open private chat
+            // Single Chat
+            Route::prefix('{chat}')->group(function () {
+                Route::get('/', 'show');
+                Route::get('/messages', 'messages');
+                Route::post('/messages', 'sendMessage');
+                Route::post('/read', 'markRead');
 
-            // 3. Group Management
-            Route::prefix('group')->group(function () {
-                Route::post('/', 'createGroup');       // Create group
-                Route::post('/{chat}/participants', 'addParticipants'); // Add members
-                Route::delete('/{chat}/participants/{userId}', 'removeParticipant'); // Remove member
-                Route::post('/{chat}/leave', 'leaveOrRemove'); // Leave or bulk remove
+                // Group Actions (Can separate controller later)
+                Route::post('/participants', 'addParticipants');
+                Route::post('/leave', 'leaveGroup');
             });
 
-            // 4. Messages & Interactions
-            Route::post('/{chat}/messages', 'sendMessage');  // Send message
-            Route::get('/{chat}/messages', 'messages');      // Get messages (Lazy load)
-            Route::post('/read/{chat}', 'markRead');         // Mark messages as read
+            // Message Actions
+            Route::delete('/messages/{message}', 'deleteMessage'); // Payload: { delete_for_everyone: true/false }
         });
+
+        // Route::prefix('chats')->controller(ChatController::class)->group(function () {
+
+        //     // 1. Inbox & Single Chat
+        //     Route::get('/', 'index');                  // List all chats
+        //     Route::get('/{chat}', 'show')->whereNumber('chat'); // Chat details
+
+        //     // 2. Start Private Chat
+        //     Route::post('/private', 'openPrivate');    // Start/Open private chat
+
+        //     // 3. Group Management
+        //     Route::prefix('group')->group(function () {
+        //         Route::post('/', 'createGroup');       // Create group
+        //         Route::post('/{chat}/participants', 'addParticipants'); // Add members
+        //         Route::delete('/{chat}/participants/{userId}', 'removeParticipant'); // Remove member
+        //         Route::post('/{chat}/leave', 'leaveOrRemove'); // Leave or bulk remove
+        //     });
+
+        //     // 4. Messages & Interactions
+        //     Route::post('/{chat}/messages', 'sendMessage');  // Send message
+        //     Route::get('/{chat}/messages', 'messages');      // Get messages (Lazy load)
+        //     Route::post('/read/{chat}', 'markRead');         // Mark messages as read
+        // });
 
 
 

@@ -3,15 +3,16 @@
 namespace App\Http\Requests\Chat;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class CreatePrivateChatRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
-    public function authorize(): bool
+    public function authorize()
     {
-        return auth()->check();
+        return true;
     }
 
     /**
@@ -26,7 +27,7 @@ class CreatePrivateChatRequest extends FormRequest
                 'required',
                 'integer',
                 'exists:users,id',
-                'different:' . auth()->id(),
+                'different:' . Auth::id(),
                 // Rule::notIn(BlockedUser::where('user_id', auth()->id())->pluck('blocked_user_id')->toArray()),
             ],
         ];

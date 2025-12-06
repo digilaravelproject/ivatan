@@ -101,6 +101,40 @@ class UserPost extends Model implements HasMedia
     public function scopeTrending($query)
     {
         return $query->active()
+            ->orderBy('trending_score', 'DESC'); // Super Fast Index Scan
+    }
+    public function scopeTrending__old($query)
+    {
+        return $query->active()
+            ->orderByRaw('
+            (
+                -- PART 1: Engagement Score (Weighted)
+                (
+                    (view_count * 0.5) +       -- Views ko kam weight (Cheap metric)
+                    (like_count * 10) +        -- Likes ko medium weight
+                    (comment_count * 20)       -- Comments ko High weight (Effort lagta hai)
+                )
+                * -- PART 2: Content Type Multiplier (Reels ko 1.5x Boost)
+                (CASE
+                    WHEN type = "reel" THEN 1.5
+                    WHEN type = "video" THEN 1.2
+                    ELSE 1.0
+                END)
+                +
+                -- PART 3: "Freshness Bonus" (Pehle 24 ghante me extra 500 points)
+                (CASE
+                    WHEN created_at >= NOW() - INTERVAL 24 HOUR THEN 500
+                    ELSE 0
+                END)
+            )
+            /
+            -- PART 4: Time Decay (Gravity increased to 1.8 for faster turnover)
+            POW((TIMESTAMPDIFF(HOUR, created_at, NOW()) + 2), 1.8)
+            DESC');
+    }
+    public function scopeTrending_old($query)
+    {
+        return $query->active()
             ->orderByRaw('(view_count + (like_count * 5) + (comment_count * 10)) DESC')
             ->orderBy('created_at', 'DESC');
     }

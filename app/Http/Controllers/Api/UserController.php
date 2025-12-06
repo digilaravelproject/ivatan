@@ -99,7 +99,9 @@ class UserController extends Controller
             if (!$user) {
                 return $this->error('User not found.', 404);
             }
-
+            $postCount = $user->posts()->where('status', 'active')->count();
+            $userData = $user->toArray();
+            $userData['posts_count'] = $postCount;
             return $this->success(['user' => $user], 'User details retrieved successfully.');
         } catch (\Exception $e) {
             \Log::error($e);
