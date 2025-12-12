@@ -232,14 +232,10 @@ class UserService
             }
         }
 
-        // 3. Extra Counts (Active Posts)
-        $postCount = $user->posts()->where('status', 'active')->count();
-
         // 4. Data Merge & Return
         $userData = $user->toArray();
 
         // Custom fields inject kar rahe hain
-        $userData['posts_count'] = $postCount;
         $userData['is_mine'] = $isMine;
         $userData['is_following'] = $isFollowing;
         $userData['is_follower'] = $isFollower;
@@ -251,6 +247,8 @@ class UserService
      */
     public function findByUsername(string $username): ?User
     {
-        return User::with('interests.category')->where('username', $username)->first();
+        return User::with('interests.category')->where('username', $username)->withCount(['followers', 'following'])->withCount(['posts' => function ($query) {
+            $query->where('status', 'active');
+        }])->first();
     }
 }

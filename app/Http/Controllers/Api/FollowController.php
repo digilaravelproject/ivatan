@@ -9,11 +9,18 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Laravel\Telescope\AuthorizesRequests;
+use App\Http\Resources\UserFollowResource;
+use App\Services\FollowService; // Service import
 
 class FollowController extends Controller
 {
-    use AuthorizesRequests;
+    protected $followService;
+
+    public function __construct(FollowService $followService)
+    {
+        $this->followService = $followService;
+    }
+
     /**
      * Follow a user.
      *
@@ -23,66 +30,28 @@ class FollowController extends Controller
      */
     public function follow(Request $request, $userId): JsonResponse
     {
-        // 1. Start Transaction for Data Integrity
-        DB::beginTransaction();
+        $authUser = Auth::user();
 
-        try {
-            $authUser = Auth::user();
-
-            if (!$authUser) {
-                return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
-            }
-
-            // Self follow check
-            if ((int)$authUser->id === (int)$userId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You cannot follow yourself.',
-                    'code' => 'SELF_ACTION_FORBIDDEN'
-                ], 422);
-            }
-
-            $userToFollow = User::lockForUpdate()->find($userId); // lockForUpdate prevents race conditions
-
-            if (!$userToFollow) {
-                DB::rollBack();
-                return response()->json(['success' => false, 'message' => 'User not found.'], 404);
-            }
-
-            // Already following check
-            if ($authUser->isFollowing($userToFollow)) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Already following.',
-                    'code' => 'ALREADY_FOLLOWING'
-                ], 200);
-            }
-
-            // 2. Main Logic: Attach & Increment
-            $authUser->following()->attach($userId);
-
-            // Manual Increment (Fast & Reliable)
-            $authUser->increment('following_count');
-            $userToFollow->increment('followers_count');
-
-            // 3. Commit Transaction
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Followed successfully.'
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack(); // Kuch bhi galat hua to database purani state me aa jayega
-            Log::error("Follow Error: " . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Something went wrong.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+        if (!$authUser) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
+
+        $result = $this->followService->followUser($authUser, $userId);
+
+        if ($result['success']) {
+            // Handle success (including 'Already Following')
+            $statusCode = ($result['code'] ?? null) === 'ALREADY_FOLLOWING' ? 200 : 200;
+            return response()->json($result, $statusCode);
+        }
+
+        // Handle errors based on code
+        $statusCode = match ($result['code'] ?? 'SERVER_ERROR') {
+            'NOT_FOUND' => 404,
+            'SELF_ACTION_FORBIDDEN' => 422,
+            default => 500,
+        };
+
+        return response()->json($result, $statusCode);
     }
 
     /**
@@ -94,68 +63,32 @@ class FollowController extends Controller
      */
     public function unfollow(Request $request, $userId): JsonResponse
     {
-        DB::beginTransaction();
+        $authUser = Auth::user();
 
-        try {
-            $authUser = Auth::user();
-
-            if (!$authUser) {
-                return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
-            }
-
-            if ((int)$authUser->id === (int)$userId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You cannot unfollow yourself.',
-                    'code' => 'SELF_ACTION_FORBIDDEN'
-                ], 422);
-            }
-
-            $userToUnfollow = User::lockForUpdate()->find($userId);
-
-            if (!$userToUnfollow) {
-                DB::rollBack();
-                return response()->json(['success' => false, 'message' => 'User not found.'], 404);
-            }
-
-            // Check relation
-            if (!$authUser->isFollowing($userToUnfollow)) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You are not following this user.',
-                    'code' => 'NOT_FOLLOWING'
-                ], 400);
-            }
-
-            // 2. Main Logic: Detach & Decrement
-            $authUser->following()->detach($userId);
-
-            // Manual Decrement (Ensure count doesn't go below 0)
-            if ($authUser->following_count > 0) {
-                $authUser->decrement('following_count');
-            }
-            if ($userToUnfollow->followers_count > 0) {
-                $userToUnfollow->decrement('followers_count');
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Unfollowed successfully.'
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Unfollow Error: " . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Something went wrong.',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+        if (!$authUser) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
+
+        $result = $this->followService->unfollowUser($authUser, $userId);
+
+        if ($result['success']) {
+            return response()->json($result, 200);
+        }
+
+        // Handle errors based on code
+        $statusCode = match ($result['code'] ?? 'SERVER_ERROR') {
+            'NOT_FOUND' => 404,
+            'SELF_ACTION_FORBIDDEN' => 422,
+            'NOT_FOLLOWING' => 400,
+            default => 500,
+        };
+
+        return response()->json($result, $statusCode);
     }
+
+    // --------------------------------------------------------------------------
+    // List Methods (Optimized with DB::raw for follow status check)
+    // --------------------------------------------------------------------------
 
     /**
      * Get list of followers.
@@ -166,20 +99,34 @@ class FollowController extends Controller
     public function getFollowers($userId): JsonResponse
     {
         try {
-            $user = User::find($userId);
+            // Only fetch ID to find user
+            $user = User::select(['id'])->find($userId);
             if (!$user) {
                 return response()->json(['success' => false, 'message' => 'User not found.'], 404);
             }
 
-            // Using simplePaginate is better for performance than get() for lists
-            $followers = $user->followers()
-                ->select(['users.id', 'users.name', 'users.uuid', 'users.username', 'users.profile_photo_path'])
-                ->simplePaginate(50);
+            $authUserId = Auth::id();
 
-            return response()->json([
-                'success' => true,
-                'data' => $followers
-            ], 200);
+            // Select minimal columns required for the resource
+            $selectColumns = ['users.id', 'users.name', 'users.username', 'users.profile_photo_path', 'users.is_verified'];
+
+            $followersQuery = $user->followers()->select($selectColumns);
+
+            // Efficiently check if the authenticated user follows the follower
+            if ($authUserId) {
+                $followersQuery->leftJoin('followers as auth_follows', function ($join) use ($authUserId) {
+                    $join->on('users.id', '=', 'auth_follows.following_id')
+                        ->where('auth_follows.follower_id', '=', $authUserId);
+                })
+                    ->addSelect(DB::raw('auth_follows.follower_id IS NOT NULL as is_followed_by_auth_user'));
+            } else {
+                $followersQuery->addSelect(DB::raw('FALSE as is_followed_by_auth_user'));
+            }
+
+            $followers = $followersQuery->simplePaginate(50);
+
+            // Use the lean UserFollowResource
+            return UserFollowResource::collection($followers)->response();
         } catch (\Exception $e) {
             Log::error("Get Followers Error: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server Error'], 500);
@@ -195,19 +142,34 @@ class FollowController extends Controller
     public function getFollowing($userId): JsonResponse
     {
         try {
-            $user = User::find($userId);
+            // Only fetch ID to find user
+            $user = User::select(['id'])->find($userId);
             if (!$user) {
                 return response()->json(['success' => false, 'message' => 'User not found.'], 404);
             }
 
-            $following = $user->following()
-                ->select(['users.id', 'users.name', 'users.uuid', 'users.username', 'users.profile_photo_path'])
-                ->simplePaginate(50);
+            $authUserId = Auth::id();
 
-            return response()->json([
-                'success' => true,
-                'data' => $following
-            ], 200);
+            // Select minimal columns required for the resource
+            $selectColumns = ['users.id', 'users.name', 'users.username', 'users.profile_photo_path', 'users.is_verified'];
+
+            $followingQuery = $user->following()->select($selectColumns);
+
+            // Efficiently check if the authenticated user follows the following user
+            if ($authUserId) {
+                $followingQuery->leftJoin('followers as auth_follows', function ($join) use ($authUserId) {
+                    $join->on('users.id', '=', 'auth_follows.following_id')
+                        ->where('auth_follows.follower_id', '=', $authUserId);
+                })
+                    ->addSelect(DB::raw('auth_follows.follower_id IS NOT NULL as is_followed_by_auth_user'));
+            } else {
+                $followingQuery->addSelect(DB::raw('FALSE as is_followed_by_auth_user'));
+            }
+
+            $following = $followingQuery->simplePaginate(50);
+
+            // Use the lean UserFollowResource
+            return UserFollowResource::collection($following)->response();
         } catch (\Exception $e) {
             Log::error("Get Following Error: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server Error'], 500);

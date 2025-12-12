@@ -26,7 +26,7 @@ class UserPostController extends Controller
     /**
      * Get the authenticated user.
      */
-    private function getAuthUser(): \App\Models\User
+    private function getAuthUser()
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
