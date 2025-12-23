@@ -23,6 +23,7 @@ class User extends Authenticatable implements HasMedia
 
     protected $fillable = [
         'uuid',
+        'google_id',
         'username',
         'occupation',
         'name',

@@ -21,18 +21,60 @@ use App\Http\Controllers\Api\Chat\ChatController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\CommentController;
+use App\Http\Controllers\Api\Contact\ContactSyncController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Ecommerce\OrderController;
 use App\Http\Controllers\Api\Seller\UserSellerController;
 use App\Http\Controllers\Api\ViewController;
 use App\Http\Controllers\CacheClearController;
+use App\Http\Controllers\Api\GoogleAuthController;
 
+// use Illuminate\Support\Facades\Artisan;
+
+// Route::get('/run-migration', function (Request $request) {
+    
+//     // 🔒 SECURITY: Bina key ke run mat karne dena
+//     // Browser me ?key=my_secret_pass lagana padega
+//     if ($request->query('key') !== 'my_secret_pass_123') {
+//         return response()->json(['error' => 'Unauthorized access!'], 403);
+//     }
+
+//     try {
+//         // --force lagana zaruri hai production server ke liye
+//         Artisan::call('migrate', ["--force" => true]);
+        
+//         return response()->json([
+//             'status' => true,
+//             'message' => 'Migrations executed successfully!',
+//             'output' => Artisan::output(), // Console ka output dikhega
+//         ]);
+
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'status' => false,
+//             'error' => $e->getMessage()
+//         ], 500);
+//     }
+// });
+// use Illuminate\Support\Facades\DB;
+
+// Route::get('/update-country-code', function () {
+    
+//     // Direct SQL Update - Yeh bohot fast hai
+//     // Saare users ka country_code '+91' set kar dega
+//     DB::table('users')->update(['country_code' => '+91']);
+
+//     return response()->json([
+//         'message' => 'Success! Sabhi users ka country_code +91 set ho gaya hai.'
+//     ]);
+// });
 /**
  * Public Routes (No authentication required)
  */
 Route::get('interests', [InterestController::class, 'index']);
 Route::post('auth/register', [UserController::class, 'register']);
 Route::post('auth/login', [UserController::class, 'login']);
+Route::post('auth/google-login', [GoogleAuthController::class, 'login']);
 Route::post('check-username', [UserController::class, 'checkUsernameAvailability']);
 
 
@@ -84,6 +126,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/', 'index');           // Mixed Feed
             Route::get('/feed/images', 'postsFeed');  // Only Images/Text
             Route::get('/feed/videos', 'videosFeed'); // Only Videos
+            Route::get('/video/{id}/related', 'getRelatedVideos'); // Related Videos
             Route::get('/feed/reels', 'reelsFeed');   // Only Reels
 
             // 2. Post Operations
@@ -94,7 +137,10 @@ Route::prefix('v1')->group(function () {
             // 3. Toggle Like (Single Endpoint)
             Route::post('/{id}/like', 'toggleLike');
             Route::get('/user/{username}', 'getPostsByUser');
+             Route::get('/feed/trending', 'globalTrendingFeed'); // Global Trending
+    Route::get('/feed/trending/interests', 'trendingInterestsFeed'); // User Interest Based Trending
         });
+        Route::post('/contacts/sync', [ContactSyncController::class, 'sync']);
         // ================================
         // View Management Routes
         // ================================
@@ -124,21 +170,21 @@ Route::prefix('v1')->group(function () {
          * Authenticated Story Routes
          * ================================
          */
-        Route::prefix('stories')->group(function () {
+             Route::prefix('stories')->group(function () {
 
-            // Feeds
-            Route::get('/feed', [StoryController::class, 'index']);
-            Route::get('/me', [StoryController::class, 'myStories']);
-            Route::get('/user/{username}', [StoryController::class, 'getStoriesByUsername']);
-
-            // Single Story CRUD
-            Route::post('/', [StoryController::class, 'store']);
-            Route::get('/{id}', [StoryController::class, 'show']);
-            Route::delete('/{id}', [StoryController::class, 'destroy']);
-
-            // Engagement
-            Route::post('/{id}/view', [StoryController::class, 'markAsViewed']);
-            Route::post('/{id}/like', [StoryController::class, 'toggleLike']);
+                // Feeds
+                Route::get('/feed', [StoryController::class, 'index']);
+                Route::get('/me', [StoryController::class, 'myStories']);
+                Route::get('/user/{username}', [StoryController::class, 'getStoriesByUsername']);
+    
+                // Single Story CRUD
+                Route::post('/', [StoryController::class, 'store']);
+                Route::get('/{id}', [StoryController::class, 'show']);
+                Route::delete('/{id}', [StoryController::class, 'destroy']);
+    
+                // Engagement
+                Route::post('/{id}/view', [StoryController::class, 'markAsViewed']);
+                Route::post('/{id}/like', [StoryController::class, 'toggleLike']);
 
             /* -------------------------- Highlights Sub-Routes ------------------------- */
 
@@ -301,29 +347,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/messages/{message}', 'deleteMessage'); // Payload: { delete_for_everyone: true/false }
         });
 
-        // Route::prefix('chats')->controller(ChatController::class)->group(function () {
-
-        //     // 1. Inbox & Single Chat
-        //     Route::get('/', 'index');                  // List all chats
-        //     Route::get('/{chat}', 'show')->whereNumber('chat'); // Chat details
-
-        //     // 2. Start Private Chat
-        //     Route::post('/private', 'openPrivate');    // Start/Open private chat
-
-        //     // 3. Group Management
-        //     Route::prefix('group')->group(function () {
-        //         Route::post('/', 'createGroup');       // Create group
-        //         Route::post('/{chat}/participants', 'addParticipants'); // Add members
-        //         Route::delete('/{chat}/participants/{userId}', 'removeParticipant'); // Remove member
-        //         Route::post('/{chat}/leave', 'leaveOrRemove'); // Leave or bulk remove
-        //     });
-
-        //     // 4. Messages & Interactions
-        //     Route::post('/{chat}/messages', 'sendMessage');  // Send message
-        //     Route::get('/{chat}/messages', 'messages');      // Get messages (Lazy load)
-        //     Route::post('/read/{chat}', 'markRead');         // Mark messages as read
-        // });
-
+       
 
 
 
