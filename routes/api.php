@@ -28,6 +28,8 @@ use App\Http\Controllers\Api\Seller\UserSellerController;
 use App\Http\Controllers\Api\ViewController;
 use App\Http\Controllers\CacheClearController;
 use App\Http\Controllers\Api\GoogleAuthController;
+use App\Http\Controllers\Api\MobileLoginController;
+
 
 // use Illuminate\Support\Facades\Artisan;
 
@@ -75,6 +77,7 @@ Route::get('interests', [InterestController::class, 'index']);
 Route::post('auth/register', [UserController::class, 'register']);
 Route::post('auth/login', [UserController::class, 'login']);
 Route::post('auth/google-login', [GoogleAuthController::class, 'login']);
+Route::post('auth/mobile_login', [MobileLoginController::class, 'loginWithMobile']);
 Route::post('check-username', [UserController::class, 'checkUsernameAvailability']);
 
 
