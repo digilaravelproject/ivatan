@@ -29,6 +29,8 @@ use App\Http\Controllers\Api\ViewController;
 use App\Http\Controllers\CacheClearController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\MobileLoginController;
+use App\Http\Controllers\Api\ForgotPasswordController;
+
 
 
 // use Illuminate\Support\Facades\Artisan;
@@ -79,6 +81,10 @@ Route::post('auth/login', [UserController::class, 'login']);
 Route::post('auth/google-login', [GoogleAuthController::class, 'login']);
 Route::post('auth/mobile_login', [MobileLoginController::class, 'loginWithMobile']);
 Route::post('check-username', [UserController::class, 'checkUsernameAvailability']);
+
+Route::post('forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp']);
+Route::post('forgot-password/reset', [ForgotPasswordController::class, 'resetPassword']);
+
 
 
 
