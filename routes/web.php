@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\AdminPostController;
 use App\Http\Controllers\Admin\AdminReportedPostController;
+use App\Http\Controllers\Admin\AdminBannerController;
 use App\Http\Controllers\Admin\CommentController;
 use App\Http\Controllers\Admin\Ecommerce\OrderController;
 use App\Http\Controllers\Admin\PostController;
@@ -112,6 +113,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::post('/{postId}/soft-delete', 'softDelete')->name('softDelete');
     });
 
+    // prefix admin.
     Route::get('reported-posts', [AdminReportedPostController::class, 'index'])
         ->name('reported-post.index');
 
@@ -127,6 +129,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
     Route::delete('reported-posts/{id}/force', [AdminReportedPostController::class, 'forceDelete'])
         ->name('reported-post.force-delete');
 
+    Route::resource('banners', AdminBannerController::class)
+        ->except(['show']);
 
     // route::delete('comments/{commentId}', [CommentController::class, 'destroy'])->name('comments.delete');
     // =====================

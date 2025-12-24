@@ -142,6 +142,20 @@
         <span>Jobs</span>
     </a>
 
+    <a href="{{ route('admin.banners.index') }}"
+    class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
+    @if (request()->routeIs('admin.banners.*')) bg-gray-700 text-white @endif
+    transition-colors duration-300">
+
+        <!-- Banners Icon -->
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4h16v6H4zM4 14h16v6H4z" />
+        </svg>
+
+        <span>Banners</span>
+    </a>
+
     {{-- <div
         x-data="{ open: {{ request()->routeIs('admin.ads.*') || request()->routeIs('admin.ad.ad-packages.*') ? 'true' : 'false' }} }"
         class="space-y-1"> --}}
