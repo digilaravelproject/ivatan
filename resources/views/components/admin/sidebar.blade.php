@@ -34,7 +34,7 @@
 
     </a>
 
-    <a href="{{ route('admin.userpost.index') }}" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
+    <?php /*<a href="{{ route('admin.userpost.index') }}" class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
         @if (request()->routeIs('admin.userpost.*') || request()->routeIs('admin.posts.*')) bg-gray-700 text-white @endif
         transition-colors duration-300">
 
@@ -45,8 +45,66 @@
         </svg>
 
         <span>Posts</span>
-    </a>
+    </a> */?>
 
+    <div
+            x-data="{ open: false }"
+            x-init="open = {{ request()->routeIs('admin.userpost.*') || request()->routeIs('admin.posts.*') ? 'true' : 'false' }}"
+            class="space-y-1"
+        >
+            <!-- Parent Button -->
+            <button
+                @click="open = !open"
+                class="w-full flex items-center justify-between gap-2 py-2 px-4 rounded-lg
+                hover:bg-gray-700 transition-colors duration-300
+                {{ request()->routeIs('admin.userpost.*') || request()->routeIs('admin.posts.*') ? 'bg-gray-700 text-white' : '' }}"
+            >
+                <div class="flex items-center gap-2">
+                    <!-- Posts Icon -->
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 16h8M8 12h8m-8-4h8M4 6h16v12H4z" />
+                    </svg>
+
+                    <span>Manage Posts</span>
+                </div>
+
+                <!-- Chevron -->
+                <svg
+                    :class="{ 'rotate-90': open }"
+                    class="w-4 h-4 transition-transform transform"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5l7 7-7 7" />
+                </svg>
+            </button>
+
+            <!-- Sub Menu -->
+            <div x-show="open" x-collapse class="pl-6 space-y-1">
+
+                <!-- Total Posts -->
+                <a
+                    href="{{ route('admin.userpost.index') }}"
+                    class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+                    {{ request()->routeIs('admin.userpost.index') ? 'bg-gray-700 text-white' : 'text-gray-500' }}"
+                >
+                    Total Posts
+                </a>
+
+                <!-- Reported Posts -->
+                <a
+                    href="{{ route('admin.reported-post.index') }}"
+                    class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+                    {{ request()->routeIs('admin.reported-post.index') ? 'bg-gray-700 text-white' : 'text-gray-500' }}"
+                >
+                    Reported Posts
+                </a>
+
+            </div>
+        </div>
 
     <a href="{{ route('admin.products.index') }} "
         class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 @if (request()->is('admin/products*')) bg-gray-700 text-white @endif transition-colors duration-300">

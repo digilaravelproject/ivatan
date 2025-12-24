@@ -13,6 +13,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
 use App\Http\Controllers\Admin\AdminPostController;
+use App\Http\Controllers\Admin\AdminReportedPostController;
 use App\Http\Controllers\Admin\CommentController;
 use App\Http\Controllers\Admin\Ecommerce\OrderController;
 use App\Http\Controllers\Admin\PostController;
@@ -110,6 +111,22 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::delete('/{commentId}', 'deleteComment')->name('comments.delete');
         Route::post('/{postId}/soft-delete', 'softDelete')->name('softDelete');
     });
+
+    Route::get('reported-posts', [AdminReportedPostController::class, 'index'])
+        ->name('reported-post.index');
+
+    Route::get('reported-posts/{id}', [AdminReportedPostController::class, 'show'])
+        ->name('reported-post.details');
+
+    Route::post('reported-posts/{id}/status', [AdminReportedPostController::class, 'updateStatus'])
+        ->name('reported-post.status');
+
+    Route::delete('reported-posts/{id}', [AdminReportedPostController::class, 'softDelete'])
+        ->name('reported-post.delete');
+
+    Route::delete('reported-posts/{id}/force', [AdminReportedPostController::class, 'forceDelete'])
+        ->name('reported-post.force-delete');
+
 
     // route::delete('comments/{commentId}', [CommentController::class, 'destroy'])->name('comments.delete');
     // =====================
