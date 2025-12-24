@@ -40,6 +40,13 @@ class MobileLoginController extends Controller
             }
 
             /** -----------------------------------
+             * 3. Update Firebase UID / Token
+             * ----------------------------------- */
+            $user->update([
+                'firebase_token' => $firebaseUid, // ✅ best practice
+            ]);
+
+            /** -----------------------------------
              * 3. Login User
              * ----------------------------------- */
             Auth::login($user);

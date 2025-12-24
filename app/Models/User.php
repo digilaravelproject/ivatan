@@ -24,6 +24,7 @@ class User extends Authenticatable implements HasMedia
     protected $fillable = [
         'uuid',
         'google_id',
+        'firebase_token',
         'username',
         'occupation',
         'name',
