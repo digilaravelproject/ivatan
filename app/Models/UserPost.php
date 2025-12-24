@@ -214,4 +214,9 @@ class UserPost extends Model implements HasMedia
             ];
         });
     }
+
+    public function reports()
+    {
+        return $this->hasMany(\App\Models\PostReport::class, 'post_id');
+    }
 }

@@ -145,6 +145,9 @@ Route::prefix('v1')->group(function () {
 
             // 3. Toggle Like (Single Endpoint)
             Route::post('/{id}/like', 'toggleLike');
+
+            Route::post('/{id}/report', 'reportPost');
+            
             Route::get('/user/{username}', 'getPostsByUser');
              Route::get('/feed/trending', 'globalTrendingFeed'); // Global Trending
     Route::get('/feed/trending/interests', 'trendingInterestsFeed'); // User Interest Based Trending

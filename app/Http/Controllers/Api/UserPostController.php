@@ -7,6 +7,7 @@ use App\Http\Requests\StorePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\UserPost;
 use App\Services\LikeService;
+use App\Services\ReportService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ use App\Services\ViewTrackingService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Illuminate\Validation\ValidationException;
+
 
 class UserPostController extends Controller
 {
@@ -345,5 +348,54 @@ class UserPostController extends Controller
             Log::error("Like Error: " . $e->getMessage());
             return response()->json(['error' => 'Something went wrong.'], 400);
         }
+    }
+
+    /**
+     * Report a post.
+     */
+
+    public function reportPost(Request $request,$id,ReportService $reportService): JsonResponse {
+        // ✅ Laravel handles validation errors automatically
+        
+        try{
+            $request->validate([
+                'reason'      => 'required|string|max:255',
+                'description' => 'nullable|string|max:1000',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+              'status' => false,
+              'message' => $e->errors(),
+            ], 422);
+        }
+        
+        $post = UserPost::findOrFail($id);
+        $user = $this->getAuthUser();
+    
+        $alreadyReported = $post->reports()
+            ->where('user_id', $user->id)
+            ->exists();
+    
+        if ($alreadyReported) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You have already reported this post.'
+            ], 409);
+        }
+    
+        $reportService->report(
+            $post,
+            $user,
+            $request->reason,
+            $request->description
+        );
+    
+        return response()->json([
+            'success' => true,
+            'message' => 'Post reported successfully.',
+            'data'    => [
+                'reports_count' => $reportService->reportCount($post)
+            ]
+        ]);
     }
 }
