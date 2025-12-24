@@ -30,6 +30,7 @@ use App\Http\Controllers\CacheClearController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\MobileLoginController;
 use App\Http\Controllers\Api\ForgotPasswordController;
+use App\Http\Controllers\Api\BannerController;
 
 
 
@@ -94,6 +95,7 @@ Route::post('forgot-password/reset', [ForgotPasswordController::class, 'resetPas
 Route::prefix('v1')->group(function () {
     // clear Cache
     Route::get('/clear-cache', [CacheClearController::class, 'clearAllCache']);
+    Route::get('/banners', [BannerController::class, 'index']);
     /**
      * ================================
      * Authentication Required Routes
@@ -147,7 +149,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/{id}/like', 'toggleLike');
 
             Route::post('/{id}/report', 'reportPost');
-            
+
             Route::get('/user/{username}', 'getPostsByUser');
              Route::get('/feed/trending', 'globalTrendingFeed'); // Global Trending
     Route::get('/feed/trending/interests', 'trendingInterestsFeed'); // User Interest Based Trending
