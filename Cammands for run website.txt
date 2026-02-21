@@ -1,0 +1,4 @@
+php artisan serve --port=8000 --host=0.0.0.0
+npm run dev
+php artisan queue:work --timeout=0 --tries=0 --sleep=3 --daemon
+php artisan reverb:start
