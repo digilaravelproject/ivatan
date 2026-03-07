@@ -37,7 +37,14 @@ class UpdateJobPostRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return Auth::check() && Auth::user()->is_employer;
+        $user = Auth::user();
+        if (!$user || !$user->is_employer) {
+            return false;
+        }
+
+        // Check if the job exists and belongs to the authenticated user
+        $job = $this->route('job'); // Assumes the parameter name in the route is 'job'
+        return $job && $job->employer_id === $user->id;
     }
 
     /**
@@ -59,9 +66,10 @@ class UpdateJobPostRequest extends FormRequest
             'country'           => 'sometimes|nullable|string|max:100',
             'employment_type'   => 'sometimes|required|in:full_time,part_time,contract,internship,freelance',
             'salary_min'        => 'sometimes|nullable|numeric|min:0',
-            'salary_max'        => 'sometimes|nullable|numeric|min:0',
+            'salary_max'        => 'sometimes|nullable|numeric|min:0|gt:salary_min',
             'currency'          => 'sometimes|nullable|string|max:10',
             'is_remote'         => 'sometimes|boolean',
+            'is_urgent'         => 'sometimes|boolean',
             'status'            => 'sometimes|nullable|in:draft,published,closed',
         ];
     }
@@ -104,6 +112,7 @@ class UpdateJobPostRequest extends FormRequest
             'currency.max'              => 'Currency code may not exceed 10 characters.',
 
             'is_remote.boolean'         => 'The remote option must be true or false.',
+            'is_urgent.boolean'         => 'The urgent option must be true or false.',
 
             'status.in'                 => 'Invalid status value. Allowed: draft, published, closed.',
         ];

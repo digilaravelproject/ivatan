@@ -62,6 +62,7 @@ class StoreJobPostRequest extends FormRequest
             'salary_max'        => 'nullable|numeric|min:0',
             'currency'          => 'nullable|string|max:10',
             'is_remote'         => 'boolean',
+            'is_urgent'         => 'boolean',
             'status'            => 'nullable|in:draft,published,closed',
         ];
     }
@@ -104,6 +105,7 @@ class StoreJobPostRequest extends FormRequest
             'currency.max'              => 'Currency code may not exceed 10 characters.',
 
             'is_remote.boolean'         => 'The remote option must be true or false.',
+            'is_urgent.boolean'         => 'The urgent option must be true or false.',
 
             'status.in'                 => 'Invalid status value. Allowed: draft, published, closed.',
         ];

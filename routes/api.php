@@ -11,12 +11,12 @@ use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\InterestController;
 use App\Http\Controllers\Api\Jobs\JobApplicationController;
 use App\Http\Controllers\Api\Jobs\JobPostController;
+use App\Http\Controllers\Api\Jobs\RecruiterJobController;
 use App\Http\Controllers\Api\Seller\UserProductController;
 use App\Http\Controllers\Api\Seller\UserServiceController;
 use App\Http\Controllers\Api\Story\StoryController;
 use App\Http\Controllers\Api\Story\StoryHighlightController;
 use App\Http\Controllers\Api\UserPostController;
-use Illuminate\Http\Request;
 use App\Http\Controllers\Api\Chat\ChatController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
@@ -37,7 +37,7 @@ use App\Http\Controllers\Api\BannerController;
 // use Illuminate\Support\Facades\Artisan;
 
 // Route::get('/run-migration', function (Request $request) {
-    
+
 //     // 🔒 SECURITY: Bina key ke run mat karne dena
 //     // Browser me ?key=my_secret_pass lagana padega
 //     if ($request->query('key') !== 'my_secret_pass_123') {
@@ -47,7 +47,7 @@ use App\Http\Controllers\Api\BannerController;
 //     try {
 //         // --force lagana zaruri hai production server ke liye
 //         Artisan::call('migrate', ["--force" => true]);
-        
+
 //         return response()->json([
 //             'status' => true,
 //             'message' => 'Migrations executed successfully!',
@@ -64,7 +64,7 @@ use App\Http\Controllers\Api\BannerController;
 // use Illuminate\Support\Facades\DB;
 
 // Route::get('/update-country-code', function () {
-    
+
 //     // Direct SQL Update - Yeh bohot fast hai
 //     // Saare users ka country_code '+91' set kar dega
 //     DB::table('users')->update(['country_code' => '+91']);
@@ -190,12 +190,12 @@ Route::prefix('v1')->group(function () {
                 Route::get('/feed', [StoryController::class, 'index']);
                 Route::get('/me', [StoryController::class, 'myStories']);
                 Route::get('/user/{username}', [StoryController::class, 'getStoriesByUsername']);
-    
+
                 // Single Story CRUD
                 Route::post('/', [StoryController::class, 'store']);
                 Route::get('/{id}', [StoryController::class, 'show']);
                 Route::delete('/{id}', [StoryController::class, 'destroy']);
-    
+
                 // Engagement
                 Route::post('/{id}/view', [StoryController::class, 'markAsViewed']);
                 Route::post('/{id}/like', [StoryController::class, 'toggleLike']);
@@ -308,16 +308,23 @@ Route::prefix('v1')->group(function () {
         // ================================
         Route::prefix('jobs')->group(function () {
 
+            Route::get('my/applications', [JobApplicationController::class, 'myApplications']); // List logged-in user's applications
+            Route::get('my/profile', [JobApplicationController::class, 'profile']); // Get logged-in user's career profile
+
+            // Recruiter specific management routes
+            Route::prefix('recruiter')->controller(RecruiterJobController::class)->group(function () {
+                Route::get('/', 'index');                  // List recruiter's jobs
+                Route::put('{job}/status', 'updateStatus'); // Update job status
+            });
+
             // JobPostController routes
             Route::controller(JobPostController::class)->group(function () {
                 Route::get('/', 'index');           // List all jobs
-                Route::get('{identifier}', 'show');        // Show single job
                 Route::post('/', 'store');          // Create new job
                 Route::put('{job}', 'update');      // Update job
                 Route::delete('{job}', 'destroy');  // Delete job
+                Route::get('{identifier}', 'show');        // Show single job (Wildcard, must be last)
             });
-
-            Route::get('my/applications', [JobApplicationController::class, 'myApplications']); // List logged-in user's applications
 
             // JobApplicationController routes
             Route::controller(JobApplicationController::class)->group(function () {
@@ -361,7 +368,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/messages/{message}', 'deleteMessage'); // Payload: { delete_for_everyone: true/false }
         });
 
-       
+
 
 
 

@@ -6,16 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Jobs\StoreJobPostRequest;
 use App\Http\Requests\Jobs\UpdateJobPostRequest;
 use App\Models\Jobs\UserJobPost;
-use App\Models\View;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
+use App\Jobs\TrackJobView;
 
 class JobPostController extends Controller
 {
@@ -80,32 +79,8 @@ class JobPostController extends Controller
             $user = Auth::user();
             $ipAddress = request()->ip();
 
-            // Check if this user/IP has already viewed this job
-            $alreadyViewed = View::where('viewable_type', UserJobPost::class)
-                ->where('viewable_id', $job->id)
-                ->when($user, fn($q) => $q->where('user_id', $user->id))
-                ->orWhere(function ($q) use ($job, $user, $ipAddress) {
-                    // If not logged in, track by IP
-                    if (!$user) {
-                        $q->where('viewable_type', UserJobPost::class)
-                            ->where('viewable_id', $job->id)
-                            ->where('ip_address', $ipAddress);
-                    }
-                })
-                ->exists();
-
-            if (!$alreadyViewed) {
-                // Record the view
-                View::create([
-                    'user_id' => $user?->id,
-                    'viewable_type' => UserJobPost::class,
-                    'viewable_id' => $job->id,
-                    'ip_address' => $ipAddress,
-                ]);
-
-                // Increment view count
-                $job->increment('views_count');
-            }
+            // Dispatch background job to handle view tracking
+            TrackJobView::dispatch($job->id, $user?->id, $ipAddress);
 
             return $this->success($job, 'Job fetched successfully.');
         } catch (Throwable $e) {
@@ -132,9 +107,15 @@ class JobPostController extends Controller
                 . '-' . Str::slug($request->company_name ?? 'company')
                 . '-' . Str::random(10);
 
+            $jobData = $request->validated();
+
+            if (!empty($jobData['is_urgent']) && $jobData['is_urgent']) {
+                $jobData['urgent_until'] = now()->addDays(14);
+            }
+
             // Create job post
             $job = UserJobPost::create(array_merge(
-                $request->validated(),
+                $jobData,
                 [
                     'slug'        => $slug,
                     'employer_id' => $user->id,
@@ -177,36 +158,33 @@ class JobPostController extends Controller
     {
         try {
             $user = $request->user();
+            $jobData = $request->validated();
 
-            // Ensure job belongs to the logged-in employer
-            if ($job->employer_id !== $user->id) {
-                return $this->error('Unauthorized to update this job.', 403);
-            }
-
-            // Update job data
-            $job->update($request->validated());
-
-            // Handle logo update
-            if ($request->hasFile('company_logo')) {
-                try {
-                    // Delete old logo if it exists
-                    if (!empty($job->company_logo)) {
-                        Storage::disk('public')->delete($job->company_logo);
-                    }
-
-                    // Store new logo
-                    $path = $request->file('company_logo')->store("company_logos/{$user->id}", 'public');
-                    $job->update(['company_logo' => $path]);
-                } catch (Throwable $e) {
-                    Log::warning("Logo update failed: " . $e->getMessage(), [
-                        'user_id' => $user->id,
-                        'job_id'  => $job->id,
-                    ]);
+            // Handle urgency logic
+            if (isset($jobData['is_urgent'])) {
+                if ($jobData['is_urgent'] && !$job->is_urgent) {
+                    $jobData['urgent_until'] = now()->addDays(14);
+                } elseif (!$jobData['is_urgent']) {
+                    $jobData['urgent_until'] = null;
                 }
             }
 
+            // Handle logo upload (if any)
+            if ($request->hasFile('company_logo')) {
+                // Delete old logo
+                if (!empty($job->company_logo)) {
+                    Storage::disk('public')->delete($job->company_logo);
+                }
+
+                // Store new logo and add to data array
+                $jobData['company_logo'] = $request->file('company_logo')->store("company_logos/{$user->id}", 'public');
+            }
+
+            // Single update call
+            $job->update($jobData);
+
             return $this->success(
-                $job->load('employer'),
+                $job->fresh('employer'),
                 'Job updated successfully.'
             );
         } catch (Throwable $e) {

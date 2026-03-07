@@ -9,6 +9,7 @@ use App\Models\Jobs\UserJobPost;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -41,27 +42,71 @@ class JobApplicationController extends Controller
                 return $this->error('You have already applied for this job', 422);
             }
 
-            $application = UserJobApplication::create([
-                'job_id' => $job->id,
-                'applicant_id' => $user->id,
-                'cover_message' => $request->cover_message,
-            ]);
+            $application = DB::transaction(function () use ($job, $user, $request) {
+                // Update or Create the Profile permanently
+                $profile = \App\Models\Jobs\UserProfile::updateOrCreate(
+                    ['user_id' => $user->id],
+                    $request->only(['resume_headline', 'skills_list', 'contact_no'])
+                );
 
-            // Handle resume upload
-            if ($request->hasFile('resume')) {
-                try {
-                    $path = $request->file('resume')->store("resumes/{$user->id}", 'public');
-                    $application->resume_path = $path;
-                    $application->save();
-                } catch (Throwable $e) {
-                    \Log::warning('Resume upload failed: ' . $e->getMessage(), [
-                        'user_id' => $user->id,
-                        'job_id' => $job->id,
-                    ]);
+                // Update Profile Employments (delete old, create new)
+                if ($request->has('employments') && is_array($request->employments)) {
+                    $profile->employments()->delete();
+                    foreach ($request->employments as $emp) {
+                        $profile->employments()->create($emp);
+                    }
                 }
-            }
 
-            return $this->success($application, 'Application submitted successfully', 201);
+                // Update Profile Educations (delete old, create new)
+                if ($request->has('educations') && is_array($request->educations)) {
+                    $profile->educations()->delete();
+                    foreach ($request->educations as $edu) {
+                        $profile->educations()->create($edu);
+                    }
+                }
+
+                $appData = [
+                    'job_id' => $job->id,
+                    'applicant_id' => $user->id,
+                    'cover_message' => $request->cover_message,
+                    'resume_headline' => $profile->resume_headline,
+                    'skills_list' => $profile->skills_list,
+                    'contact_no' => $profile->contact_no,
+                ];
+
+                $app = UserJobApplication::create($appData);
+
+                // Snapshot Employments and Educations to the Application
+                foreach ($profile->employments as $emp) {
+                    $app->employments()->create($emp->toArray());
+                }
+                foreach ($profile->educations as $edu) {
+                    $app->educations()->create($edu->toArray());
+                }
+
+                // Handle optional resume upload
+                if ($request->hasFile('resume')) {
+                    $path = $request->file('resume')->store("resumes/{$user->id}", 'local');
+                    if (!$path) {
+                        throw new \Exception('Failed to upload resume to local storage.');
+                    }
+                    $app->resume_path = $path;
+                    $app->save();
+                }
+
+                return $app;
+            });
+
+            return $this->success(
+                $application->load([
+                    'job:id,title,slug,company_name',
+                    'applicant:id,name,username,email,profile_photo_path',
+                    'employments',
+                    'educations'
+                ]),
+                'Application submitted successfully',
+                201
+            );
         } catch (Throwable $e) {
             return $this->exceptionResponse($e, 'Failed to apply for job');
         }
@@ -147,15 +192,34 @@ class JobApplicationController extends Controller
 
             $applications = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
-            // Add resume URL if exists
+            // Add secure resume URL if exists
             $applications->getCollection()->transform(function ($app) {
-                $app->resume_url = $app->resume_path ? Storage::disk('public')->url($app->resume_path) : null;
+                $app->resume_url = $app->resume_path ? url("/api/v1/jobs/applications/{$app->id}/resume") : null;
                 return $app;
             });
 
             return $this->success($applications, 'Your applications fetched successfully');
         } catch (Throwable $e) {
             return $this->exceptionResponse($e, 'Failed to fetch your applications');
+        }
+    }
+
+    /**
+     * Get the logged-in user's career profile
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function profile(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            $profile = \App\Models\Jobs\UserProfile::with(['employments', 'educations'])
+                ->firstOrCreate(['user_id' => $user->id]);
+
+            return $this->success($profile, 'User career profile fetched successfully');
+        } catch (Throwable $e) {
+            return $this->exceptionResponse($e, 'Failed to fetch user profile');
         }
     }
 
@@ -176,11 +240,14 @@ class JobApplicationController extends Controller
                 return $this->error('Unauthorized to download resume', 403);
             }
 
-            if (!$application->resume_path || !Storage::disk('public')->exists($application->resume_path)) {
+            // Support legacy public disk resumes as well
+            $disk = Storage::disk('local')->exists($application->resume_path) ? 'local' : 'public';
+
+            if (!$application->resume_path || !Storage::disk($disk)->exists($application->resume_path)) {
                 return $this->error('Resume not found', 404);
             }
 
-            return Storage::disk('public')->download(
+            return Storage::disk($disk)->download(
                 $application->resume_path,
                 $application->applicant->name . '_resume.pdf'
             );

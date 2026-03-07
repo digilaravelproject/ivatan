@@ -52,10 +52,14 @@ class UserJobApplication extends Model
         'resume_media_id',
         'status',
         'applied_at',
+        'resume_headline',
+        'skills_list',
+        'contact_no',
     ];
 
     protected $casts = [
         'applied_at' => 'datetime',
+        'skills_list' => 'array',
     ];
 
     public function job()
@@ -66,5 +70,15 @@ class UserJobApplication extends Model
     public function applicant()
     {
         return $this->belongsTo(User::class, 'applicant_id');
+    }
+
+    public function employments()
+    {
+        return $this->morphMany(UserEmployment::class, 'employable');
+    }
+
+    public function educations()
+    {
+        return $this->morphMany(UserEducation::class, 'educationable');
     }
 }

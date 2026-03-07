@@ -8,7 +8,7 @@ use App\Traits\AutoGeneratesUuid;
 use App\Traits\HasViews;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * @property int $id
@@ -90,6 +90,8 @@ class UserJobPost extends Model
         'currency',
         'is_remote',
         'status',
+        'is_urgent',
+        'urgent_until',
     ];
 
     protected $casts = [
@@ -97,7 +99,11 @@ class UserJobPost extends Model
         'salary_max'  => 'decimal:2',
         'is_remote'   => 'boolean',
         'views_count' => 'integer',
+        'is_urgent'   => 'boolean',
+        'urgent_until'=> 'datetime',
     ];
+
+    protected $appends = ['is_mine', 'is_urgent_active'];
 
 
 
@@ -161,5 +167,15 @@ class UserJobPost extends Model
     public function views()
     {
         return $this->morphMany(View::class, 'viewable');
+    }
+
+    public function getIsMineAttribute(): bool
+    {
+        return Auth::check() && $this->employer_id === Auth::id();
+    }
+
+    public function getIsUrgentActiveAttribute(): bool
+    {
+        return $this->is_urgent && $this->urgent_until && $this->urgent_until->isFuture();
     }
 }
