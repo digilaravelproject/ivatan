@@ -9,7 +9,6 @@ use App\Models\Ecommerce\UserCart;
 use App\Models\Ecommerce\UserCartItem;
 use App\Models\Ecommerce\UserProduct;
 use App\Models\Ecommerce\UserService;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -31,7 +30,7 @@ class CartController extends Controller
                 return $this->getUserCart($request->user()->id);
             });
 
-            $totalPrice = $cart->items->sum(fn($item) => $item->price * $item->quantity);
+            $totalPrice = $cart->items->sum(fn($item) => $item->price * ($item->quantity ?? 1));
 
             return response()->json([
                 'cart' => $cart,
@@ -118,8 +117,8 @@ class CartController extends Controller
                     'seller' => $service->seller,  // Seller details (e.g., name, contact)
                 ];
 
-                // For services, the quantity is irrelevant or can be treated differently
-                $quantity = null; // Optional: Set a default for services
+                // For services, the quantity is always 1
+                $quantity = 1;
             }
 
             // If seller_id is not found, return an error
@@ -215,10 +214,11 @@ class CartController extends Controller
             }
             if ($item->item_type === 'user_services') {
                 // No stock validation needed for services
-                $request->quantity = null; // Set quantity to null for services
             }
+
+            $quantityToUpdate = $item->item_type === 'user_services' ? 1 : $request->quantity;
             // Update the quantity in the cart
-            $item->update(['quantity' => $request->quantity]);
+            $item->update(['quantity' => $quantityToUpdate]);
 
             // Prepare the item details for the response
             $itemDetails = null;

@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Traits\AutoGeneratesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $id
@@ -47,6 +47,7 @@ class UserService extends Model
 {
     use HasFactory;
     use AutoGeneratesUuid;
+    use SoftDeletes;
 
     protected $table = 'user_services';
 
@@ -57,6 +58,7 @@ class UserService extends Model
         'slug',
         'description',
         'price',
+        'discount_price',
         'status',
         'cover_image',
     ];

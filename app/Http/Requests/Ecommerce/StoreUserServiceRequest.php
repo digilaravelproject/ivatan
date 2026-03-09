@@ -33,6 +33,9 @@ class StoreUserServiceRequest extends FormRequest
             // Price is required, numeric, and must be at least 0
             'price' => 'required|numeric|min:0',
 
+            // Discount Price must be less than regular price if provided
+            'discount_price' => 'nullable|numeric|min:0|lt:price',
+
             // Cover image is optional, but if present, it must be an image with specific mime types
             'cover_image' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
 
@@ -57,6 +60,9 @@ class StoreUserServiceRequest extends FormRequest
             'price.required' => 'The price is required.',
             'price.numeric' => 'The price must be a valid number.',
             'price.min' => 'The price must be at least 0.',
+            'discount_price.numeric' => 'The discount price must be a valid number.',
+            'discount_price.min' => 'The discount price must be at least 0.',
+            'discount_price.lt' => 'The discount price must be less than the regular price.',
             'cover_image.image' => 'The cover image must be an image file.',
             'cover_image.mimes' => 'The cover image must be a jpeg, jpg, png, or webp image.',
             'cover_image.max' => 'The cover image may not be greater than 5MB.',

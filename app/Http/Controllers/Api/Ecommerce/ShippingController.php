@@ -11,6 +11,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use App\Services\Ecommerce\OrderService;
 
 /**
  * Class ShippingController
@@ -25,6 +26,13 @@ use Illuminate\Http\JsonResponse;
  */
 class ShippingController extends Controller
 {
+    protected $orderService;
+
+    public function __construct(OrderService $orderService)
+    {
+        $this->orderService = $orderService;
+    }
+
     /**
      * Update shipping info (tracking number, status) - Only seller or admin can update
      */
@@ -70,12 +78,15 @@ class ShippingController extends Controller
                     throw new AuthorizationException('You are not authorized to update this shipping info.');
                 }
 
-                $hasItem = \App\Models\Ecommerce\UserOrderItem::where('order_id', $order->id)
-                    ->where('seller_id', $user->id)
-                    ->exists();
+                if ($order->seller_id !== $user->id) {
+                    // Fallback to checking items to support legacy orders (before sub-orders feature)
+                    $hasItem = \App\Models\Ecommerce\UserOrderItem::where('order_id', $order->id)
+                        ->where('seller_id', $user->id)
+                        ->exists();
 
-                if (!$hasItem) {
-                    throw new AuthorizationException('You are not authorized to update this order’s shipping info.');
+                    if (!$hasItem) {
+                        throw new AuthorizationException('You are not authorized to update this order’s shipping info.');
+                    }
                 }
             }
 
@@ -98,6 +109,11 @@ class ShippingController extends Controller
                 'status' => $validated['status'] ?? 'shipped',
                 'meta' => isset($validated['meta']) ? json_encode($validated['meta']) : $shipping->meta,
             ])->save();
+
+            // 🛑 Catch Order Cancellation Flow
+            if ($shipping->status === 'cancelled') {
+                $this->orderService->cancelOrder($order->id, $user);
+            }
 
             // ✅ Successful response
             return response()->json([

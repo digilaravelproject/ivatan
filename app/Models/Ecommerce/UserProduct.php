@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Traits\AutoGeneratesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $id
@@ -49,7 +49,7 @@ use Illuminate\Support\Str;
  */
 class UserProduct extends Model
 {
-    use HasFactory,AutoGeneratesUuid;
+    use HasFactory,AutoGeneratesUuid,SoftDeletes;
     protected $fillable = [
         'uuid',
         'seller_id',
@@ -57,6 +57,7 @@ class UserProduct extends Model
         'slug',
         'description',
         'price',
+        'discount_price',
         'stock',
         'cover_image',
         'status'

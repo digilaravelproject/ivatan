@@ -8,7 +8,6 @@ use App\Models\Ecommerce\UserOrderItem;
 use App\Models\Ecommerce\UserPayment;
 use App\Models\Ecommerce\UserAddress;
 use App\Models\Ecommerce\UserProduct;
-use App\Models\Ecommerce\UserService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -44,21 +43,43 @@ class CheckoutService
                 }
             }
 
-            // Create order and save address
-            $order = $this->createOrder($user, $total, $data);
-            $this->saveShippingAddress($data['shipping_address'], $order);
+            if (!empty($priceChangedItems)) {
+                throw ValidationException::withMessages([
+                    'error' => 'Some item prices have changed. Please review your cart.',
+                    'price_updates' => $priceChangedItems
+                ]);
+            }
 
-            // Create order items
-            $this->createOrderItems($cart->items, $order);
+            // Create parent order and save address
+            $parentOrder = $this->createOrder($user, $total, $data);
+            $this->saveShippingAddress($data['shipping_address'], $parentOrder);
 
-            // Create payment record
-            $this->createPayment($order, $total, $data['payment_method']);
+            // Group items by seller to create Child Orders
+            $itemsBySeller = $cart->items->groupBy('seller_id');
+
+            foreach ($itemsBySeller as $sellerId => $items) {
+                $sellerTotal = 0;
+                foreach ($items as $item) {
+                    $itemTotal = bcmul((string) $item->price, (string) $item->quantity, 2);
+                    $sellerTotal = bcadd((string) $sellerTotal, (string) $itemTotal, 2);
+                }
+
+                // Create Child Order
+                $childOrder = $this->createOrder($user, $sellerTotal, $data, $parentOrder->id, $sellerId);
+
+                // Create order items linked to Child Order
+                $this->createOrderItems($items, $childOrder);
+            }
+
+            // Create payment record linked to Parent Order
+            $this->createPayment($parentOrder, $total, $data['payment_method']);
 
             // Clear cart
             $cart->items()->delete();
+            \Illuminate\Support\Facades\Cache::forget("cart_user_{$user->id}");
 
             return [
-                'order' => $order,
+                'order' => $parentOrder,
                 'price_updates' => $priceChangedItems,
             ];
         });
@@ -90,8 +111,10 @@ class CheckoutService
                 $ci->update(['price' => $product->price]);
             }
 
-            // Deduct product stock
-            $this->deductProductStock($ci);
+            if ($priceChangedItems) {
+                // Revert price silently to cart update is okay, but we shouldn't continue checkout
+                // Will throw after collecting all price changes.
+            }
         } elseif ($ci->item_type === 'user_services') {
             $service = $ci->service; // Use the relationship here
 
@@ -149,11 +172,13 @@ class CheckoutService
 
 
 
-    private function createOrder($user, $total, $data)
+    private function createOrder($user, $total, $data, $parentId = null, $sellerId = null)
     {
         return UserOrder::create([
             'uuid' => (string) Str::uuid(),
             'buyer_id' => $user->id,
+            'parent_id' => $parentId,
+            'seller_id' => $sellerId,
             'total_amount' => $total,
             'status' => 'pending',
             'payment_status' => $data['payment_method'] === 'cod' ? 'unpaid' : 'initiated',

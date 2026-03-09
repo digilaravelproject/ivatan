@@ -3,21 +3,18 @@
 namespace App\Jobs;
 
 use App\Models\Ecommerce\UserOrder;
-use App\Models\Ecommerce\UserOrderItem;
 use App\Models\Ecommerce\UserPayment;
-use App\Models\Ecommerce\UserProduct;
 use App\Models\Ecommerce\UserShipping;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
-use Razorpay\Api\Api;
-
+use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Support\Facades\DB;
 
 class ProcessOrderPayment implements ShouldQueue
 {
@@ -41,6 +38,16 @@ class ProcessOrderPayment implements ShouldQueue
         $this->paymentId = $paymentId;
         $this->razorpayOrderId = $razorpayOrderId;
         $this->razorpaySignature = $razorpaySignature;
+    }
+
+    /**
+     * Get the middleware the job should pass through.
+     *
+     * @return array
+     */
+    public function middleware()
+    {
+        return [new WithoutOverlapping((string) $this->orderId)];
     }
 
     /**
@@ -75,75 +82,63 @@ class ProcessOrderPayment implements ShouldQueue
                 if (!$payment) {
                     Log::error('Payment record not found or already processed', ['order_id' => $order->id]);
                 } else {
-                    // Get the current meta value and decode it to an array
-                    $currentMeta = json_decode($payment->meta, true) ?? [];
+                    // UserPayment 'meta' is cast to array in the model
+                    $currentMeta = is_array($payment->meta) ? $payment->meta : (is_string($payment->meta) ? json_decode($payment->meta, true) : []);
+
                     // Add the new keys to the existing meta array
                     $currentMeta['razorpay_order_id'] = $this->razorpayOrderId;
                     $currentMeta['razorpay_signature'] = $this->razorpaySignature;
 
-                    // Update the payment record, keeping the existing meta values and adding new ones
+                    // Update the payment record
                     $payment->update([
                         'status' => UserPayment::STATUS_SUCCESSFUL ?? 'successful',
                         'transaction_id' => $this->paymentId,
-                        'meta' => json_encode($currentMeta),  // Re-encode the updated meta array
+                        'meta' => $currentMeta,
                     ]);
 
 
                     Log::info('Payment record updated successfully', ['payment_id' => $payment->id]);
                 }
 
-                // Update order status
+                // Update order status (Parent)
                 $order->update([
+                    'payment_status' => UserOrder::PAYMENT_PAID ?? 'paid',
+                    'status' => UserOrder::STATUS_PROCESSING ?? 'processing',
+                ]);
+
+                // Update order status (Children)
+                UserOrder::where('parent_id', $order->id)->update([
                     'payment_status' => UserOrder::PAYMENT_PAID ?? 'paid',
                     'status' => UserOrder::STATUS_PROCESSING ?? 'processing',
                 ]);
 
                 Log::info('Order payment status updated', ['order_id' => $order->id]);
 
-                // Update stock for each item
-                foreach ($order->items as $item) {
-                    if ($item->item_type === 'user_products') {
-                        $product = UserProduct::lockForUpdate()->find($item->item_id);
-                        if ($product) {
-                            $oldStock = $product->stock;
-                            $product->stock = max(0, $product->stock - $item->quantity);
-                            $product->save();
+                // Stock is already deducted during checkout (CheckoutService)
+                // Redundant stock deduction removed here to prevent double/triple deduction bug.
 
-                            Log::info('Stock updated', [
-                                'product_id' => $product->id,
-                                'old_stock' => $oldStock,
-                                'new_stock' => $product->stock,
-                                'quantity_sold' => $item->quantity,
+                // Create shipping per child order
+                $childOrders = UserOrder::where('parent_id', $order->id)->get();
+                $address = $order->address;
+
+                if ($address) {
+                    foreach ($childOrders as $childOrder) {
+                        if (!$childOrder->shipping) {
+                            $shipping = UserShipping::create([
+                                'uuid' => (string) Str::uuid(),
+                                'order_id' => $childOrder->id,
+                                'address_id' => $address->id,
+                                'status' => 'pending',
                             ]);
-                        } else {
-                            Log::warning('Product not found for stock update', [
-                                'product_id' => $item->item_id,
+
+                            Log::info('Shipping record created for Child Order', [
+                                'shipping_id' => $shipping->id,
+                                'child_order_id' => $childOrder->id,
                             ]);
                         }
                     }
-                }
-
-                // Create shipping
-                if (!$order->shipping) {
-                    $address = $order->address;
-
-                    if ($address) {
-                        $shipping = UserShipping::create([
-                            'uuid' => (string) Str::uuid(),
-                            'order_id' => $order->id,
-                            'address_id' => $address->id,
-                            'status' => 'pending',
-                        ]);
-
-                        Log::info('Shipping record created', [
-                            'shipping_id' => $shipping->id,
-                            'order_id' => $order->id,
-                        ]);
-                    } else {
-                        Log::warning('No address found to create shipping', ['order_id' => $order->id]);
-                    }
                 } else {
-                    Log::info('Shipping already exists for order', ['order_id' => $order->id]);
+                    Log::warning('No address found to create shipping', ['order_id' => $order->id]);
                 }
 
                 // You can also log the final success if all goes well

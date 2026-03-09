@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\Seller;
 
 use App\Helpers\ImageHelper;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreUserProductRequest;
-use App\Http\Requests\UpdateUserProductRequest;
+use App\Http\Requests\Ecommerce\StoreUserProductRequest;
+use App\Http\Requests\Ecommerce\UpdateUserProductRequest;
 use App\Models\Ecommerce\UserProduct;
 use App\Models\Ecommerce\UserProductImage;
 use App\Models\User;
@@ -15,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 
@@ -38,7 +37,7 @@ class UserProductController extends Controller
             $products = UserProduct::with('images')
                 ->where('seller_id', $user->id)
                 ->latest()
-                ->simplePaginate(10);
+                ->paginate(10);
 
 
             return response()->json([
@@ -85,7 +84,7 @@ class UserProductController extends Controller
             $products = UserProduct::with('images')
                 ->where('seller_id', $seller->id)
                 ->latest()
-                ->simplePaginate(10);
+                ->paginate(10);
 
             return response()->json([
                 'success' => true,
@@ -180,6 +179,7 @@ class UserProductController extends Controller
                 'slug'        => $slug,
                 'description' => $request->description ?? null,
                 'price'       => $request->price,
+                'discount_price' => $request->discount_price ?? null,
                 'stock'       => $request->stock ?? 0,
                 'status'      => 'pending',
             ]);
@@ -231,6 +231,9 @@ class UserProductController extends Controller
     {
         DB::beginTransaction();
         try {
+            // Re-fetch the product with a pessimistic lock to ensure secure stock updates against concurrent purchases
+            $product = UserProduct::lockForUpdate()->findOrFail($product->id);
+
             /** @var \Illuminate\Http\Request $request */
             $user = $request->user();
 
@@ -243,7 +246,7 @@ class UserProductController extends Controller
             }
 
             // Only these fields are allowed to be updated
-            $updateFields = $request->only(['title', 'description', 'price', 'stock']);
+            $updateFields = $request->only(['title', 'description', 'price', 'discount_price', 'stock']);
 
             // Check if any fields are provided for update
             if (empty($updateFields) && !$request->hasFile('cover_image') && !$request->hasFile('images') && !$request->filled('remove_image_ids')) {
@@ -350,17 +353,6 @@ class UserProductController extends Controller
                     'success' => false,
                     'message' => 'Unauthorized access to product.',
                 ], 403);
-            }
-
-            // Delete cover image
-            if ($product->cover_image) {
-                ImageHelper::deleteEcomImage($product->cover_image);
-            }
-
-            // Delete gallery images
-            foreach ($product->images as $img) {
-                ImageHelper::deleteEcomImage($img->image_path);
-                $img->delete();
             }
 
             $product->delete();

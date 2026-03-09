@@ -24,7 +24,11 @@ use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\Contact\ContactSyncController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Ecommerce\OrderController;
+use App\Http\Controllers\Api\Ecommerce\EnquiryController;
 use App\Http\Controllers\Api\Seller\UserSellerController;
+use App\Http\Controllers\Api\Seller\SellerFinancialController;
+use App\Http\Controllers\Api\Seller\SellerTransactionController;
+use App\Http\Controllers\Api\Seller\SellerOrderController;
 use App\Http\Controllers\Api\ViewController;
 use App\Http\Controllers\CacheClearController;
 use App\Http\Controllers\Api\GoogleAuthController;
@@ -36,7 +40,7 @@ use App\Http\Controllers\Api\BannerController;
 
 // use Illuminate\Support\Facades\Artisan;
 
-// Route::get('/run-migration', function (Request $request) {
+// Route::get('/run-migration', function (Illuminate\Http\Request $request) {
 
 //     // 🔒 SECURITY: Bina key ke run mat karne dena
 //     // Browser me ?key=my_secret_pass lagana padega
@@ -86,6 +90,9 @@ Route::post('check-username', [UserController::class, 'checkUsernameAvailability
 Route::post('forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp']);
 Route::post('forgot-password/reset', [ForgotPasswordController::class, 'resetPassword']);
 
+// Public Enquiry (Rate limited: 5 requests per minute)
+Route::post('enquiries', [EnquiryController::class, 'store'])->middleware('throttle:5,1');
+
 
 
 
@@ -97,24 +104,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/clear-cache', [CacheClearController::class, 'clearAllCache']);
     Route::get('/banners', [BannerController::class, 'index']);
 
-    // ⚠️ TEMPORARY: Reset Passwords for all non-admin users
-    Route::get('/temp/reset-passwords', function () {
-        $users = \App\Models\User::whereHas('roles', function ($q) {
-            $q->where('name', '!=', 'admin');
-        })->orWhereDoesntHave('roles')->get();
 
-        $count = 0;
-        foreach ($users as $user) {
-            $user->password = '12345678'; // Cast 'hashed' in User model will handle hashing
-            $user->save();
-            $count++;
-        }
-
-        return response()->json([
-            'status' => true,
-            'message' => "Successfully reset $count user passwords to '12345678'. Admin users were skipped.",
-        ]);
-    });
     /**
      * ================================
      * Authentication Required Routes
@@ -245,12 +235,31 @@ Route::prefix('v1')->group(function () {
         // ================================
         Route::prefix('seller')->group(function () {
             Route::post('/', [UserSellerController::class, 'toggleSelf']);
+            Route::get('dashboard/stats', [UserSellerController::class, 'getDashboardStats']);
             Route::get('products', [UserProductController::class, 'index']);
             Route::get('{sellerId}/products', [UserProductController::class, 'getSellerProducts']);
             Route::post('products', [UserProductController::class, 'store']);
             Route::get('products/{productIdentifier}', [UserProductController::class, 'show']);
             Route::match(['put', 'patch', 'post'], 'products/{product}', [UserProductController::class, 'update']);
             Route::delete('products/{product}', [UserProductController::class, 'destroy']);
+
+            // Seller Enquiry Dashboard
+            Route::get('enquiries', [EnquiryController::class, 'index']);
+            Route::get('enquiries/stats', [EnquiryController::class, 'stats']);
+            Route::patch('enquiries/{uuid}/status', [EnquiryController::class, 'updateStatus']);
+            Route::delete('enquiries/{uuid}', [EnquiryController::class, 'destroy']);
+
+            // Seller Financial Details
+            Route::get('financials', [SellerFinancialController::class, 'show']);
+            Route::post('financials', [SellerFinancialController::class, 'store']);
+            Route::delete('financials', [SellerFinancialController::class, 'destroy']);
+
+            Route::get('transactions', [SellerTransactionController::class, 'index']);
+
+            // Seller Order Management
+            Route::get('orders', [SellerOrderController::class, 'index']);
+            Route::get('orders/{id}', [SellerOrderController::class, 'show']);
+            Route::patch('orders/{id}/status', [SellerOrderController::class, 'updateStatus']);
         });
         // ================================
         // Services Routes

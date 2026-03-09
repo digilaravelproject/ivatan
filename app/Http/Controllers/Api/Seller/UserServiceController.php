@@ -33,7 +33,7 @@ class UserServiceController extends Controller
             $services = UserService::with('images')
                 ->where('seller_id', $user->id)
                 ->latest()
-                ->simplePaginate(10);
+                ->paginate(10);
 
             return $this->successResponse('Services fetched successfully.', $services);
         } catch (\Throwable $e) {
@@ -63,7 +63,7 @@ class UserServiceController extends Controller
             $services = UserService::with('images')
                 ->where('seller_id', $seller->id)
                 ->latest()
-                ->simplePaginate(10);
+                ->paginate(10);
 
             return $this->successResponse('Seller services fetched successfully.', $services);
         } catch (\Throwable $e) {
@@ -95,6 +95,7 @@ class UserServiceController extends Controller
                 'slug'        => $slug,
                 'description' => $request->description ?? null,
                 'price'       => $request->price,
+                'discount_price' => $request->discount_price ?? null,
                 'status'      => 'pending',
             ]);
 
@@ -142,7 +143,7 @@ class UserServiceController extends Controller
             }
 
             // Get the fields to update
-            $update = $request->only(['title', 'description', 'price', 'status']);
+            $update = $request->only(['title', 'description', 'price', 'discount_price', 'status']);
 
             // If no valid fields are provided, return an error
             if (empty($update)) {
@@ -243,12 +244,6 @@ class UserServiceController extends Controller
             return $this->errorResponse('Unauthorized', 403);
         }
 
-        // Delete images
-        foreach ($service->images as $img) {
-            ImageHelper::deleteEcomImage($img->image_path);
-            $img->delete();
-        }
-
         $service->delete();
 
         return $this->successResponse('Service deleted successfully.');
@@ -333,26 +328,5 @@ class UserServiceController extends Controller
         }
     }
 
-    /**
-     * Standardize success responses
-     */
-    private function successResponse(string $message, $data = null): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => $data,
-        ]);
-    }
 
-    /**
-     * Standardize error responses
-     */
-    private function errorResponse(string $message, int $statusCode): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => $message,
-        ], $statusCode);
-    }
 }

@@ -14,3 +14,6 @@ Schedule::job(new UpdatePostTrendingScore)->everyThirtyMinutes();
 Schedule::command('queue:work --queue=default,database --stop-when-empty --tries=3 --timeout=120')
     ->everyMinute()
     ->withoutOverlapping();
+
+// Auto-restore abandoned carts (30+ mins old pending orders)
+Schedule::command('orders:restore-abandoned')->everyThirtyMinutes();
