@@ -42,7 +42,7 @@ class UpdateUserProductRequest extends FormRequest
         $validator->after(function (Validator $validator) {
             $request = $this;
             $fieldsToCheck = [
-                'title', 'description', 'price', 'discount_price', 'stock', 'cover_image', 'images', 'remove_image_ids'
+                'title', 'description', 'price', 'discount_price', 'stock', 'cover_image', 'images', 'remove_image_ids', 'status'
             ];
 
             $hasAtLeastOneField = collect($fieldsToCheck)->contains(function ($field) use ($request) {

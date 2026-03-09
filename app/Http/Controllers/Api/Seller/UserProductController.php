@@ -246,7 +246,7 @@ class UserProductController extends Controller
             }
 
             // Only these fields are allowed to be updated
-            $updateFields = $request->only(['title', 'description', 'price', 'discount_price', 'stock']);
+            $updateFields = $request->only(['title', 'description', 'price', 'discount_price', 'stock', 'status']);
 
             // Check if any fields are provided for update
             if (empty($updateFields) && !$request->hasFile('cover_image') && !$request->hasFile('images') && !$request->filled('remove_image_ids')) {

@@ -82,7 +82,8 @@ class UpdateUserServiceRequest extends FormRequest
                 'discount_price',
                 'cover_image',
                 'images',
-                'remove_image_ids'
+                'remove_image_ids',
+                'status'
             ];
 
             // Using `collect` to loop through the fields and check if any of them are filled or a file is uploaded
