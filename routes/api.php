@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Ad\AdPaymentController;
 use App\Http\Controllers\Api\Ad\AdServingController;
 use App\Http\Controllers\Api\Ecommerce\CartController;
 use App\Http\Controllers\Api\Ecommerce\CheckoutController;
+use App\Http\Controllers\Api\Ecommerce\AddressController;
 use App\Http\Controllers\Api\Ecommerce\PaymentController;
 use App\Http\Controllers\Api\Ecommerce\ShippingController;
 use App\Http\Controllers\Api\FollowController;
@@ -283,7 +284,14 @@ Route::prefix('v1')->group(function () {
             Route::post('{id}', [CartController::class, 'update']); // Update qty
             Route::delete('{id}', [CartController::class, 'remove']); // Remove item
             Route::delete('/', [CartController::class, 'clear']);    // Clear cart
+        });
 
+        // ================================
+        // Address Routes
+        // ================================
+        Route::prefix('addresses')->group(function () {
+            Route::get('/', [AddressController::class, 'index']);
+            Route::post('/', [AddressController::class, 'store']);
         });
 
         /*

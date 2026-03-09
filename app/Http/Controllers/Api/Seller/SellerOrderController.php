@@ -48,7 +48,7 @@ class SellerOrderController extends Controller
     public function updateStatus(Request $request, string $id): JsonResponse
     {
         $request->validate([
-            'status' => 'required|in:processing,shipped,delivered,completed,cancelled',
+            'status' => 'required|in:accepted,rejected,shipped,delivered,cancelled',
         ]);
 
         return DB::transaction(function () use ($request, $id) {

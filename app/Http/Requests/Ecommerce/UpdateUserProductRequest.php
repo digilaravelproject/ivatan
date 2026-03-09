@@ -26,6 +26,7 @@ class UpdateUserProductRequest extends FormRequest
             'images.*' => 'sometimes|nullable|image|mimes:jpeg,jpg,png,webp|max:5120',
             'remove_image_ids' => 'sometimes|nullable|array',
             'remove_image_ids.*' => 'sometimes|nullable|integer|exists:user_product_images,id',
+            'status' => 'sometimes|string|in:active,inactive',
         ];
     }
 
