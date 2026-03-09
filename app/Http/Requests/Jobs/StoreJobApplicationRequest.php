@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Jobs;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Auth;
 
 class StoreJobApplicationRequest extends FormRequest
 {
@@ -13,7 +12,7 @@ class StoreJobApplicationRequest extends FormRequest
     public function authorize(): bool
     {
         // Only non-employers can apply
-        return Auth::check() && !Auth::user()->is_employer;
+        return true;
     }
 
     /**

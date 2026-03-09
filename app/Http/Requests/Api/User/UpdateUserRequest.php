@@ -21,14 +21,30 @@ class UpdateUserRequest extends FormRequest
     public function rules(): array
     {
         // Current User ID to ignore unique checks for self
-        $userId = $this->user()->id;
+        $user = $this->user();
+        $userId = $user ? $user->id : null;
 
         return [
             // --- Basic Identity ---
             'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $userId,
-            'phone' => 'sometimes|string|unique:users,phone,' . $userId,
-            'username' => 'sometimes|string|max:50|unique:users,username,' . $userId,
+            'email' => [
+                'sometimes',
+                'string',
+                'email',
+                'max:255',
+                \Illuminate\Validation\Rule::unique('users', 'email')->ignore($userId),
+            ],
+            'phone' => [
+                'sometimes',
+                'string',
+                \Illuminate\Validation\Rule::unique('users', 'phone')->ignore($userId),
+            ],
+            'username' => [
+                'sometimes',
+                'string',
+                'max:50',
+                \Illuminate\Validation\Rule::unique('users', 'username')->ignore($userId),
+            ],
 
             // --- Security ---
             'password' => 'sometimes|string|min:8',
@@ -43,6 +59,11 @@ class UpdateUserRequest extends FormRequest
             // --- Privacy Settings ---
             'account_privacy' => 'nullable|in:public,private',
             'messaging_privacy' => 'nullable|in:everyone,followers,none',
+            'status' => 'sometimes|string|in:active,inactive',
+            'is_employer' => 'sometimes|boolean',
+            'is_seller' => 'sometimes|boolean',
+            'hide_email' => 'sometimes|boolean',
+            'hide_phone' => 'sometimes|boolean',
 
             // --- JSON Settings (Frontend sends JSON/Array) ---
             'settings' => 'nullable|array',

@@ -15,12 +15,13 @@ use Spatie\Permission\Traits\HasRoles;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 
 
 /**
  * @property Collection<int, Interest> $interests
  */
- 
+
 class User extends Authenticatable implements HasMedia
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
@@ -56,6 +57,8 @@ class User extends Authenticatable implements HasMedia
         'following_count',
         'posts_count',
         'settings',
+        'hide_email',
+        'hide_phone',
     ];
 
     protected $hidden = [
@@ -80,6 +83,8 @@ class User extends Authenticatable implements HasMedia
             'email_notification_preferences' => 'array',
             // 'interests' => 'array',
             'settings' => 'array',
+            'hide_email' => 'boolean',
+            'hide_phone' => 'boolean',
             'password' => 'hashed',
         ];
     }

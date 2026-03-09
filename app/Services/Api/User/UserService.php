@@ -7,7 +7,6 @@ use App\Models\Interest;
 use App\Models\Chat\UserChat;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -73,6 +72,11 @@ class UserService
                 // Privacy & Settings
                 'account_privacy',
                 'messaging_privacy',
+                'status',
+                'is_employer',
+                'is_seller',
+                'hide_email',
+                'hide_phone',
                 'settings',
                 'email_notification_preferences'
             ];
@@ -245,6 +249,18 @@ class UserService
         // 4. Data Merge & Return
         $userData = $user->toArray();
 
+        // 5. Privacy Logic: Hide Email/Phone if restricted
+        if (!$isMine) {
+            if ($user->hide_email) {
+                // Return masked or null. User said "encrypted jayega but kisi ko visula nhi h hoga"
+                // Let's go with masked for now as it's common
+                $userData['email'] = $this->maskEmail($user->email);
+            }
+            if ($user->hide_phone) {
+                $userData['phone'] = $this->maskPhone($user->phone);
+            }
+        }
+
         // Custom fields inject kar rahe hain
         $userData['is_mine'] = $isMine;
         $userData['is_following'] = $isFollowing;
@@ -253,6 +269,32 @@ class UserService
 
         return $userData;
     }
+
+    /**
+     * Mask Email (e.g., s***h@gmail.com)
+     */
+    private function maskEmail(?string $email): ?string
+    {
+        if (!$email) return null;
+        $parts = explode("@", $email);
+        $name = $parts[0];
+        $domain = $parts[1] ?? '';
+        $len = strlen($name);
+        if ($len <= 2) return "***@" . $domain;
+        return substr($name, 0, 1) . str_repeat("*", $len - 2) . substr($name, -1) . "@" . $domain;
+    }
+
+    /**
+     * Mask Phone (e.g., +91 ******3727)
+     */
+    private function maskPhone(?string $phone): ?string
+    {
+        if (!$phone) return null;
+        $len = strlen($phone);
+        if ($len <= 4) return str_repeat("*", $len);
+        return substr($phone, 0, 4) . str_repeat("*", $len - 8) . substr($phone, -4);
+    }
+
     /**
      *  Find User by Username
      */
