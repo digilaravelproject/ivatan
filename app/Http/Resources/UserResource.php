@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\InterestResource;
 
 class UserResource extends JsonResource
 {
@@ -12,47 +13,82 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // ✅ LOGIC: INTERESTS STRING (Inspired by PostResource)
-        $interestsString = "";
-        $resource = $this->resource;
+        $user = $this->resource;
+        $currentUser = $request->user('sanctum');
 
-        // 1. Priority: Check if Controller eager loaded 'interests' (Best Performance)
-        // Using getRelation() avoids conflict with 'interests' column containing IDs
-        if ($resource->relationLoaded('interests')) {
-            $interestsCollection = $resource->getRelation('interests');
+        // Logic: Agar ye user ka apna data h toh full dikhao.
+        // Login/Register response me currentUser null hota h, isliye hum resource check krte hain.
+        $isMine = ($currentUser && $currentUser->id === $user->id) || ($user->is_own_profile ?? false);
 
-            $interestsString = collect($interestsCollection)
-                ->pluck('name')
-                ->implode(', ');
-        }
-        // 2. Fallback: If not loaded, fetch manually (Fixes "Showing IDs" issue)
-        else {
-            try {
-                // Force call relationship method () to bypass column data [1,2]
-                $interestsString = $resource->interests()->pluck('name')->implode(', ');
-            } catch (\Exception $e) {
-                // If relationship doesn't exist or fails
-                $interestsString = "";
-            }
-        }
-
-        return [
+        $data = [
             'id' => $this->id,
+            'uuid' => $this->uuid,
             'username' => $this->username,
             'name' => $this->name,
+            'email' => $this->getEmail($isMine),
+            'phone' => $this->getPhone($isMine),
             'occupation' => $this->occupation,
-            // Mapping 'profile_photo_path' to 'avtar' as requested
-            'avtar' => $this->profile_photo_path 
-                ? asset('storage/'.$this->profile_photo_path) 
-                : null,
+            'bio' => $this->bio,
+            'gender' => $this->gender,
+            'date_of_birth' => $this->date_of_birth,
+            'language_preference' => $this->language_preference,
             'is_seller' => (bool) $this->is_seller,
+            'is_employer' => (bool) $this->is_employer,
             'is_verified' => (bool) $this->is_verified,
             'status' => $this->status,
+            'reputation_score' => (int) $this->reputation_score,
             'followers_count' => (int) $this->followers_count,
             'following_count' => (int) $this->following_count,
-            
-            // ✅ Interest String output
-            'interests' => $interestsString,
+            'posts_count' => (int) $this->posts_count,
+            'profile_photo_url' => $this->profile_photo_url,
+            'is_mine' => $this->when(isset($this->is_mine), $this->is_mine),
+            'is_following' => $this->when(isset($this->is_following), $this->is_following),
+            'is_follower' => $this->when(isset($this->is_follower), $this->is_follower),
+            'chat_id' => $this->when(isset($this->chat_id), $this->chat_id),
+            'interests' => $this->when($this->relationLoaded('interests'), function() {
+                return InterestResource::collection($this->getRelation('interests'));
+            }),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
+
+        return $data;
+    }
+
+    private function getEmail(bool $isMine): ?string
+    {
+        if ($isMine || !$this->hide_email) {
+            return $this->email;
+        }
+        return $this->maskEmail($this->email);
+    }
+
+    private function getPhone(bool $isMine): ?string
+    {
+        if ($isMine || !$this->hide_phone) {
+            return $this->phone;
+        }
+        return $this->maskPhone($this->phone);
+    }
+
+    private function maskEmail(?string $email): ?string
+    {
+        if (!$email) return null;
+        $parts = explode("@", $email);
+        $name = $parts[0];
+        $domain = $parts[1] ?? '';
+        $len = strlen($name);
+        if ($len <= 2) return str_repeat("*", $len) . "@" . $domain;
+        return substr($name, 0, 1) . str_repeat("*", $len - 2) . substr($name, -1) . "@" . $domain;
+    }
+
+    private function maskPhone(?string $phone): ?string
+    {
+        if (!$phone) return null;
+        $len = strlen($phone);
+        if ($len <= 2) return str_repeat("*", $len);
+
+        // Only show last 2 digits
+        return str_repeat("*", $len - 2) . substr($phone, -2);
     }
 }

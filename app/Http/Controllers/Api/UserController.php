@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\User\RegisterUserRequest;
 use App\Http\Requests\Api\User\LoginRequest;
 use App\Http\Requests\Api\User\UpdateUserRequest;
+use App\Http\Resources\UserResource;
 use App\Services\Api\User\UserService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,13 @@ class UserController extends Controller
     {
         try {
             $result = $this->userService->register($request->validated());
-            return $this->success($result, 'User registered successfully.', 201);
+            $user = $result['user'];
+            $user->is_own_profile = true; // Tag for resource
+
+            return $this->success([
+                'user' => new UserResource($user),
+                'token' => $result['token']
+            ], 'User registered successfully.', 201);
         } catch (\Exception $e) {
             \Log::error($e);
             return $this->error($e->getMessage());
@@ -44,7 +51,13 @@ class UserController extends Controller
                 return $this->error('Invalid credentials.', 401);
             }
 
-            return $this->success($result, 'Login successful');
+            $user = $result['user'];
+            $user->is_own_profile = true; // Tag for resource
+
+            return $this->success([
+                'user' => new UserResource($user),
+                'token' => $result['token']
+            ], 'Login successful');
         } catch (\Exception $e) {
             \Log::error($e);
             return $this->error($e->getMessage());
@@ -84,7 +97,8 @@ class UserController extends Controller
     {
         try {
             $updatedUser = $this->userService->update($request->user(), $request->validated());
-            return $this->success(['user' => $updatedUser], 'Profile updated successfully.');
+            $updatedUser->is_own_profile = true;
+            return $this->success(['user' => new UserResource($updatedUser)], 'Profile updated successfully.');
         } catch (\Exception $e) {
             \Log::error($e);
             return $this->error($e->getMessage());
@@ -95,13 +109,19 @@ class UserController extends Controller
     {
         try {
             // Saara logic service handle karega
-            $userData = $this->userService->getUserProfileDetails($username);
+            $user = $this->userService->findByUsername($username);
 
-            if (!$userData) {
+            if (!$user) {
                 return $this->error('User not found.', 404);
             }
 
-            return $this->success(['user' => $userData], 'User details retrieved successfully.');
+            // Check if the authenticated user is viewing their own profile
+            $user->is_own_profile = (auth('sanctum')->check() && auth('sanctum')->id() == $user->id);
+
+            // Get extra details (following status etc)
+            $user = $this->userService->attachRelationStatus($user);
+
+            return $this->success(['user' => new UserResource($user)], 'User details retrieved successfully.');
         } catch (\Exception $e) {
             \Log::error($e);
             return $this->error($e->getMessage());

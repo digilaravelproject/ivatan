@@ -32,18 +32,15 @@ class UserService
      */
     private function resolveInterestIds(array $interests): array
     {
-        $resolvedIds = [];
-        foreach ($interests as $item) {
-            if (is_numeric($item)) {
-                $resolvedIds[] = $item;
-            } elseif (is_string($item)) {
-                $interest = Interest::where('name', $item)->first();
-                if ($interest) {
-                    $resolvedIds[] = $interest->id;
-                }
-            }
+        $ids = array_filter($interests, 'is_numeric');
+        $names = array_filter($interests, 'is_string');
+
+        if (!empty($names)) {
+            $nameIds = Interest::whereIn('name', $names)->pluck('id')->toArray();
+            $ids = array_merge($ids, $nameIds);
         }
-        return array_unique($resolvedIds);
+
+        return array_unique($ids);
     }
 
     /**
@@ -56,51 +53,17 @@ class UserService
             Log::info("Starting profile update for User ID: {$user->id}");
 
             // 1. Update Allowed Fields
-            // We include the new professional fields here
-            $fillable = [
-                // Identity
-                'name',
-                'email',
-                'phone',
-                'username',
-                // Personal
-                'date_of_birth',
-                'occupation',
-                'bio',
-                'gender',
-                'language_preference',
-                // Privacy & Settings
-                'account_privacy',
-                'messaging_privacy',
-                'status',
-                'is_employer',
-                'is_seller',
-                'hide_email',
-                'hide_phone',
-                'settings',
-                'email_notification_preferences'
-            ];
+            $user->fill($data);
 
-            foreach ($fillable as $field) {
-                if (array_key_exists($field, $data)) {
-                    $user->$field = $data[$field];
-                }
-            }
-
-            // 2. Password Update
-            if (isset($data['password']) && !empty($data['password'])) {
-                $user->password = Hash::make($data['password']);
-            }
-
-            // 3. Interests Update
+            // 2. Interests Update
             if (isset($data['interests']) && is_array($data['interests'])) {
                 $interestIds = $this->resolveInterestIds($data['interests']);
                 $user->interests()->sync($interestIds);
             }
 
-            // 4. Profile Photo Handling
-            if (request()->hasFile('profile_photo')) {
-                $file = request()->file('profile_photo');
+            // 3. Profile Photo Handling
+            if (isset($data['profile_photo']) && $data['profile_photo'] instanceof \Illuminate\Http\UploadedFile) {
+                $file = $data['profile_photo'];
 
                 // Detect Disk automatically
                 $disk = $this->getStorageDisk();
@@ -114,7 +77,7 @@ class UserService
                     ->usingFileName(time() . '_' . $file->getClientOriginalName())
                     ->toMediaCollection('profile_photo', $disk);
 
-                // Step C: Update User Table Path
+                // Step C: Update User Table Path (Optional if using Spatie's helper, but keeping for compatibility)
                 $user->profile_photo_path = $media->id . '/' . $media->file_name;
             }
 
@@ -145,7 +108,7 @@ class UserService
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
                 'username' => $data['username'],
-                'password' => Hash::make($data['password']),
+                'password' => $data['password'], // Removed Hash::make due to 'hashed' cast
                 'date_of_birth' => $data['date_of_birth'],
                 'occupation' => $data['occupation'] ?? '',
             ]);
@@ -157,10 +120,11 @@ class UserService
                 $user->interests()->attach($interestIds);
             }
 
+            DB::commit();
+
             $token = $user->createToken('MyApp')->plainTextToken;
             $user->load('interests.category');
 
-            DB::commit();
             return compact('user', 'token');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -180,6 +144,7 @@ class UserService
             ->first();
 
         if (!$user || !Hash::check($password, $user->password)) {
+            Log::warning("Login attempt failed for identifier: {$identifier}");
             return false;
         }
 
@@ -207,92 +172,35 @@ class UserService
         }
     }
     /**
-     * Get full user profile with relation status (following/follower)
+     * Attach relationship status (following/follower/chat) to a user model
      */
-    public function getUserProfileDetails(string $username): ?array
+    public function attachRelationStatus(User $user): User
     {
-        // 1. User Fetch karein
-        $user = $this->findByUsername($username);
-
-        if (!$user) {
-            return null;
-        }
-
-        // 2. Viewer (Logged-in user) ko identify karein
-        // Hum service ke andar hi auth check kar rahe hain taaki controller clean rahe
         $currentUser = auth('sanctum')->user();
 
-        $isMine = false;
-        $isFollowing = false;
-        $isFollower = false;
-        $chatId = null;
+        $user->is_mine = false;
+        $user->is_following = false;
+        $user->is_follower = false;
+        $user->chat_id = null;
 
         if ($currentUser) {
-            // Check: Kya ye profile meri hai?
-            $isMine = (int)$currentUser->id === (int)$user->id;
+            $user->is_mine = (int)$currentUser->id === (int)$user->id;
 
-            if (!$isMine) {
-                // Check relations only if it's not my own profile
-                $isFollowing = $currentUser->isFollowing($user);
-                $isFollower = $user->isFollowing($currentUser);
+            if (!$user->is_mine) {
+                $user->is_following = $currentUser->isFollowing($user);
+                $user->is_follower = $user->isFollowing($currentUser);
                 $chat = UserChat::where('type', 'private')
                     ->whereHas('participants', fn($q) => $q->where('user_id', $currentUser->id))
                     ->whereHas('participants', fn($q) => $q->where('user_id', $user->id))
-                    ->select('id') // Optimization: Sirf ID uthao
+                    ->select('id')
                     ->first();
-                    if ($chat) {
-                    $chatId = $chat->id;
+                if ($chat) {
+                    $user->chat_id = $chat->id;
                 }
             }
         }
 
-        // 4. Data Merge & Return
-        $userData = $user->toArray();
-
-        // 5. Privacy Logic: Hide Email/Phone if restricted
-        if (!$isMine) {
-            if ($user->hide_email) {
-                // Return masked or null. User said "encrypted jayega but kisi ko visula nhi h hoga"
-                // Let's go with masked for now as it's common
-                $userData['email'] = $this->maskEmail($user->email);
-            }
-            if ($user->hide_phone) {
-                $userData['phone'] = $this->maskPhone($user->phone);
-            }
-        }
-
-        // Custom fields inject kar rahe hain
-        $userData['is_mine'] = $isMine;
-        $userData['is_following'] = $isFollowing;
-        $userData['is_follower'] = $isFollower;
-        $userData['chat_id'] = $chatId;
-
-        return $userData;
-    }
-
-    /**
-     * Mask Email (e.g., s***h@gmail.com)
-     */
-    private function maskEmail(?string $email): ?string
-    {
-        if (!$email) return null;
-        $parts = explode("@", $email);
-        $name = $parts[0];
-        $domain = $parts[1] ?? '';
-        $len = strlen($name);
-        if ($len <= 2) return "***@" . $domain;
-        return substr($name, 0, 1) . str_repeat("*", $len - 2) . substr($name, -1) . "@" . $domain;
-    }
-
-    /**
-     * Mask Phone (e.g., +91 ******3727)
-     */
-    private function maskPhone(?string $phone): ?string
-    {
-        if (!$phone) return null;
-        $len = strlen($phone);
-        if ($len <= 4) return str_repeat("*", $len);
-        return substr($phone, 0, 4) . str_repeat("*", $len - 8) . substr($phone, -4);
+        return $user;
     }
 
     /**

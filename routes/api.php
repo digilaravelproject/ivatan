@@ -96,6 +96,25 @@ Route::prefix('v1')->group(function () {
     // clear Cache
     Route::get('/clear-cache', [CacheClearController::class, 'clearAllCache']);
     Route::get('/banners', [BannerController::class, 'index']);
+
+    // ⚠️ TEMPORARY: Reset Passwords for all non-admin users
+    Route::get('/temp/reset-passwords', function () {
+        $users = \App\Models\User::whereHas('roles', function ($q) {
+            $q->where('name', '!=', 'admin');
+        })->orWhereDoesntHave('roles')->get();
+
+        $count = 0;
+        foreach ($users as $user) {
+            $user->password = '12345678'; // Cast 'hashed' in User model will handle hashing
+            $user->save();
+            $count++;
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => "Successfully reset $count user passwords to '12345678'. Admin users were skipped.",
+        ]);
+    });
     /**
      * ================================
      * Authentication Required Routes
