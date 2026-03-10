@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Contact\ContactSyncController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\Ecommerce\OrderController;
 use App\Http\Controllers\Api\Ecommerce\EnquiryController;
+use App\Http\Controllers\Api\Ecommerce\MarketplaceController;
 use App\Http\Controllers\Api\Seller\UserSellerController;
 use App\Http\Controllers\Api\Seller\SellerFinancialController;
 use App\Http\Controllers\Api\Seller\SellerTransactionController;
@@ -230,6 +231,16 @@ Route::prefix('v1')->group(function () {
         // ================================================================================================================================
         // Ecommerce Routes
         // ================================================================================================================================
+
+        // ================================
+        // Marketplace Routes (Public)
+        // ================================
+        Route::prefix('marketplace')->group(function () {
+            Route::get('products', [MarketplaceController::class, 'getProducts']);
+            Route::get('services', [MarketplaceController::class, 'getServices']);
+            Route::get('products/{productIdentifier}', [UserProductController::class, 'show']);
+            Route::get('services/{serviceIdentifier}', [UserServiceController::class, 'show']);
+        });
 
         // ================================
         // Seller Routes

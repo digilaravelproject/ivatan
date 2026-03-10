@@ -121,6 +121,14 @@ class CartController extends Controller
                 $quantity = 1;
             }
 
+            // Check if user is the seller of the item
+            if ($seller_id === $request->user()->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You cannot purchase your own products or services.',
+                ], 403);
+            }
+
             // If seller_id is not found, return an error
             if (!$seller_id) {
                 return response()->json([

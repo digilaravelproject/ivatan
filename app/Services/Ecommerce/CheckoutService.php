@@ -9,6 +9,7 @@ use App\Models\Ecommerce\UserPayment;
 use App\Models\Ecommerce\UserAddress;
 use App\Models\Ecommerce\UserProduct;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -31,7 +32,7 @@ class CheckoutService
             $priceChangedItems = [];
 
             foreach ($cart->items as $ci) {
-                $this->validateItem($ci, $priceChangedItems);
+                $this->validateItem($ci, $priceChangedItems, $user);
 
                 // Calculate total
                 $lineTotal = bcmul((string) $ci->price, (string) $ci->quantity, 2);
@@ -85,8 +86,15 @@ class CheckoutService
         });
     }
 
-    private function validateItem($ci, &$priceChangedItems)
+    private function validateItem($ci, &$priceChangedItems, $user)
     {
+        // Prevent purchasing own items
+        if ($ci->seller_id === $user->id) {
+            throw ValidationException::withMessages([
+                'error' => "You cannot purchase your own item: " . ($ci->product?->title ?? $ci->service?->title)
+            ]);
+        }
+
         if ($ci->item_type === 'user_products') {
             $product = $ci->product; // Use the relationship here
 

@@ -145,11 +145,6 @@ class UserServiceController extends Controller
             // Get the fields to update
             $update = $request->only(['title', 'description', 'price', 'discount_price', 'status']);
 
-            // If no valid fields are provided, return an error
-            if (empty($update)) {
-                return $this->errorResponse('No valid fields provided to update.', 422);
-            }
-
             // Update the service details
             $updated = $service->update($update);
             if (!$updated) {

@@ -71,10 +71,6 @@ class UpdateUserServiceRequest extends FormRequest
     public function withValidator(Validator $validator)
     {
         $validator->after(function (Validator $validator) {
-            /** @var \Illuminate\Http\Request $request */
-            $request = $this;
-
-            // Check if at least one field is filled or a file is uploaded
             $fieldsToCheck = [
                 'title',
                 'description',
@@ -86,10 +82,13 @@ class UpdateUserServiceRequest extends FormRequest
                 'status'
             ];
 
-            // Using `collect` to loop through the fields and check if any of them are filled or a file is uploaded
-            $hasAtLeastOneField = collect($fieldsToCheck)->contains(function ($field) use ($request) {
-                return $request->filled($field) || $request->hasFile($field);
-            });
+            $hasAtLeastOneField = false;
+            foreach ($fieldsToCheck as $field) {
+                if ($this->has($field) || $this->hasFile($field)) {
+                    $hasAtLeastOneField = true;
+                    break;
+                }
+            }
 
             // Add custom error if no fields are filled
             if (!$hasAtLeastOneField) {

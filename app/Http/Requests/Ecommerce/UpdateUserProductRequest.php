@@ -40,14 +40,17 @@ class UpdateUserProductRequest extends FormRequest
     public function withValidator(Validator $validator)
     {
         $validator->after(function (Validator $validator) {
-            $request = $this;
             $fieldsToCheck = [
                 'title', 'description', 'price', 'discount_price', 'stock', 'cover_image', 'images', 'remove_image_ids', 'status'
             ];
 
-            $hasAtLeastOneField = collect($fieldsToCheck)->contains(function ($field) use ($request) {
-                return $request->filled($field) || $request->hasFile($field);
-            });
+            $hasAtLeastOneField = false;
+            foreach ($fieldsToCheck as $field) {
+                if ($this->has($field) || $this->hasFile($field)) {
+                    $hasAtLeastOneField = true;
+                    break;
+                }
+            }
 
             if (!$hasAtLeastOneField) {
                 $validator->errors()->add('empty', 'You must provide at least one of the fields or images to update.');
