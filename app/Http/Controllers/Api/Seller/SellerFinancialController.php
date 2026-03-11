@@ -29,16 +29,15 @@ class SellerFinancialController extends Controller
     }
 
     /**
-     * Store or update financial details (Archiving old ones)
+     * Store or update financial details (Deleting old ones)
      */
     public function store(StoreSellerFinancialRequest $request): JsonResponse
     {
         return DB::transaction(function () use ($request) {
             $user = $request->user();
 
-            // Archive (Soft Delete) existing details
-            UserSellerFinancial::where('user_id', $user->id)->update(['is_active' => false]);
-            UserSellerFinancial::where('user_id', $user->id)->delete();
+            // Force Delete existing details to avoid unique constraint violation
+            UserSellerFinancial::withTrashed()->where('user_id', $user->id)->forceDelete();
 
             $financial = UserSellerFinancial::create(array_merge(
                 $request->validated(),
@@ -47,22 +46,21 @@ class SellerFinancialController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Bank details saved and archived previous ones.',
+                'message' => 'Bank details saved successfully.',
             ], 201);
         });
     }
 
     /**
-     * Archive (Soft Delete) financial details
+     * Delete financial details
      */
     public function destroy(Request $request): JsonResponse
     {
-        UserSellerFinancial::where('user_id', $request->user()->id)->update(['is_active' => false]);
-        UserSellerFinancial::where('user_id', $request->user()->id)->delete();
+        UserSellerFinancial::withTrashed()->where('user_id', $request->user()->id)->forceDelete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Bank details archived successfully',
+            'message' => 'Bank details deleted successfully',
         ]);
     }
 }
