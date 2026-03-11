@@ -72,7 +72,7 @@ class UserSellerController extends Controller
                 $totalRevenue = UserOrder::where('seller_id', $user->id)
                     ->whereIn('payment_status', [UserOrder::PAYMENT_PAID ?? 'paid'])
                     ->sum('total_amount');
-                $totalProducts = UserProduct::where('user_id', $user->id)->count();
+                $totalProducts = UserProduct::where('seller_id', $user->id)->count();
 
                 return [
                     'total_orders' => $totalOrders,

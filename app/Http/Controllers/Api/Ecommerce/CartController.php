@@ -18,23 +18,55 @@ use Exception;
 
 class CartController extends Controller
 {
-    /**
-     * Get the current user's cart and total price.
-     * Apply caching for the cart retrieval.
-     */
     public function index(Request $request): JsonResponse
     {
         try {
             // Check if cart is cached; otherwise, retrieve and cache it
             $cart = Cache::remember("cart_user_{$request->user()->id}", 86400, function () use ($request) {
-                return $this->getUserCart($request->user()->id);
+                return UserCart::with(['items.product.images', 'items.product.seller', 'items.service.images', 'items.service.seller'])
+                    ->firstOrCreate(
+                        ['user_id' => $request->user()->id],
+                        ['uuid' => Str::uuid()]
+                    );
             });
 
             $totalPrice = $cart->items->sum(fn($item) => $item->price * ($item->quantity ?? 1));
+            $totalItems = $cart->items->sum('quantity');
+
+            // Format items to include details
+            $formattedItems = $cart->items->map(function ($item) {
+                $itemDetails = [];
+                if ($item->item_type === 'user_products' && $item->product) {
+                    $itemDetails = [
+                        'name' => $item->product->title,
+                        'cover_image' => $item->product->cover_image,
+                        'slug' => $item->product->slug,
+                        'product_id' => $item->product->id,
+                        'description' => $item->product->description,
+                        'images' => $item->product->images,
+                        'seller' => $item->product->seller,
+                    ];
+                } elseif ($item->item_type === 'user_services' && $item->service) {
+                    $itemDetails = [
+                        'name' => $item->service->title,
+                        'cover_image' => $item->service->cover_image,
+                        'slug' => $item->service->slug,
+                        'service_id' => $item->service->id,
+                        'description' => $item->service->description,
+                        'images' => $item->service->images,
+                        'seller' => $item->service->seller,
+                    ];
+                }
+                return array_merge($item->toArray(), $itemDetails);
+            });
+
+            $cartData = $cart->toArray();
+            $cartData['items'] = $formattedItems;
 
             return response()->json([
-                'cart' => $cart,
+                'cart' => $cartData,
                 'total_price' => $totalPrice,
+                'total_items' => $totalItems,
             ], 200);
         } catch (Exception $e) {
             logger('Cart retrieval error: ' . $e->getMessage());

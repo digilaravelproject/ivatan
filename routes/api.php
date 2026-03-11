@@ -92,8 +92,7 @@ Route::post('check-username', [UserController::class, 'checkUsernameAvailability
 Route::post('forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp']);
 Route::post('forgot-password/reset', [ForgotPasswordController::class, 'resetPassword']);
 
-// Public Enquiry (Rate limited: 5 requests per minute)
-Route::post('enquiries', [EnquiryController::class, 'store'])->middleware('throttle:5,1');
+
 
 
 
@@ -195,21 +194,21 @@ Route::prefix('v1')->group(function () {
          * Authenticated Story Routes
          * ================================
          */
-             Route::prefix('stories')->group(function () {
+        Route::prefix('stories')->group(function () {
 
-                // Feeds
-                Route::get('/feed', [StoryController::class, 'index']);
-                Route::get('/me', [StoryController::class, 'myStories']);
-                Route::get('/user/{username}', [StoryController::class, 'getStoriesByUsername']);
+            // Feeds
+            Route::get('/feed', [StoryController::class, 'index']);
+            Route::get('/me', [StoryController::class, 'myStories']);
+            Route::get('/user/{username}', [StoryController::class, 'getStoriesByUsername']);
 
-                // Single Story CRUD
-                Route::post('/', [StoryController::class, 'store']);
-                Route::get('/{id}', [StoryController::class, 'show']);
-                Route::delete('/{id}', [StoryController::class, 'destroy']);
+            // Single Story CRUD
+            Route::post('/', [StoryController::class, 'store']);
+            Route::get('/{id}', [StoryController::class, 'show']);
+            Route::delete('/{id}', [StoryController::class, 'destroy']);
 
-                // Engagement
-                Route::post('/{id}/view', [StoryController::class, 'markAsViewed']);
-                Route::post('/{id}/like', [StoryController::class, 'toggleLike']);
+            // Engagement
+            Route::post('/{id}/view', [StoryController::class, 'markAsViewed']);
+            Route::post('/{id}/like', [StoryController::class, 'toggleLike']);
 
             /* -------------------------- Highlights Sub-Routes ------------------------- */
 
@@ -241,7 +240,8 @@ Route::prefix('v1')->group(function () {
             Route::get('products/{productIdentifier}', [UserProductController::class, 'show']);
             Route::get('services/{serviceIdentifier}', [UserServiceController::class, 'show']);
         });
-
+        // Public Enquiry (Rate limited: 5 requests per minute)
+        Route::post('enquiries', [EnquiryController::class, 'store'])->middleware('throttle:5,1');
         // ================================
         // Seller Routes
         // ================================
@@ -258,7 +258,7 @@ Route::prefix('v1')->group(function () {
             // Seller Enquiry Dashboard
             Route::get('enquiries', [EnquiryController::class, 'index']);
             Route::get('enquiries/stats', [EnquiryController::class, 'stats']);
-            Route::patch('enquiries/{uuid}/status', [EnquiryController::class, 'updateStatus']);
+            Route::post('enquiries/{uuid}/status', [EnquiryController::class, 'updateStatus']);
             Route::delete('enquiries/{uuid}', [EnquiryController::class, 'destroy']);
 
             // Seller Financial Details
