@@ -42,6 +42,8 @@ class UserOrder extends Model
     public const STATUS_PENDING = 'pending';
     public const STATUS_ACCEPTED = 'accepted';
     public const STATUS_REJECTED = 'rejected';
+    public const STATUS_PROCESSING = 'processing';
+    public const STATUS_PAID = 'paid';
     public const STATUS_SHIPPED = 'shipped';
     public const STATUS_DELIVERED = 'delivered';
     public const STATUS_CANCELLED = 'cancelled';

@@ -271,7 +271,7 @@ Route::prefix('v1')->group(function () {
             // Seller Order Management
             Route::get('orders', [SellerOrderController::class, 'index']);
             Route::get('orders/{id}', [SellerOrderController::class, 'show']);
-            Route::patch('orders/{id}/status', [SellerOrderController::class, 'updateStatus']);
+            Route::post('orders/{id}/status', [SellerOrderController::class, 'updateStatus']);
         });
         // ================================
         // Services Routes
