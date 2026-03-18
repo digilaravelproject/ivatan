@@ -51,7 +51,13 @@ class JobPostController extends Controller
                 $query->where('salary_max', '<=', $request->salary_max);
             }
 
+            $user = Auth::user();
             $jobs = $query->with('employer')
+                ->when($user, function ($q) use ($user) {
+                    $q->withExists(['applications' => function ($aq) use ($user) {
+                        $aq->where('applicant_id', $user->id);
+                    }]);
+                })
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
 
@@ -70,13 +76,19 @@ class JobPostController extends Controller
     public function show($identifier): JsonResponse
     {
         try {
+            $user = Auth::user();
+
             // Fetch job by ID or slug
             $job = UserJobPost::where('id', $identifier)
                 ->orWhere('slug', $identifier)
                 ->with('employer')
+                ->when($user, function ($q) use ($user) {
+                    $q->withExists(['applications' => function ($aq) use ($user) {
+                        $aq->where('applicant_id', $user->id);
+                    }]);
+                })
                 ->firstOrFail();
 
-            $user = Auth::user();
             $ipAddress = request()->ip();
 
             // Dispatch background job to handle view tracking

@@ -103,7 +103,7 @@ class UserJobPost extends Model
         'urgent_until'=> 'datetime',
     ];
 
-    protected $appends = ['is_mine', 'is_urgent_active'];
+    protected $appends = ['is_mine', 'is_urgent_active', 'is_applied'];
 
 
 
@@ -177,5 +177,22 @@ class UserJobPost extends Model
     public function getIsUrgentActiveAttribute(): bool
     {
         return $this->is_urgent && $this->urgent_until && $this->urgent_until->isFuture();
+    }
+
+    public function getIsAppliedAttribute(): bool
+    {
+        if (!Auth::check()) {
+            return false;
+        }
+
+        // To avoid N+1 query, we check if the relation is already loaded
+        // or if we have the applications_exists attribute from withExists
+        if (isset($this->attributes['applications_exists'])) {
+            return (bool) $this->attributes['applications_exists'];
+        }
+
+        return $this->applications()
+            ->where('applicant_id', Auth::id())
+            ->exists();
     }
 }
