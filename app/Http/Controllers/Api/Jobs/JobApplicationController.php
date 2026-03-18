@@ -159,6 +159,8 @@ class JobApplicationController extends Controller
             $application->save();
 
             return $this->success($application, 'Application status updated successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->error('The given data was invalid.', 422, $e->errors());
         } catch (Throwable $e) {
             return $this->exceptionResponse($e, 'Failed to update application status');
         }

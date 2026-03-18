@@ -364,6 +364,14 @@ Route::prefix('v1')->group(function () {
                 Route::put('{job}/status', 'updateStatus'); // Update job status
             });
 
+            // JobApplicationController routes
+            Route::controller(JobApplicationController::class)->group(function () {
+                Route::post('{jobId}/apply', 'apply');               // Apply to a job
+                Route::get('{job}/applications', 'listByJob');    // List applications for a job
+                Route::post('applications/{application}/status', 'updateStatus'); // Update application status
+                Route::get('applications/{application}/resume', 'downloadResume'); // Download resume
+            });
+
             // JobPostController routes
             Route::controller(JobPostController::class)->group(function () {
                 Route::get('/', 'index');           // List all jobs
@@ -371,15 +379,6 @@ Route::prefix('v1')->group(function () {
                 Route::put('{job}', 'update');      // Update job
                 Route::delete('{job}', 'destroy');  // Delete job
                 Route::get('{identifier}', 'show');        // Show single job (Wildcard, must be last)
-            });
-
-            // JobApplicationController routes
-            Route::controller(JobApplicationController::class)->group(function () {
-                Route::post('{jobId}/apply', 'apply');               // Apply to a job
-                Route::get('{job}/applications', 'listByJob');    // List applications for a job
-                Route::post('applications/{application}/status', 'updateStatus'); // Update application status
-                Route::get('applications/{application}/resume', 'downloadResume'); // Download resume
-
             });
         });
 
