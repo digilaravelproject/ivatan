@@ -39,7 +39,7 @@ class PaymentController extends Controller
 
         $razorpayOrder = $api->order->create([
             'receipt' => (string) $order->uuid,
-            'amount' => (int) ($order->total_amount * 100),
+            'amount' => (int) round($order->total_amount * 100),
             'currency' => 'INR',
         ]);
         // Store Razorpay order ID in DB (so we can link it later)
@@ -48,7 +48,11 @@ class PaymentController extends Controller
             [
                 'gateway' => 'razorpay',
                 'status' => 'initiated',
-                'meta' => json_encode(['razorpay_order_id' => $razorpayOrder['id']]),
+                'meta' => [
+                    'razorpay_order_id' => $razorpayOrder['id'],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->header('User-Agent'),
+                ],
             ]
         );
 
@@ -115,7 +119,7 @@ class PaymentController extends Controller
             // Fetch payment details from Razorpay
             $payment = $api->payment->fetch($request->razorpay_payment_id);
             // ✅ Edge case: Check if Razorpay payment amount matches our order total
-            if ((int) $payment->amount / 100 !== (int) $order->total_amount) {
+            if ((int) $payment->amount !== (int) round($order->total_amount * 100)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Payment amount mismatch detected.',
@@ -134,6 +138,17 @@ class PaymentController extends Controller
                     'message' => 'Payment is not yet captured. Current status: ' . $payment->status,
                     'action' => 'Please try again or contact support.',
                 ], 400);
+            }
+
+            // You could check if razorpay_order_id matches our DB record for extra security
+            $paymentRecord = UserPayment::where('order_id', $order->id)->first();
+            if ($paymentRecord && isset($paymentRecord->meta['razorpay_order_id'])) {
+                if ($paymentRecord->meta['razorpay_order_id'] !== $request->razorpay_order_id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Razorpay Order ID mismatch.',
+                    ], 400);
+                }
             }
 
             // All good — dispatch async processing

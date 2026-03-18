@@ -238,10 +238,10 @@ class CheckoutService
             'amount' => $total,
             'status' => $paymentMethod === 'cod' ? 'pending' : 'initiated',
             'transaction_id' => null,
-            'meta' => json_encode([
+            'meta' => [
                 'ip_address' => $requestIp,
                 'user_agent' => $userAgent,
-            ]),
+            ],
         ]);
     }
 }

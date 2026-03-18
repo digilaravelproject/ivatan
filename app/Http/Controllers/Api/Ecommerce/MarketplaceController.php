@@ -16,8 +16,14 @@ class MarketplaceController extends Controller
     public function getProducts(Request $request): JsonResponse
     {
         try {
+            $user = $request->user('sanctum');
             $query = UserProduct::with(['images', 'seller'])
                 ->where('status', 'active');
+
+            // Exclude items belonging to the current user
+            if ($user) {
+                $query->where('seller_id', '!=', $user->id);
+            }
 
             // Optional search by title
             if ($request->has('search')) {
@@ -46,8 +52,14 @@ class MarketplaceController extends Controller
     public function getServices(Request $request): JsonResponse
     {
         try {
+            $user = $request->user('sanctum');
             $query = UserService::with(['images', 'seller'])
                 ->where('status', 'active');
+
+            // Exclude items belonging to the current user
+            if ($user) {
+                $query->where('seller_id', '!=', $user->id);
+            }
 
             // Optional search by title
             if ($request->has('search')) {

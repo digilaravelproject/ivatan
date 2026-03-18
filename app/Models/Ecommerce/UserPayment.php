@@ -35,8 +35,10 @@ use Illuminate\Support\Str;
 class UserPayment extends Model
 {
     protected $table = 'user_payments';
-    const STATUS_SUCCESSFUL = 'successful';
+    const STATUS_PAID = 'paid';
+    const STATUS_SUCCESSFUL = 'paid'; // Keep alias for compatibility if needed
     const STATUS_PENDING = 'pending';
+    const STATUS_INITIATED = 'initiated';
     const STATUS_FAILED = 'failed';
     const GATEWAY_COD = 'cod';
     const GATEWAY_RAZORPAY = 'razorpay';
