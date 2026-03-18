@@ -22,6 +22,7 @@ class UserEnquiry extends Model
         'subject',
         'message',
         'status',
+        'reply_message',
     ];
 
     protected static function boot()

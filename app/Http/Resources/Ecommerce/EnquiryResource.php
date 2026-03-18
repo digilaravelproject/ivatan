@@ -23,11 +23,20 @@ class EnquiryResource extends JsonResource
                 'email' => $this->email,
                 'phone' => $this->phone,
             ],
+            'seller_id' => $this->seller_id,
+            'service_id' => $this->service_id,
+            'product_id' => $this->product_id,
+            'seller' => $this->whenLoaded('seller', fn() => [
+                'id' => $this->seller->id,
+                'name' => $this->seller->name,
+                'email' => $this->seller->email,
+            ]),
             'service' => $this->whenLoaded('service'),
             'product' => $this->whenLoaded('product'),
             'subject' => $this->subject,
             'message' => $this->message,
             'status' => $this->status,
+            'reply_message' => $this->reply_message,
             'created_at' => $this->created_at,
         ];
     }

@@ -231,6 +231,9 @@ Route::prefix('v1')->group(function () {
         // Ecommerce Routes
         // ================================================================================================================================
 
+        // User Enquiries (Buyer side)
+        Route::get('user/my-enquiries', [EnquiryController::class, 'myEnquiries']);
+
         // ================================
         // Marketplace Routes (Public)
         // ================================
@@ -258,8 +261,8 @@ Route::prefix('v1')->group(function () {
             // Seller Enquiry Dashboard
             Route::get('enquiries', [EnquiryController::class, 'index']);
             Route::get('enquiries/stats', [EnquiryController::class, 'stats']);
-            Route::post('enquiries/{uuid}/status', [EnquiryController::class, 'updateStatus']);
-            Route::delete('enquiries/{uuid}', [EnquiryController::class, 'destroy']);
+            Route::post('enquiries/{identifier}/status', [EnquiryController::class, 'updateStatus']);
+            Route::delete('enquiries/{identifier}', [EnquiryController::class, 'destroy']);
 
             // Seller Financial Details
             Route::get('financials', [SellerFinancialController::class, 'show']);
@@ -325,17 +328,12 @@ Route::prefix('v1')->group(function () {
         | Orders
         |--------------------------------------------------------------------------
         */
-        // Route::get('/orders', [OrderController::class, 'index']);                // List user's orders
-        // Route::get('/orders/{order}', [OrderController::class, 'show']);         // Show specific order
-        // Route::delete('/orders/{order}', [OrderController::class, 'destroy']);   // Delete order (if allowed)
 
         // /*
         // |--------------------------------------------------------------------------
         // | Shipping
         // |--------------------------------------------------------------------------
         // */
-        // Route::get('/orders/{orderId}/shipping', [ShippingController::class, 'getShipping']);       // Get order shipping status
-        // Route::post('/orders/{orderId}/shipping', [ShippingController::class, 'updateShipping']);    // Update shipping info (admin/partner)
         Route::prefix('orders')->group(function () {
 
             // Orders routes

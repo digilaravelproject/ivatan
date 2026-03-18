@@ -30,6 +30,7 @@ class EnquiryController extends Controller
             }
 
             $enquiry = UserEnquiry::create($data);
+            $enquiry->load(['service', 'product', 'seller']);
 
             return response()->json([
                 'success' => true,
@@ -44,6 +45,19 @@ class EnquiryController extends Controller
     }
 
     /**
+     * List enquiries made by the user
+     */
+    public function myEnquiries(Request $request): AnonymousResourceCollection
+    {
+        $enquiries = UserEnquiry::with(['service', 'product', 'seller'])
+            ->where('user_id', $request->user()->id)
+            ->latest()
+            ->paginate(15);
+
+        return EnquiryResource::collection($enquiries)->additional(['success' => true]);
+    }
+
+    /**
      * List enquiries for the seller
      */
     public function index(Request $request): AnonymousResourceCollection|JsonResponse
@@ -53,7 +67,7 @@ class EnquiryController extends Controller
             return response()->json(['success' => false, 'message' => 'Only sellers can view enquiries'], 403);
         }
 
-        $enquiries = UserEnquiry::with(['service', 'product'])
+        $enquiries = UserEnquiry::with(['service', 'product', 'seller', 'user'])
             ->where('seller_id', $user->id)
             ->latest()
             ->paginate(15);
@@ -87,9 +101,13 @@ class EnquiryController extends Controller
     /**
      * Update enquiry status (and optionally message)
      */
-    public function updateStatus(UpdateEnquiryStatusRequest $request, string $uuid): JsonResponse
+    public function updateStatus(UpdateEnquiryStatusRequest $request, string $identifier): JsonResponse
     {
-        $enquiry = UserEnquiry::with('user')->where('uuid', $uuid)->firstOrFail();
+        $enquiry = UserEnquiry::with('user')
+            ->where(function($query) use ($identifier) {
+                $query->where('id', $identifier)
+                      ->orWhere('uuid', $identifier);
+            })->firstOrFail();
 
         // Security check: Only the seller of THIS enquiry can update it
         if ($enquiry->seller_id !== $request->user()->id) {
@@ -98,6 +116,7 @@ class EnquiryController extends Controller
 
         $enquiry->update([
             'status' => $request->status,
+            'reply_message' => $request->reply_message ?? $enquiry->reply_message,
         ]);
 
         // Notify the user who made the enquiry
@@ -124,9 +143,12 @@ class EnquiryController extends Controller
     /**
      * Archive/Delete enquiry
      */
-    public function destroy(Request $request, string $uuid): JsonResponse
+    public function destroy(Request $request, string $identifier): JsonResponse
     {
-        $enquiry = UserEnquiry::where('uuid', $uuid)->firstOrFail();
+        $enquiry = UserEnquiry::where(function($query) use ($identifier) {
+                $query->where('id', $identifier)
+                      ->orWhere('uuid', $identifier);
+            })->firstOrFail();
 
         if ($enquiry->seller_id !== $request->user()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
