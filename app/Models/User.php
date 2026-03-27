@@ -61,6 +61,8 @@ class User extends Authenticatable implements HasMedia
         'hide_phone',
     ];
 
+    protected $appends = ['profile_photo_url'];
+
     protected $hidden = [
         'password',
         'remember_token',

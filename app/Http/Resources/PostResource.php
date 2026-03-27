@@ -31,8 +31,8 @@ class PostResource extends JsonResource
             if ($isMine) {
                 $isFollowing = true;
             } else {
-                // Intelephense now knows $authUser is a User model
-                $isFollowing = $authUser->isFollowing($author);
+                // Optimization: Use pre-loaded attribute from Model to avoid N+1 query
+                $isFollowing = (bool)($author->is_followed_by_me ?? $authUser->isFollowing($author));
             }
         }
 
@@ -41,7 +41,6 @@ class PostResource extends JsonResource
 
         // Check if 'user.interests' relationship is loaded
         if ($author && $author->relationLoaded('interests')) {
-            // Use 'getRelation' to avoid potential naming conflicts with column values
             $interestsCollection = $author->getRelation('interests');
 
             $interestsString = collect($interestsCollection)
@@ -70,7 +69,7 @@ class PostResource extends JsonResource
                 'avatar' => $author->profile_photo_url,
                 'is_verified' => $author->is_verified ?? false,
 
-                // ✅ Ab ye 100% chalega
+                // Fully optimized interests string
                 'interests' => $interestsString,
             ],
 
@@ -90,7 +89,7 @@ class PostResource extends JsonResource
             'stats' => [
                 'like_count' => $this->like_count,
                 'comment_count' => $this->comment_count,
-                'share_count' => 0, // Placeholder for future expansion
+                'share_count' => 0, // Placeholder
                 'view_count' => $this->view_count,
                 'is_liked' => isset($this->likes_exists) ? (bool)$this->likes_exists : ($authUser ? (bool) $this->likes()->where('user_id', $authUser->id)->exists() : false),
                 'is_saved' => false,

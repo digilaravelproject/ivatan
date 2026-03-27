@@ -163,6 +163,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/user/{username}', 'getPostsByUser');
             Route::get('/feed/trending', 'globalTrendingFeed'); // Global Trending
             Route::get('/feed/trending/interests', 'trendingInterestsFeed'); // User Interest Based Trending
+            Route::get('/feed/for-you', 'forYouFeed'); // Shuffled Interest Based Feed
         });
         Route::post('/contacts/sync', [ContactSyncController::class, 'sync']);
         // ================================

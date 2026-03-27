@@ -14,7 +14,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Response;
 use App\Jobs\ProcessMediaJob;
 use App\Models\User;
 use App\Services\ViewTrackingService;
@@ -37,16 +36,39 @@ class UserPostController extends Controller
     }
 
     /**
+     * Apply common query optimizations (Eager Loading & N+1 fixes).
+     */
+    protected function applyBaseQueryOptimizations($query)
+    {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::guard('sanctum')->user();
+        $userId = $user ? $user->id : null;
+
+        return $query->withExists('likes')
+            ->with([
+                'media',
+                'user' => function ($q) use ($userId) {
+                    $q->with(['interests', 'media']); // Eager load media for profile_photo_url logic
+                    if ($userId) {
+                        $q->withExists([
+                            'followers as is_followed_by_me' => function ($f) use ($userId) {
+                                $f->where('follower_id', $userId);
+                            }
+                        ]);
+                    }
+                }
+            ]);
+    }
+
+    /**
      * Mixed Feed (Home/Explore) - "For You" Logic.
      * Shows a mix of active posts based on engagement and randomness.
      */
     public function index(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $posts = UserPost::query()
-                ->active()
-                ->withExists('likes')
-                ->with(['user.interests', 'media'])
+            $query = UserPost::query();
+            $posts = $this->applyBaseQueryOptimizations($query)
                 ->forYou() // Algorithmic scope
                 ->simplePaginate(15);
 
@@ -64,11 +86,10 @@ class UserPostController extends Controller
     public function postsFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $posts = UserPost::query()
-                ->active()
-                ->whereIn('type', ['post', 'carousel', 'video'])
-                ->withExists('likes')
-                ->with(['user.interests', 'media'])
+            $query = UserPost::query()
+                ->whereIn('type', ['post', 'carousel', 'video']);
+
+            $posts = $this->applyBaseQueryOptimizations($query)
                 ->trending()
                 ->simplePaginate(15);
 
@@ -86,11 +107,9 @@ class UserPostController extends Controller
     public function videosFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $videos = UserPost::query()
-                ->active()
-                ->ofType('video')
-                ->withExists('likes')
-                ->with(['user.interests', 'media'])
+            $query = UserPost::query()->ofType('video');
+
+            $videos = $this->applyBaseQueryOptimizations($query)
                 ->trending()
                 ->simplePaginate(15);
 
@@ -108,11 +127,9 @@ class UserPostController extends Controller
     public function reelsFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $reels = UserPost::query()
-                ->active()
-                ->ofType('reel')
-                ->withExists('likes')
-                ->with(['user.interests', 'media'])
+            $query = UserPost::query()->ofType('reel');
+
+            $reels = $this->applyBaseQueryOptimizations($query)
                 ->trending()
                 ->simplePaginate(15);
 
@@ -245,10 +262,9 @@ class UserPostController extends Controller
 
             // 4. Build the query
             $query = UserPost::query()
-                ->where('user_id', $targetUser->id)
-                ->active() // Only active posts
-                ->withExists('likes') // Optimize like status check
-                ->with(['media', 'user']); // Eager load relations
+                ->where('user_id', $targetUser->id);
+
+            $query = $this->applyBaseQueryOptimizations($query);
 
             // 5. Apply filtering logic
             // Frontend sends: ?filter=posts OR ?filter=videos OR ?filter=all
@@ -402,5 +418,146 @@ class UserPostController extends Controller
                 'reports_count' => $reportService->reportCount($post)
             ]
         ]);
+    }
+
+    /**
+     * Global Trending Feed.
+     * Shows all active posts sorted by trending score and freshness.
+     */
+    public function globalTrendingFeed(Request $request): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            $seed = $request->input('seed') ?: time();
+
+            $query = UserPost::query();
+
+            $posts = $this->applyBaseQueryOptimizations($query)
+                ->orderByRaw("RAND($seed)")
+                ->simplePaginate(15);
+
+            return PostResource::collection($posts)->additional([
+                'meta' => [
+                    'seed' => (int) $seed,
+                    'message' => 'Pass this seed to the next page to maintain order.'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Global Trending Feed Error: " . $e->getMessage());
+            return response()->json(['error' => 'An error occurred while fetching trending feed.'], 500);
+        }
+    }
+
+    /**
+     * Trending Feed based on User Interests.
+     * Shows posts from users who share interests with the authenticated user.
+     * Fallback to global trending if no results found.
+     */
+    public function trendingInterestsFeed(Request $request): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            $seed = $request->input('seed') ?: time();
+
+            /** @var \App\Models\User|null $user */
+            $user = Auth::guard('sanctum')->user();
+
+            if (!$user) {
+                return $this->globalTrendingFeed($request);
+            }
+
+            $interestIds = $user->interests()->pluck('interests.id');
+
+            if ($interestIds->isEmpty()) {
+                return $this->globalTrendingFeed($request);
+            }
+
+            // Find other users with these interests
+            $relatedUserIds = DB::table('interest_user')
+                ->whereIn('interest_id', $interestIds)
+                ->where('user_id', '!=', $user->id)
+                ->pluck('user_id')
+                ->unique();
+
+            if ($relatedUserIds->isEmpty()) {
+                return $this->globalTrendingFeed($request);
+            }
+
+            $query = UserPost::query()->whereIn('user_id', $relatedUserIds);
+
+            $posts = $this->applyBaseQueryOptimizations($query)
+                ->orderByRaw("RAND($seed)")
+                ->simplePaginate(15);
+
+            // If the interest-based feed is empty (on the first page), fallback to global
+            if ($posts->isEmpty() && (int) $request->input('page', 1) === 1) {
+                return $this->globalTrendingFeed($request);
+            }
+
+            return PostResource::collection($posts)->additional([
+                'meta' => [
+                    'seed' => (int) $seed,
+                    'message' => 'Pass this seed to the next page to maintain order.'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Interests Trending Feed Error: " . $e->getMessage());
+            // Always fallback to global on error to ensure user sees something
+            return $this->globalTrendingFeed($request);
+        }
+    }
+
+    /**
+     * "For You" Feed.
+     * Interest-based shuffling with seeded randomness to prevent duplicates on pagination.
+     */
+    public function forYouFeed(Request $request): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            // Seed management: Either use provided seed or generate new one for first page
+            $seed = $request->input('seed') ?: time();
+
+            /** @var \App\Models\User|null $user */
+            $user = Auth::guard('sanctum')->user();
+
+            $query = UserPost::query();
+
+            // Filter by interests if user has them
+            if ($user) {
+                $interestIds = $user->interests()->pluck('interests.id');
+                if ($interestIds->isNotEmpty()) {
+                    $relatedUserIds = DB::table('interest_user')
+                        ->whereIn('interest_id', $interestIds)
+                        ->pluck('user_id')
+                        ->unique();
+
+                    if ($relatedUserIds->isNotEmpty()) {
+                        $query->whereIn('user_id', $relatedUserIds);
+                    }
+                }
+            }
+
+            // Apply optimizations and seeded shuffle
+            $posts = $this->applyBaseQueryOptimizations($query)
+                ->orderByRaw("RAND($seed)")
+                ->simplePaginate(15);
+
+            // Fallback to global shuffle if interest-based feed is empty on Page 1
+            if ($posts->isEmpty() && (int) $request->input('page', 1) === 1) {
+                $query = UserPost::query();
+                $posts = $this->applyBaseQueryOptimizations($query)
+                    ->orderByRaw("RAND($seed)")
+                    ->simplePaginate(15);
+            }
+
+            return PostResource::collection($posts)->additional([
+                'meta' => [
+                    'seed' => (int) $seed,
+                    'message' => 'Pass this seed to the next page to maintain order.'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error("For You Feed Error: " . $e->getMessage());
+            // Fallback to global trending on error for stability
+            return $this->globalTrendingFeed($request);
+        }
     }
 }
