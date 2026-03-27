@@ -105,4 +105,26 @@ class UserOrder extends Model
     {
         return $this->hasOne(UserAddress::class, 'order_id');
     }
+
+    public function children()
+    {
+        return $this->hasMany(UserOrder::class, 'parent_id');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(UserOrder::class, 'parent_id');
+    }
+
+    /**
+     * Get all items for this order. 
+     * If it's a parent order, it retrieves items from all child orders.
+     */
+    public function allItems()
+    {
+        if ($this->parent_id === null) {
+            return UserOrderItem::whereIn('order_id', $this->children()->pluck('id'));
+        }
+        return $this->items();
+    }
 }

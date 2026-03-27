@@ -17,8 +17,15 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         try {
-            $orders = UserOrder::with('items', 'payment', 'shipping', 'address')
+            // Show only parent orders (main checkouts) in the history list
+            $orders = UserOrder::with([
+                'children.items.item', 
+                'payment', 
+                'shipping', 
+                'address'
+            ])
                 ->where('buyer_id', $request->user()->id)
+                ->whereNull('parent_id') // Filter for Parent Orders only
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
 
@@ -39,7 +46,14 @@ class OrderController extends Controller
     public function show(Request $request, $id)
     {
         try {
-            $order = UserOrder::with('items', 'payment', 'shipping', 'buyer', 'address')
+            $order = UserOrder::with([
+                'children.items.item', 
+                'items.item', // In case a child order is viewed directly
+                'payment', 
+                'shipping', 
+                'buyer', 
+                'address'
+            ])
                 ->findOrFail($id);
 
             $this->authorize('view', $order);

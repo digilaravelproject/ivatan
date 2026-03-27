@@ -27,6 +27,8 @@ class ViewController extends Controller
             // Map type → model
             $map = [
                 'post'   => UserPost::class,
+                'video'  => UserPost::class, // Added for video type
+                'reel'   => UserPost::class, // Added for reel type
                 'job'    => UserJobPost::class,
                 'story'  => UserStory::class,
             ];

@@ -44,14 +44,13 @@ class UserOrderItem extends Model
             $m->uuid = (string) Str::uuid();
         });
     }
+    public function item()
+    {
+        return $this->morphTo('item', 'item_type', 'item_id');
+    }
+
     public function getItemModelAttribute()
     {
-        if ($this->item_type === 'user_products') {
-            return UserProduct::find($this->item_id);
-        }
-        if ($this->item_type === 'user_services') {
-            return UserService::find($this->item_id);
-        }
-        return null;
+        return $this->item;
     }
 }

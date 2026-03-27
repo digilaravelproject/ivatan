@@ -44,7 +44,7 @@ class ViewTrackingService
     private function isDuplicateView($model, $userId, $ip): bool
     {
         return View::where('viewable_id', $model->id)
-            ->where('viewable_type', get_class($model))
+            ->whereIn('viewable_type', [$model->getMorphClass(), get_class($model)])
             ->when($userId, fn($q) => $q->where('user_id', $userId))
             ->when(!$userId, fn($q) => $q->where('ip_address', $ip))
             ->where('created_at', '>=', now()->subDay())
@@ -57,7 +57,7 @@ class ViewTrackingService
         View::create([
             'user_id' => $userId,
             'viewable_id' => $model->id,
-            'viewable_type' => get_class($model),
+            'viewable_type' => $model->getMorphClass(), // Use Morph Class for new records
             'ip_address' => $ip,
         ]);
     }
