@@ -47,6 +47,7 @@ class ViewTrackingService
             ->where('viewable_type', get_class($model))
             ->when($userId, fn($q) => $q->where('user_id', $userId))
             ->when(!$userId, fn($q) => $q->where('ip_address', $ip))
+            ->where('created_at', '>=', now()->subDay())
             ->exists();
     }
 

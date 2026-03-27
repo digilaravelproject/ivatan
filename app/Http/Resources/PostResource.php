@@ -11,7 +11,7 @@ class PostResource extends JsonResource
     {
 
         // 1. Logged-in User
-        // ✅ FIX: DocBlock add kiya taaki IDE ko pata chale ye App\Models\User hai
+        // FIX: Added DocBlock to help IDE recognize User model
         /** @var \App\Models\User|null $authUser */
         $authUser = Auth::guard('sanctum')->user() ?? Auth::user();
 
@@ -31,7 +31,7 @@ class PostResource extends JsonResource
             if ($isMine) {
                 $isFollowing = true;
             } else {
-                // Ab Intelephense error nahi dega kyunki use pata hai $authUser User model hai
+                // Intelephense now knows $authUser is a User model
                 $isFollowing = $authUser->isFollowing($author);
             }
         }
@@ -39,9 +39,9 @@ class PostResource extends JsonResource
         // ✅ LOGIC 3: INTERESTS STRING
         $interestsString = "";
 
-        // Check karo ki Controller ne 'user.interests' load kiya hai ya nahi
+        // Check if 'user.interests' relationship is loaded
         if ($author && $author->relationLoaded('interests')) {
-            // 'getRelation' use karo taaki column value se conflict na ho
+            // Use 'getRelation' to avoid potential naming conflicts with column values
             $interestsCollection = $author->getRelation('interests');
 
             $interestsString = collect($interestsCollection)
@@ -90,9 +90,9 @@ class PostResource extends JsonResource
             'stats' => [
                 'like_count' => $this->like_count,
                 'comment_count' => $this->comment_count,
-                'share_count' => 0, // Placeholder for future
+                'share_count' => 0, // Placeholder for future expansion
                 'view_count' => $this->view_count,
-                'is_liked' => $authUser ? (bool) $this->likes()->where('user_id', $authUser->id)->exists() : false,
+                'is_liked' => isset($this->likes_exists) ? (bool)$this->likes_exists : ($authUser ? (bool) $this->likes()->where('user_id', $authUser->id)->exists() : false),
                 'is_saved' => false,
             ],
 

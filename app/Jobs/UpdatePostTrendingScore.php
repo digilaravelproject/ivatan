@@ -19,8 +19,8 @@ class UpdatePostTrendingScore implements ShouldQueue
     public function handle(): void
     {
         try {
-            // Direct SQL Update (Super Fast Performance)
-            // Hum wahi formula use kar rahe hain jo pehle banaya tha
+            // Direct SQL Update (High Performance)
+            // Using the scoring formula defined in the algorithm logic
             DB::statement('
                 UPDATE user_posts
                 SET trending_score = (

@@ -45,6 +45,7 @@ class UserPostController extends Controller
         try {
             $posts = UserPost::query()
                 ->active()
+                ->withExists('likes')
                 ->with(['user.interests', 'media'])
                 ->forYou() // Algorithmic scope
                 ->simplePaginate(15);
@@ -66,6 +67,7 @@ class UserPostController extends Controller
             $posts = UserPost::query()
                 ->active()
                 ->whereIn('type', ['post', 'carousel', 'video'])
+                ->withExists('likes')
                 ->with(['user.interests', 'media'])
                 ->trending()
                 ->simplePaginate(15);
@@ -87,6 +89,7 @@ class UserPostController extends Controller
             $videos = UserPost::query()
                 ->active()
                 ->ofType('video')
+                ->withExists('likes')
                 ->with(['user.interests', 'media'])
                 ->trending()
                 ->simplePaginate(15);
@@ -108,6 +111,7 @@ class UserPostController extends Controller
             $reels = UserPost::query()
                 ->active()
                 ->ofType('reel')
+                ->withExists('likes')
                 ->with(['user.interests', 'media'])
                 ->trending()
                 ->simplePaginate(15);
@@ -137,12 +141,12 @@ class UserPostController extends Controller
 
                 // Create Post Record
                 $post = UserPost::create([
-                    'user_id'    => $user->id,
-                    'uuid'       => $uuid,
-                    'type'       => $request->type,
-                    'caption'    => $request->caption,
+                    'user_id' => $user->id,
+                    'uuid' => $uuid,
+                    'type' => $request->type,
+                    'caption' => $request->caption,
                     'visibility' => $request->visibility ?? 'public',
-                    'status'     => 'active',
+                    'status' => 'active',
                     'view_count' => 0,
                     'like_count' => 0,
                     'comment_count' => 0,
@@ -192,8 +196,8 @@ class UserPostController extends Controller
 
             return response()->json([
                 'message' => 'Post created successfully',
-                'data'    => new PostResource($post->load('media', 'user')),
-            ], Response::HTTP_CREATED);
+                'data' => new PostResource($post->load('media', 'user')),
+            ], 201); // Created
         } catch (\Exception $e) {
             Log::error("Store Post Error: " . $e->getMessage());
             Log::error($e->getTraceAsString());
@@ -210,14 +214,14 @@ class UserPostController extends Controller
     public function getPostsByUser(Request $request, $username): AnonymousResourceCollection|JsonResponse
     {
         try {
-            // 1. Target User ko find karo
+            // 1. Find the target user
             $targetUser = User::where('username', $username)->first();
 
             if (!$targetUser) {
                 return response()->json(['message' => 'User not found.'], 404);
             }
 
-            // 2. Current Logged-in User (Check karo kaun dekh raha hai)
+            // 2. Identify the current logged-in user
             /** @var \App\Models\User|null $currentUser */
             $currentUser = Auth::guard('sanctum')->user();
 
@@ -230,7 +234,7 @@ class UserPostController extends Controller
                 $isFollowing = $currentUser->isFollowing($targetUser);
             }
 
-            // AGAR Account Private hai AND (Na main khud hu, Na main follower hu) -> ACCESS DENIED
+            // If account is private and viewer is neither owner nor follower, deny access
             if ($targetUser->account_privacy === 'private' && !$isMine && !$isFollowing) {
                 return response()->json([
                     'message' => 'This account is private. Follow to see their posts.',
@@ -239,24 +243,24 @@ class UserPostController extends Controller
                 ], 403);
             }
 
-            // 4. Query Build Karo
+            // 4. Build the query
             $query = UserPost::query()
                 ->where('user_id', $targetUser->id)
-                ->active() // Sirf Active posts
+                ->active() // Only active posts
+                ->withExists('likes') // Optimize like status check
                 ->with(['media', 'user']); // Eager load relations
 
-            // ✅ 5. APPLY FILTER LOGIC HERE
-            // Frontend bhejega: ?filter=posts YA ?filter=videos YA ?filter=all
-            $filter = $request->get('filter', 'all');
+            // 5. Apply filtering logic
+            // Frontend sends: ?filter=posts OR ?filter=videos OR ?filter=all
+            $filter = $request->input('filter', 'all');
 
             if ($filter === 'posts') {
-                // Filter 1: Sirf Images aur Carousels
+                // Filter 1: Only Images and Carousels
                 $query->whereIn('type', ['post', 'carousel']);
             } elseif ($filter === 'videos') {
-                // Filter 2: Sirf Videos aur Reels
+                // Filter 2: Only Videos and Reels
                 $query->whereIn('type', ['video', 'reel']);
             }
-            // else case 'all' hai, usme koi where clause nahi lagega (sab aayega)
 
             // 6. Sorting & Pagination
             $posts = $query->orderBy('created_at', 'DESC')
@@ -266,10 +270,10 @@ class UserPostController extends Controller
             return PostResource::collection($posts)->additional([
                 'meta' => [
                     'user_stats' => [
-                        'post_count' => $targetUser->posts()->active()->count(), // Total count hamesha full dikhana chahiye
+                        'post_count' => $targetUser->posts()->active()->count(), // Always show full count for active posts
                         'is_private' => $targetUser->account_privacy === 'private',
                         'is_following' => $isFollowing,
-                        'current_filter' => $filter // Frontend ko batao kaunsa filter laga hai
+                        'current_filter' => $filter // Inform frontend about the applied filter
                     ]
                 ]
             ]);
@@ -339,8 +343,8 @@ class UserPostController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
-                'data'    => [
-                    'is_liked'    => $isLiked,
+                'data' => [
+                    'is_liked' => $isLiked,
                     'likes_count' => $likeService->likeCount($post)
                 ]
             ]);
@@ -354,46 +358,47 @@ class UserPostController extends Controller
      * Report a post.
      */
 
-    public function reportPost(Request $request,$id,ReportService $reportService): JsonResponse {
+    public function reportPost(Request $request, $id, ReportService $reportService): JsonResponse
+    {
         // ✅ Laravel handles validation errors automatically
-        
-        try{
+
+        try {
             $request->validate([
-                'reason'      => 'required|string|max:255',
+                'reason' => 'required|string|max:255',
                 'description' => 'nullable|string|max:1000',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
-              'status' => false,
-              'message' => $e->errors(),
+                'status' => false,
+                'message' => $e->errors(),
             ], 422);
         }
-        
+
         $post = UserPost::findOrFail($id);
         $user = $this->getAuthUser();
-    
+
         $alreadyReported = $post->reports()
             ->where('user_id', $user->id)
             ->exists();
-    
+
         if ($alreadyReported) {
             return response()->json([
                 'success' => false,
                 'message' => 'You have already reported this post.'
             ], 409);
         }
-    
+
         $reportService->report(
             $post,
             $user,
             $request->reason,
             $request->description
         );
-    
+
         return response()->json([
             'success' => true,
             'message' => 'Post reported successfully.',
-            'data'    => [
+            'data' => [
                 'reports_count' => $reportService->reportCount($post)
             ]
         ]);

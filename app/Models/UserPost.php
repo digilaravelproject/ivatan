@@ -38,12 +38,11 @@ class UserPost extends Model implements HasMedia
         'caption',
         'like_count',
         'comment_count',
-        'view_count',   // Code 1 se liya (Important)
+        'view_count',
         'status',       // 'active', 'inactive'
         'visibility',   // 'public', 'private'
     ];
 
-    // ✅ FIX: View count ko integer banana zaroori hai calculation ke liye
     protected $casts = [
         'like_count' => 'integer',
         'comment_count' => 'integer',
@@ -110,18 +109,18 @@ class UserPost extends Model implements HasMedia
             (
                 -- PART 1: Engagement Score (Weighted)
                 (
-                    (view_count * 0.5) +       -- Views ko kam weight (Cheap metric)
-                    (like_count * 10) +        -- Likes ko medium weight
-                    (comment_count * 20)       -- Comments ko High weight (Effort lagta hai)
+                    (view_count * 0.5) +       -- Views receive lower weight (low effort metric)
+                    (like_count * 10) +        -- Likes receive medium weight
+                    (comment_count * 20)       -- Comments receive high weight (requires more effort)
                 )
-                * -- PART 2: Content Type Multiplier (Reels ko 1.5x Boost)
+                * -- PART 2: Content Type Multiplier (1.5x boost for Reels)
                 (CASE
                     WHEN type = "reel" THEN 1.5
                     WHEN type = "video" THEN 1.2
                     ELSE 1.0
                 END)
                 +
-                -- PART 3: "Freshness Bonus" (Pehle 24 ghante me extra 500 points)
+                -- PART 3: "Freshness Bonus" (Extra 500 points for content created within the last 24 hours)
                 (CASE
                     WHEN created_at >= NOW() - INTERVAL 24 HOUR THEN 500
                     ELSE 0
@@ -185,16 +184,16 @@ class UserPost extends Model implements HasMedia
             ->width(300)
             ->height(300)
             ->sharpen(10)
-            ->nonQueued(); // Images ke liye instant conversion better hai
+            ->nonQueued(); // Instant conversion is better for images
 
-        // 2. Video/Reel Poster (Using Code 1 Logic)
-        // Ye logic specific 'videos' collection pe apply hoga
+        // 2. Video/Reel Poster
+        // Captures a frame from the first second
         $this->addMediaConversion('thumb')
             ->width(480)   // Reel Aspect Ratio width
             ->height(854)  // Reel Aspect Ratio height
-            ->extractVideoFrameAtSecond(1) // 1st second ka frame lega
+            ->extractVideoFrameAtSecond(1) 
             ->performOnCollections('videos')
-            ->queued();    // Videos heavy hote hain, isliye queue me dala
+            ->queued();    // Videos are processed via queue due to their size
     }
 
     /*

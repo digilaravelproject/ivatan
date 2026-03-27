@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\UserPost;
 use App\Services\ViewTrackingService;
+use Illuminate\Support\Facades\Auth;
 
 class UserPostObserver
 {
@@ -56,8 +57,10 @@ class UserPostObserver
 
     public function retrieved(UserPost $userPost): void
     {
-        // Check if it's a valid request and if it's not from an admin
-        if (request()->isMethod('get') && !auth()->user()->is_admin) {
+        // Only track if it's a GET request and the user is not an admin
+        // Guests (unauthenticated users) are tracked by IP in the service
+        $user = Auth::user();
+        if (request()->isMethod('get') && (!$user || !$user->is_admin)) {
             $this->viewTrackingService->track($userPost, request());
         }
     }
