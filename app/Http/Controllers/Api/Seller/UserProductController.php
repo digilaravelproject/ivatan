@@ -33,8 +33,8 @@ class UserProductController extends Controller
                 ], 401);
             }
 
-            // Fetch products with related images (eager loaded)
-            $products = UserProduct::with('images')
+            // Fetch products with related images and seller (eager loaded)
+            $products = UserProduct::with(['images', 'seller'])
                 ->where('seller_id', $user->id)
                 ->latest()
                 ->paginate(10);
@@ -81,7 +81,7 @@ class UserProductController extends Controller
             }
 
             // Step 2: Fetch seller's products
-            $products = UserProduct::with('images')
+            $products = UserProduct::with(['images', 'seller'])
                 ->where('seller_id', $seller->id)
                 ->latest()
                 ->paginate(10);
@@ -193,7 +193,11 @@ class UserProductController extends Controller
 
             // Upload gallery images
             if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $img) {
+                $images = $request->file('images');
+                if (!is_array($images)) {
+                    $images = [$images];
+                }
+                foreach ($images as $img) {
                     $path = ImageHelper::uploadEcomImage($img, $user->id, 'products/gallery');
                     UserProductImage::create([
                         'product_id' => $product->id,
@@ -279,7 +283,11 @@ class UserProductController extends Controller
 
             // Add new gallery images if any
             if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $img) {
+                $images = $request->file('images');
+                if (!is_array($images)) {
+                    $images = [$images];
+                }
+                foreach ($images as $img) {
                     $galleryPath = ImageHelper::uploadEcomImage($img, $user->id, 'products/gallery');
                     UserProductImage::create([
                         'product_id' => $product->id,

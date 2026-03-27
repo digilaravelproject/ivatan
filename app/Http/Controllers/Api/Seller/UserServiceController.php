@@ -30,7 +30,7 @@ class UserServiceController extends Controller
                 return $this->errorResponse('Unauthenticated.', 401);
             }
 
-            $services = UserService::with('images')
+            $services = UserService::with(['images', 'seller'])
                 ->where('seller_id', $user->id)
                 ->latest()
                 ->paginate(10);
@@ -60,7 +60,7 @@ class UserServiceController extends Controller
                 return $this->errorResponse('Seller not found or is not active.', 404);
             }
 
-            $services = UserService::with('images')
+            $services = UserService::with(['images', 'seller'])
                 ->where('seller_id', $seller->id)
                 ->latest()
                 ->paginate(10);
@@ -143,24 +143,34 @@ class UserServiceController extends Controller
             }
 
             // Get the fields to update
-            $update = $request->only(['title', 'description', 'price', 'discount_price', 'status']);
+            $updateFields = $request->only(['title', 'description', 'price', 'discount_price', 'status']);
+
+            // Update slug if title is changed
+            if (isset($updateFields['title'])) {
+                $updateFields['slug'] = $this->generateUniqueSlug($updateFields['title']);
+            }
 
             // Update the service details
-            $updated = $service->update($update);
-            if (!$updated) {
-                return $this->errorResponse('Failed to update service.', 500);
-            }
+            $service->update($updateFields);
 
-            // Handle cover image upload if a new one is provided
+            // Handle cover image upload
             if ($request->hasFile('cover_image')) {
+                // Delete old cover image if it exists
+                if ($service->cover_image) {
+                    ImageHelper::deleteEcomImage($service->cover_image);
+                }
+                
                 $coverImagePath = $this->handleCoverImage($request->file('cover_image'), $user, $service);
-                $service->cover_image = $coverImagePath; // Assuming the `cover_image` column exists in the service model
-                $service->save();
+                $service->update(['cover_image' => $coverImagePath]);
             }
 
-            // Handle additional images upload if new images are provided
+            // Handle additional images upload
             if ($request->hasFile('images')) {
-                $this->handleServiceImages($request->file('images'), $user, $service);
+                $images = $request->file('images');
+                if (!is_array($images)) {
+                    $images = [$images];
+                }
+                $this->handleServiceImages($images, $user, $service);
             }
 
             // Remove images if any remove_image_ids are provided
@@ -269,15 +279,8 @@ class UserServiceController extends Controller
      */
     private function handleCoverImage($coverImage, $user, $service): string
     {
-        // Validate image format and size (optional)
-        if (!$coverImage->isValid() || !in_array($coverImage->getClientOriginalExtension(), ['jpeg', 'jpg', 'png', 'webp'])) {
-            throw new \Exception('The cover image is invalid. Please upload a valid image.');
-        }
-
-        // Upload the image (using your existing helper)
-        $path = ImageHelper::uploadEcomImage($coverImage, $user->id, 'services/cover');
-
-        return $path;
+        // Upload the image using existing helper
+        return ImageHelper::uploadEcomImage($coverImage, $user->id, 'services/cover');
     }
 
     /**
@@ -291,22 +294,11 @@ class UserServiceController extends Controller
     private function handleServiceImages(array $images, $user, $service): void
     {
         foreach ($images as $img) {
-            // Validate image format and size
-            if ($img->isValid() && in_array($img->getClientOriginalExtension(), ['jpeg', 'jpg', 'png', 'webp'])) {
-                $path = ImageHelper::uploadEcomImage($img, $user->id, 'services/gallery');
-                UserServiceImage::create([
-                    'service_id' => $service->id,
-                    'image_path' => $path,
-                ]);
-            } else {
-                // Log invalid image error
-                \Log::warning('Invalid image upload attempt for service', [
-                    'user_id' => $user->id,
-                    'service_id' => $service->id,
-                    'filename' => $img->getClientOriginalName(),
-                ]);
-                throw new \Exception('One or more images are invalid. Please upload a valid image.');
-            }
+            $path = ImageHelper::uploadEcomImage($img, $user->id, 'services/gallery');
+            UserServiceImage::create([
+                'service_id' => $service->id,
+                'image_path' => $path,
+            ]);
         }
     }
 

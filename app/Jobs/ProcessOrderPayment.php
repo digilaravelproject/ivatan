@@ -91,7 +91,7 @@ class ProcessOrderPayment implements ShouldQueue
 
                     // Update the payment record
                     $payment->update([
-                        'status' => UserPayment::STATUS_SUCCESSFUL ?? 'successful',
+                        'status' => UserPayment::STATUS_PAID,
                         'transaction_id' => $this->paymentId,
                         'meta' => $currentMeta,
                     ]);

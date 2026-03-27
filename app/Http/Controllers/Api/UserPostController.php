@@ -121,6 +121,73 @@ class UserPostController extends Controller
     }
 
     /**
+     * Get Related Videos.
+     * Logic: Suggests videos from the same user or sharing similar interests.
+     */
+    public function getRelatedVideos(Request $request, $id): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            $post = UserPost::findOrFail($id);
+
+            // Fetch related videos/reels:
+            // 1. Must be video or reel
+            // 2. Exclude current post
+            // 3. Prioritize same user OR same interests
+
+            $query = UserPost::query()
+                ->whereIn('type', ['video', 'reel'])
+                ->where('id', '!=', $post->id);
+
+            // Try to find posts from the same user or same interest
+            $userId = $post->user_id;
+
+            // Get current post's user interests (as a proxy for post interests if post_interests table doesn't exist)
+            $interestIds = DB::table('interest_user')
+                ->where('user_id', $userId)
+                ->pluck('interest_id');
+
+            $query->where(function ($q) use ($userId, $interestIds) {
+                $q->where('user_id', $userId);
+                if ($interestIds->isNotEmpty()) {
+                    $q->orWhereExists(function ($sub) use ($interestIds) {
+                        $sub->select(DB::raw(1))
+                            ->from('interest_user')
+                            ->whereColumn('interest_user.user_id', 'user_posts.user_id')
+                            ->whereIn('interest_user.interest_id', $interestIds);
+                    });
+                }
+            });
+
+            $relatedPosts = $this->applyBaseQueryOptimizations($query)
+                ->inRandomOrder()
+                ->limit(10)
+                ->get();
+
+            // Fallback: If not enough related videos, get trending videos
+            if ($relatedPosts->count() < 5) {
+                $trendingQuery = UserPost::query()
+                    ->whereIn('type', ['video', 'reel'])
+                    ->where('id', '!=', $post->id)
+                    ->whereNotIn('id', $relatedPosts->pluck('id'));
+
+                $trendingPosts = $this->applyBaseQueryOptimizations($trendingQuery)
+                    ->trending()
+                    ->limit(10 - $relatedPosts->count())
+                    ->get();
+
+                $relatedPosts = $relatedPosts->merge($trendingPosts);
+            }
+
+            return PostResource::collection($relatedPosts);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Post not found.'], 404);
+        } catch (\Exception $e) {
+            Log::error("Related Videos Error: " . $e->getMessage());
+            return response()->json(['error' => 'An error occurred while fetching related videos.'], 500);
+        }
+    }
+
+    /**
      * Reels Feed.
      * Shows short videos (reels) sorted by popularity.
      */
@@ -364,6 +431,8 @@ class UserPostController extends Controller
                     'likes_count' => $likeService->likeCount($post)
                 ]
             ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Post not found.'], 404);
         } catch (\Exception $e) {
             Log::error("Like Error: " . $e->getMessage());
             return response()->json(['error' => 'Something went wrong.'], 400);
@@ -376,48 +445,51 @@ class UserPostController extends Controller
 
     public function reportPost(Request $request, $id, ReportService $reportService): JsonResponse
     {
-        // ✅ Laravel handles validation errors automatically
-
         try {
             $request->validate([
                 'reason' => 'required|string|max:255',
                 'description' => 'nullable|string|max:1000',
+            ]);
+
+            $post = UserPost::findOrFail($id);
+            $user = $this->getAuthUser();
+
+            $alreadyReported = $post->reports()
+                ->where('user_id', $user->id)
+                ->exists();
+
+            if ($alreadyReported) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You have already reported this post.'
+                ], 409);
+            }
+
+            $reportService->report(
+                $post,
+                $user,
+                $request->reason,
+                $request->description
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Post reported successfully.',
+                'data' => [
+                    'reports_count' => $reportService->reportCount($post)
+                ]
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'status' => false,
                 'message' => $e->errors(),
             ], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Post not found.'], 404);
+        } catch (\Exception $e) {
+            Log::error("Report Error: " . $e->getMessage());
+            return response()->json(['error' => 'Something went wrong.'], 400);
         }
-
-        $post = UserPost::findOrFail($id);
-        $user = $this->getAuthUser();
-
-        $alreadyReported = $post->reports()
-            ->where('user_id', $user->id)
-            ->exists();
-
-        if ($alreadyReported) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You have already reported this post.'
-            ], 409);
-        }
-
-        $reportService->report(
-            $post,
-            $user,
-            $request->reason,
-            $request->description
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Post reported successfully.',
-            'data' => [
-                'reports_count' => $reportService->reportCount($post)
-            ]
-        ]);
     }
 
     /**
