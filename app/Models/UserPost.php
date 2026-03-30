@@ -218,4 +218,14 @@ class UserPost extends Model implements HasMedia
     {
         return $this->hasMany(\App\Models\PostReport::class, 'post_id');
     }
+
+    public function bookmarks()
+    {
+        return $this->hasMany(Bookmark::class, 'post_id');
+    }
+
+    public function preferences()
+    {
+        return $this->hasMany(PostPreference::class, 'post_id');
+    }
 }

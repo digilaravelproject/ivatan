@@ -4,6 +4,8 @@ namespace App\Http\Requests\Chat;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use App\Models\UserBlock;
 
 class CreatePrivateChatRequest extends FormRequest
 {
@@ -22,13 +24,22 @@ class CreatePrivateChatRequest extends FormRequest
      */
     public function rules(): array
     {
+        $blockedIds = UserBlock::where('user_id', Auth::id())
+            ->pluck('blocked_user_id')
+            ->merge(
+                UserBlock::where('blocked_user_id', Auth::id())
+                    ->pluck('user_id')
+            )
+            ->unique()
+            ->toArray();
+
         return [
             'other_user_id' => [
                 'required',
                 'integer',
                 'exists:users,id',
                 'different:' . Auth::id(),
-                // Rule::notIn(BlockedUser::where('user_id', auth()->id())->pluck('blocked_user_id')->toArray()),
+                Rule::notIn($blockedIds),
             ],
         ];
     }

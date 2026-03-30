@@ -25,6 +25,12 @@ class PostResource extends JsonResource
             $isMine = $authUser->id === $author->id;
         }
 
+        // ✅ LOGIC: IS BLOCKED (bidirectional check)
+        $isBlocked = false;
+        if ($authUser && $author && !$isMine) {
+            $isBlocked = $authUser->hasBlockRelationWith($author);
+        }
+
         // ✅ LOGIC 2: IS FOLLOWING
         $isFollowing = false;
         if ($authUser) {
@@ -92,7 +98,8 @@ class PostResource extends JsonResource
                 'share_count' => 0, // Placeholder
                 'view_count' => $this->view_count,
                 'is_liked' => isset($this->likes_exists) ? (bool)$this->likes_exists : ($authUser ? (bool) $this->likes()->where('user_id', $authUser->id)->exists() : false),
-                'is_saved' => false,
+                'is_saved' => isset($this->bookmarks_exists) ? (bool)$this->bookmarks_exists : ($authUser ? (bool) $this->bookmarks()->where('user_id', $authUser->id)->exists() : false),
+                'is_blocked' => $isBlocked,
             ],
 
             // 5. Timestamps

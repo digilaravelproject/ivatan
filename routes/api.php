@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\Seller\SellerFinancialController;
 use App\Http\Controllers\Api\Seller\SellerTransactionController;
 use App\Http\Controllers\Api\Seller\SellerOrderController;
 use App\Http\Controllers\Api\ViewController;
+use App\Http\Controllers\Api\UserInteractionController;
 use App\Http\Controllers\CacheClearController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\MobileLoginController;
@@ -165,6 +166,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/feed/trending/interests', 'trendingInterestsFeed'); // User Interest Based Trending
             Route::get('/feed/for-you', 'forYouFeed'); // Shuffled Interest Based Feed
         });
+
+        // ================================
+        // User Interactions (Bookmark, Block, Preferences)
+        // ================================
+        Route::post('/posts/{id}/bookmark', [UserInteractionController::class, 'toggleBookmark']);
+        Route::get('/user/bookmarks', [UserInteractionController::class, 'getBookmarks']);
+        Route::post('/users/{id}/block', [UserInteractionController::class, 'toggleBlock']);
+        Route::get('/user/blocked-users', [UserInteractionController::class, 'getBlockedUsers']);
+        Route::post('/posts/{id}/interested', [UserInteractionController::class, 'markInterested']);
+        Route::post('/posts/{id}/not-interested', [UserInteractionController::class, 'markNotInterested']);
+        Route::delete('/posts/{id}/preference', [UserInteractionController::class, 'removePreference']);
+
         Route::post('/contacts/sync', [ContactSyncController::class, 'sync']);
         // ================================
         // View Management Routes

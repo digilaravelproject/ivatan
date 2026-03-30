@@ -201,6 +201,111 @@ class User extends Authenticatable implements HasMedia
         return $this->following()->where('following_id', $user->id)->exists();
     }
 
+    // --- Bookmark, Block, Preference Relationships ---
+
+    public function bookmarks()
+    {
+        return $this->hasMany(Bookmark::class);
+    }
+
+    /**
+     * Users that I have blocked.
+     */
+    public function blockedUsers()
+    {
+        return $this->belongsToMany(User::class, 'user_blocks', 'user_id', 'blocked_user_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Users that have blocked me.
+     */
+    public function blockedByUsers()
+    {
+        return $this->belongsToMany(User::class, 'user_blocks', 'blocked_user_id', 'user_id')
+            ->withTimestamps();
+    }
+
+    public function postPreferences()
+    {
+        return $this->hasMany(PostPreference::class);
+    }
+
+    // --- Block Helpers (Per-Request Cached) ---
+
+    protected ?array $cachedBlockedIds = null;
+    protected ?array $cachedBlockedByIds = null;
+
+    /**
+     * Get IDs of users I have blocked (cached per request lifecycle).
+     */
+    public function getBlockedUserIds(): array
+    {
+        if ($this->cachedBlockedIds === null) {
+            $this->cachedBlockedIds = UserBlock::where('user_id', $this->id)
+                ->pluck('blocked_user_id')
+                ->all();
+        }
+        return $this->cachedBlockedIds;
+    }
+
+    /**
+     * Get IDs of users who have blocked me (cached per request lifecycle).
+     */
+    public function getBlockedByUserIds(): array
+    {
+        if ($this->cachedBlockedByIds === null) {
+            $this->cachedBlockedByIds = UserBlock::where('blocked_user_id', $this->id)
+                ->pluck('user_id')
+                ->all();
+        }
+        return $this->cachedBlockedByIds;
+    }
+
+    /**
+     * Get ALL user IDs to exclude from feed (users I blocked + users who blocked me).
+     */
+    public function getAllBlockedIds(): array
+    {
+        return array_unique(array_merge(
+            $this->getBlockedUserIds(),
+            $this->getBlockedByUserIds()
+        ));
+    }
+
+    /**
+     * Check if I have blocked a specific user.
+     */
+    public function hasBlocked(User $user): bool
+    {
+        return in_array($user->id, $this->getBlockedUserIds());
+    }
+
+    /**
+     * Check if a specific user has blocked me.
+     */
+    public function isBlockedBy(User $user): bool
+    {
+        return in_array($user->id, $this->getBlockedByUserIds());
+    }
+
+    /**
+     * Check if ANY block exists between me and another user (bidirectional).
+     */
+    public function hasBlockRelationWith(User $user): bool
+    {
+        return $this->hasBlocked($user) || $this->isBlockedBy($user);
+    }
+
+    /**
+     * Clear the per-request block cache (call after block/unblock action).
+     */
+    public function clearBlockCache(): void
+    {
+        $this->cachedBlockedIds = null;
+        $this->cachedBlockedByIds = null;
+    }
+
     // --- Helpers ---
     protected ?int $cachedUnreadCount = null;
     public function getNotificationUnreadCountAttribute(): int

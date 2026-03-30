@@ -8,6 +8,7 @@ use App\Models\Chat\UserChat;
 use App\Models\Chat\UserChatMessage;
 use App\Models\Chat\UserChatParticipant;
 use App\Models\User;
+use App\Models\UserBlock;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -44,9 +45,21 @@ class ChatService
 
     /**
      * ✅ Get/Create Private Chat
+     * Includes block check: prevents chat between blocked users.
      */
     public function getPrivateChat(int $myId, int $otherId)
     {
+        // === BLOCK CHECK ===
+        $isBlocked = UserBlock::where(function ($q) use ($myId, $otherId) {
+            $q->where('user_id', $myId)->where('blocked_user_id', $otherId);
+        })->orWhere(function ($q) use ($myId, $otherId) {
+            $q->where('user_id', $otherId)->where('blocked_user_id', $myId);
+        })->exists();
+
+        if ($isBlocked) {
+            throw new \Exception('You cannot chat with this user.');
+        }
+
         $chat = UserChat::where('type', 'private')
             ->whereHas('participants', fn($q) => $q->where('user_id', $myId))
             ->whereHas('participants', fn($q) => $q->where('user_id', $otherId))
@@ -188,9 +201,31 @@ class ChatService
 
     /**
      * ✅ Send Message
+     * Includes block check for private chats.
      */
     public function sendMessage(User $sender, UserChat $chat, array $data)
     {
+        // === BLOCK CHECK for private chats ===
+        if ($chat->type === 'private') {
+            $otherParticipant = $chat->participants()
+                ->where('user_id', '!=', $sender->id)
+                ->first();
+
+            if ($otherParticipant) {
+                $isBlocked = UserBlock::where(function ($q) use ($sender, $otherParticipant) {
+                    $q->where('user_id', $sender->id)
+                        ->where('blocked_user_id', $otherParticipant->user_id);
+                })->orWhere(function ($q) use ($sender, $otherParticipant) {
+                    $q->where('user_id', $otherParticipant->user_id)
+                        ->where('blocked_user_id', $sender->id);
+                })->exists();
+
+                if ($isBlocked) {
+                    throw new \Exception('You cannot send messages to this user.');
+                }
+            }
+        }
+
         return DB::transaction(function () use ($sender, $chat, $data) {
             $attachmentPath = null;
             $meta = null;

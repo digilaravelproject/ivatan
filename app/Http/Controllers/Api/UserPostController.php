@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\UserPost;
+use App\Models\PostPreference;
 use App\Services\LikeService;
 use App\Services\ReportService;
+use App\Services\BlockService;
+use App\Services\PostPreferenceService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +40,7 @@ class UserPostController extends Controller
 
     /**
      * Apply common query optimizations (Eager Loading & N+1 fixes).
+     * Also applies feed filters: blocked users, not-interested posts, similar content reduction.
      */
     protected function applyBaseQueryOptimizations($query)
     {
@@ -44,20 +48,61 @@ class UserPostController extends Controller
         $user = Auth::guard('sanctum')->user();
         $userId = $user ? $user->id : null;
 
-        return $query->withExists('likes')
-            ->with([
-                'media',
-                'user' => function ($q) use ($userId) {
-                    $q->with(['interests', 'media']); // Eager load media for profile_photo_url logic
-                    if ($userId) {
-                        $q->withExists([
-                            'followers as is_followed_by_me' => function ($f) use ($userId) {
-                                $f->where('follower_id', $userId);
-                            }
-                        ]);
-                    }
+        // =====================================================================
+        // FEED FILTERING: Block + Not-Interested + Similar Content Reduction
+        // Single-point filter — applies to ALL feed endpoints automatically.
+        // =====================================================================
+        if ($user) {
+            // 1. Exclude posts from blocked users (bidirectional)
+            $blockedIds = $user->getAllBlockedIds();
+            if (!empty($blockedIds)) {
+                $query->whereNotIn('user_posts.user_id', $blockedIds);
+            }
+
+            // 2. Exclude specific posts marked as "not interested"
+            $preferenceService = app(PostPreferenceService::class);
+            $notInterestedPostIds = $preferenceService->getNotInterestedPostIds($user);
+            if (!empty($notInterestedPostIds)) {
+                $query->whereNotIn('user_posts.id', $notInterestedPostIds);
+            }
+
+            // 3. Reduce similar content: deprioritize posts from authors
+            //    whose content was marked not-interested.
+            //    We use a scoring penalty via orderByRaw instead of excluding entirely.
+            $notInterestedAuthorIds = $preferenceService->getNotInterestedAuthorIds($user);
+            if (!empty($notInterestedAuthorIds)) {
+                $idList = implode(',', array_map('intval', $notInterestedAuthorIds));
+                $query->orderByRaw("CASE WHEN user_posts.user_id IN ({$idList}) THEN 1 ELSE 0 END ASC");
+            }
+        }
+
+        // =====================================================================
+        // EAGER LOADING & N+1 Prevention
+        // =====================================================================
+        $baseQuery = $query->withExists('likes');
+
+        // Add bookmark exists check for authenticated users
+        if ($userId) {
+            $baseQuery->withExists([
+                'bookmarks as bookmarks_exists' => function ($bq) use ($userId) {
+                    $bq->where('user_id', $userId);
                 }
             ]);
+        }
+
+        return $baseQuery->with([
+            'media',
+            'user' => function ($q) use ($userId) {
+                $q->with(['interests', 'media']); // Eager load media for profile_photo_url logic
+                if ($userId) {
+                    $q->withExists([
+                        'followers as is_followed_by_me' => function ($f) use ($userId) {
+                            $f->where('follower_id', $userId);
+                        }
+                    ]);
+                }
+            }
+        ]);
     }
 
     /**
@@ -312,6 +357,35 @@ class UserPostController extends Controller
             // 3. Privacy Check Logic
             $isMine = $currentUser && $currentUser->id === $targetUser->id;
 
+            // === BLOCK CHECK ===
+            // If any block exists between users, show restricted profile
+            if ($currentUser && !$isMine && $currentUser->hasBlockRelationWith($targetUser)) {
+                $isBlockedByMe = $currentUser->hasBlocked($targetUser);
+                return response()->json([
+                    'message' => $isBlockedByMe
+                        ? 'You have blocked this user.'
+                        : 'This user is not available.',
+                    'is_blocked' => true,
+                    'is_blocked_by_me' => $isBlockedByMe,
+                    'user' => [
+                        'id' => $targetUser->id,
+                        'name' => $targetUser->name,
+                        'username' => $targetUser->username,
+                        'avatar' => $targetUser->profile_photo_url,
+                    ],
+                    'posts' => [],
+                    'meta' => [
+                        'user_stats' => [
+                            'post_count' => 0,
+                            'is_private' => false,
+                            'is_following' => false,
+                            'is_blocked' => true,
+                            'current_filter' => $request->input('filter', 'all'),
+                        ]
+                    ]
+                ], 200); // 200, not 403 — profile page loads, just empty
+            }
+
             // Check following status
             $isFollowing = false;
             if ($currentUser && !$isMine) {
@@ -356,6 +430,7 @@ class UserPostController extends Controller
                         'post_count' => $targetUser->posts()->active()->count(), // Always show full count for active posts
                         'is_private' => $targetUser->account_privacy === 'private',
                         'is_following' => $isFollowing,
+                        'is_blocked' => false,
                         'current_filter' => $filter // Inform frontend about the applied filter
                     ]
                 ]
