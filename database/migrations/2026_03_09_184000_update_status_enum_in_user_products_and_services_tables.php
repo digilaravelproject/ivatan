@@ -12,22 +12,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Update user_products status enum
         DB::statement("ALTER TABLE user_products MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'active', 'inactive') DEFAULT 'pending'");
-
-        // Update user_services status enum
         DB::statement("ALTER TABLE user_services MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'active', 'inactive') DEFAULT 'pending'");
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        // Revert user_products status enum
         DB::statement("ALTER TABLE user_products MODIFY COLUMN status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending'");
-
-        // Revert user_services status enum
         DB::statement("ALTER TABLE user_services MODIFY COLUMN status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending'");
     }
 };

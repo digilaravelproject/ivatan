@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\Seller\SellerTransactionController;
 use App\Http\Controllers\Api\Seller\SellerOrderController;
 use App\Http\Controllers\Api\ViewController;
 use App\Http\Controllers\Api\UserInteractionController;
+use App\Http\Controllers\Api\UserHistoryController;
 use App\Http\Controllers\CacheClearController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\MobileLoginController;
@@ -466,5 +467,17 @@ Route::prefix('v1')->group(function () {
             // ================================
             Route::get('serve', [AdServingController::class, 'serveAd']); // GET /api/ads/serve
         });
+
+        // ================================
+        // User History Routes
+        // ================================
+        Route::prefix('history')->controller(UserHistoryController::class)->group(function () {
+            Route::get('likes',        'likes');
+            Route::get('comments',     'comments');
+            Route::get('video-views',  'videoViews');
+            Route::get('purchases',    'purchases');
+            Route::get('services',     'services');
+        });
+
     });
 });

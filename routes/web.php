@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\Ecommerce\OrderController;
 use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FollowController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\HistoryController;
 
 // Public Routes
 Route::get('/', fn() => view('web.index'))->name('web.index');
@@ -99,6 +100,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::delete('/{user}', 'destroy')->name('destroy');
         Route::post('/{user}/restore', 'restore')->name('restore');
         Route::post('/force-delete/{user}', 'forceDelete')->name('delete');
+    });
+
+    // User History
+    Route::controller(HistoryController::class)->prefix('users/{user}/history')->name('users.history.')->group(function () {
+        Route::get('likes',        'likes')->name('likes');
+        Route::get('comments',     'comments')->name('comments');
+        Route::get('video-views',  'videoViews')->name('video-views');
+        Route::get('purchases',    'purchases')->name('purchases');
+        Route::get('services',     'services')->name('services');
     });
 
     // Followers / Following

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 
@@ -11,36 +12,36 @@ class ViewTrackingService
 {
     public function track($model, Request $request): bool
     {
-        // Initialize variables
-        $userId = Auth::id();  // Can be null for guests
-        $ip = $request->ip();  // Get the IP address
+        $userId = Auth::id();
+        $ip = $request->ip();
 
         try {
-            // Check for duplicate view
-            if ($this->isDuplicateView($model, $userId, $ip)) {
-                return false;
-            }
+            return DB::transaction(function () use ($model, $userId, $ip) {
+                $locked = $model->newQuery()
+                    ->whereKey($model->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            // Record the view
-            $this->createViewRecord($model, $userId, $ip);
+                if ($this->isDuplicateView($locked, $userId, $ip)) {
+                    return false;
+                }
 
-            // Increment the view count if applicable
-            $this->incrementViewCount($model);
+                $this->createViewRecord($locked, $userId, $ip);
+                $this->incrementViewCount($locked);
 
-            return true;
+                return true;
+            });
         } catch (\Exception $e) {
-            // Log the error details
             Log::error("View tracking failed: " . $e->getMessage(), [
-                'model' => $model,
-                'user_id' => $userId ?? 'guest',
-                'ip_address' => $ip,
+                'model'    => $model,
+                'user_id'  => $userId ?? 'guest',
+                'ip'       => $ip,
                 'exception' => $e,
             ]);
             return false;
         }
     }
 
-    // Check if the view is a duplicate
     private function isDuplicateView($model, $userId, $ip): bool
     {
         return View::where('viewable_id', $model->id)
@@ -51,24 +52,22 @@ class ViewTrackingService
             ->exists();
     }
 
-    // Create the view record in the database
     private function createViewRecord($model, $userId, $ip): void
     {
         View::create([
-            'user_id' => $userId,
-            'viewable_id' => $model->id,
-            'viewable_type' => $model->getMorphClass(), // Use Morph Class for new records
-            'ip_address' => $ip,
+            'user_id'      => $userId,
+            'viewable_id'  => $model->id,
+            'viewable_type' => $model->getMorphClass(),
+            'ip_address'   => $ip,
         ]);
     }
 
-    // Increment view count if applicable
     private function incrementViewCount($model): void
     {
         $model->increment('view_count');
-        // Force reload to reflect updated view_count
         $model->refresh();
     }
+
     public function getUserLogs(int $userId, int $perPage = 15)
     {
         return \DB::table('activity_log')

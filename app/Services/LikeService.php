@@ -4,57 +4,68 @@ namespace App\Services;
 
 use App\Models\Like;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
 class LikeService
 {
-    public function like($model)
+    public function like(Model $model): bool
     {
-        $user = Auth::user();
+        return DB::transaction(function () use ($model) {
+            $locked = $model->newQuery()
+                ->whereKey($model->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $existingLike = $model->likes()->where('user_id', $user->id)->first();
-        if ($existingLike) {
-            throw new \Exception('You have already liked this item.');
-        }
+            $existing = $locked->likes()->where('user_id', Auth::id())->first();
+            if ($existing) {
+                throw new \Exception('You have already liked this item.');
+            }
 
-        $model->likes()->create([
-            'user_id' => $user->id,
-        ]);
-        // ✅ Increment like_count if the column exists
-        if ($this->hasLikeCountColumn($model)) {
-            $model->increment('like_count');
-        }
-        return true;
+            $locked->likes()->create(['user_id' => Auth::id()]);
+
+            if ($this->hasLikeCountColumn($locked)) {
+                $locked->increment('like_count');
+            }
+
+            return true;
+        });
     }
 
-    public function unlike($model)
+    public function unlike(Model $model): bool
     {
-        $user = Auth::user();
+        return DB::transaction(function () use ($model) {
+            $locked = $model->newQuery()
+                ->whereKey($model->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $like = $model->likes()->where('user_id', $user->id)->first();
-        if (!$like) {
-            throw new \Exception('You have not liked this item yet.');
-        }
+            $like = $locked->likes()->where('user_id', Auth::id())->first();
+            if (!$like) {
+                throw new \Exception('You have not liked this item yet.');
+            }
 
-        $like->delete();
+            $like->delete();
 
-        // ✅ Decrement like_count if the column exists
-        if ($this->hasLikeCountColumn($model)) {
-            $model->decrement('like_count');
-        }
-        return true;
+            if ($this->hasLikeCountColumn($locked)) {
+                $locked->decrement('like_count');
+            }
+
+            return true;
+        });
     }
 
-    public function hasLiked($model): bool
+    public function hasLiked(Model $model): bool
     {
         return $model->likes()->where('user_id', Auth::id())->exists();
     }
 
-    public function likeCount($model): int
+    public function likeCount(Model $model): int
     {
         return $model->likes()->count();
     }
+
     protected function hasLikeCountColumn(Model $model): bool
     {
         return Schema::hasColumn($model->getTable(), 'like_count');

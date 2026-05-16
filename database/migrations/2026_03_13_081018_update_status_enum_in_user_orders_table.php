@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -14,9 +15,6 @@ return new class extends Migration
         DB::statement("ALTER TABLE user_orders MODIFY COLUMN status ENUM('pending', 'accepted', 'rejected', 'processing', 'paid', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending'");
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         DB::statement("ALTER TABLE user_orders MODIFY COLUMN status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending'");

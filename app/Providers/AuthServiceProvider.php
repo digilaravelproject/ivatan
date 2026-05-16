@@ -14,6 +14,7 @@ use App\Policies\CommentPolicy;
 use App\Policies\UserPostPolicy;
 use App\Policies\OrderPolicy;
 use App\Policies\ServicePolicy;
+use App\Policies\HistoryPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -52,5 +53,6 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('admin-actions', function ($user) {
             return $user->hasRole('admin');
         });
+        Gate::define('viewHistory', [HistoryPolicy::class, 'viewHistory']);
     }
 }
