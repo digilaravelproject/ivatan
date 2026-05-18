@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\HistoryService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 
 class HistoryController extends Controller
 {
+    use AuthorizesRequests;
     public function __construct(
         protected HistoryService $historyService
     ) {}
