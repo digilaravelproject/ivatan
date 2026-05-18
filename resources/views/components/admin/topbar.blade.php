@@ -40,7 +40,7 @@
                     </template>
 
                     <template x-for="n in recent" :key="n.id">
-                        <a :href="'{{ route('admin.notifications.show', '') }}/' + n.id"
+                        <a :href="'{{ route('admin.notifications.show', '_ID_') }}'.replace('_ID_', n.id)"
                            class="block px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
                            :class="n.read_at ? '' : 'bg-blue-50'"
                         >
