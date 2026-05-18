@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreLiveChatGroupRequest;
+use App\Models\Chat\UserChatMessage;
 use App\Models\Chat\UserChatParticipant;
 use App\Models\LiveChatGroup;
 use App\Models\User;
+use App\Services\ChatService;
 use App\Services\LiveChatGroupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,10 +17,14 @@ use Illuminate\Support\Facades\Log;
 class LiveChatGroupController extends Controller
 {
     protected LiveChatGroupService $liveChatGroupService;
+    protected ChatService $chatService;
 
-    public function __construct(LiveChatGroupService $liveChatGroupService)
-    {
+    public function __construct(
+        LiveChatGroupService $liveChatGroupService,
+        ChatService $chatService
+    ) {
         $this->liveChatGroupService = $liveChatGroupService;
+        $this->chatService = $chatService;
     }
 
     public function index(Request $request)
@@ -164,6 +170,110 @@ class LiveChatGroupController extends Controller
             return back()->with('success', 'Participant muted.');
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function chat(LiveChatGroup $liveChatGroup)
+    {
+        if (!$liveChatGroup->chat) {
+            return redirect()->route('admin.live-chat-groups.show', $liveChatGroup)
+                ->with('error', 'No chat associated with this group yet.');
+        }
+
+        $user = Auth::user();
+
+        // Auto-join admin as participant if not already
+        $isParticipant = $liveChatGroup->chat->participants()
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if (!$isParticipant) {
+            $liveChatGroup->chat->participants()->create([
+                'user_id' => $user->id,
+                'is_admin' => true,
+            ]);
+        }
+
+        $liveChatGroup->load(['creator', 'chat.participants.user']);
+
+        return view('admin.live-chat-groups.chat', [
+            'group' => $liveChatGroup,
+            'chat' => $liveChatGroup->chat,
+            'user' => $user,
+        ]);
+    }
+
+    public function fetchMessages(LiveChatGroup $liveChatGroup, Request $request)
+    {
+        if (!$liveChatGroup->chat) {
+            return response()->json(['messages' => []]);
+        }
+
+        $query = UserChatMessage::where('chat_id', $liveChatGroup->chat->id)
+            ->with('sender')
+            ->orderByDesc('created_at');
+
+        if ($request->after_id) {
+            $query->where('id', '>', $request->after_id);
+            $messages = $query->oldest()->get();
+        } else {
+            $messages = $query->limit(50)->get()->reverse()->values();
+        }
+
+        $messages->transform(function ($msg) {
+            return [
+                'id' => $msg->id,
+                'chat_id' => $msg->chat_id,
+                'sender_id' => $msg->sender_id,
+                'content' => $msg->content,
+                'message_type' => $msg->message_type,
+                'created_at' => $msg->created_at->toISOString(),
+                'sender' => $msg->sender ? [
+                    'id' => $msg->sender->id,
+                    'name' => $msg->sender->name,
+                    'profile_photo_url' => $msg->sender->profile_photo_url,
+                ] : null,
+            ];
+        });
+
+        return response()->json(['messages' => $messages]);
+    }
+
+    public function sendMessage(Request $request, LiveChatGroup $liveChatGroup)
+    {
+        $request->validate([
+            'content' => 'required|string|max:5000',
+        ]);
+
+        if (!$liveChatGroup->chat) {
+            return response()->json(['error' => 'No chat associated.'], 400);
+        }
+
+        try {
+            $message = $this->chatService->sendMessage(
+                Auth::user(),
+                $liveChatGroup->chat,
+                ['content' => $request->input('content'), 'message_type' => 'text']
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => [
+                    'id' => $message->id,
+                    'chat_id' => $message->chat_id,
+                    'sender_id' => $message->sender_id,
+                    'content' => $message->content,
+                    'message_type' => $message->message_type,
+                    'created_at' => $message->created_at->toISOString(),
+                    'sender' => [
+                        'id' => Auth::user()->id,
+                        'name' => Auth::user()->name,
+                        'profile_photo_url' => Auth::user()->profile_photo_url,
+                    ],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 403);
         }
     }
 }

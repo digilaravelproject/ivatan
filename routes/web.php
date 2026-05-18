@@ -247,6 +247,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::post('/{liveChatGroup}/unban-participant', 'unbanParticipant')->name('unban-participant');
         Route::post('/{liveChatGroup}/mute-participant', 'muteParticipant')->name('mute-participant');
         Route::post('/{liveChatGroup}/sync-users', 'syncUsers')->name('sync-users');
+        Route::get('/{liveChatGroup}/chat', 'chat')->name('chat');
+        Route::get('/{liveChatGroup}/chat/messages', 'fetchMessages')->name('chat.messages');
+        Route::post('/{liveChatGroup}/chat/messages', 'sendMessage')->name('chat.send');
     });
 });
 

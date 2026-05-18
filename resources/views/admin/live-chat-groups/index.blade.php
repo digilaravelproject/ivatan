@@ -47,6 +47,9 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2 flex items-center">
                         <a href="{{ route('admin.live-chat-groups.show', $group) }}" class="text-blue-600 hover:underline">View</a>
                         <a href="{{ route('admin.live-chat-groups.edit', $group) }}" class="text-indigo-600 hover:underline">Edit</a>
+                        @if($group->chat)
+                        <a href="{{ route('admin.live-chat-groups.chat', $group) }}" class="text-green-600 hover:underline">Chat</a>
+                        @endif
                         <form action="{{ route('admin.live-chat-groups.sync-users', $group) }}" method="POST" class="inline" onsubmit="return confirm('Add all users to this group?')">
                             @csrf
                             <button type="submit" class="text-green-600 hover:underline text-sm">Sync</button>

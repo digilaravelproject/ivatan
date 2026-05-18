@@ -37,11 +37,17 @@
 
             @if($liveChatGroup->chat)
             <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb-3">
-                    <a href="{{ route('admin.live-chat-groups.show', $liveChatGroup) }}#chat" class="text-blue-600 hover:underline">Live Chat</a>
-                </h3>
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-semibold">Live Chat</h3>
+                    <a href="{{ route('admin.live-chat-groups.chat', $liveChatGroup) }}"
+                       class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                        Open Live Chat
+                    </a>
+                </div>
                 <p class="text-sm text-gray-500">Chat ID: #{{ $liveChatGroup->chat->id }} | Participants: {{ $participants->count() }}</p>
-                <p class="text-sm text-gray-400 mt-1">Messages can be viewed from the API or by clicking into the chat.</p>
             </div>
             @endif
         </div>
