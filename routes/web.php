@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\PostController;
 use App\Http\Controllers\Admin\FollowController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\HistoryController;
+use App\Http\Controllers\Admin\LiveChatGroupController;
 
 // Public Routes
 Route::get('/', fn() => view('web.index'))->name('web.index');
@@ -228,6 +229,23 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         route::get('/{adPackage}/edit', 'edit')->name('ad-packages.edit');
         route::put('/{adPackage}', 'update')->name('ad-packages.update');
         route::delete('/{adPackage}', 'destroy')->name('ad-packages.destroy');
+    });
+
+    // =====================
+    // Live Chat Groups (Admin)
+    // =====================
+    Route::prefix('live-chat-groups')->name('live-chat-groups.')->controller(LiveChatGroupController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/{liveChatGroup}', 'show')->name('show');
+        Route::get('/{liveChatGroup}/edit', 'edit')->name('edit');
+        Route::put('/{liveChatGroup}', 'update')->name('update');
+        Route::delete('/{liveChatGroup}', 'destroy')->name('destroy');
+        Route::post('/{liveChatGroup}/remove-participant', 'removeParticipant')->name('remove-participant');
+        Route::post('/{liveChatGroup}/ban-participant', 'banParticipant')->name('ban-participant');
+        Route::post('/{liveChatGroup}/unban-participant', 'unbanParticipant')->name('unban-participant');
+        Route::post('/{liveChatGroup}/mute-participant', 'muteParticipant')->name('mute-participant');
     });
 });
 

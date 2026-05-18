@@ -5,6 +5,7 @@ namespace App\Services\Api\User;
 use App\Models\User;
 use App\Models\Interest;
 use App\Models\Chat\UserChat;
+use App\Services\LiveChatGroupService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,13 @@ use Illuminate\Support\Facades\Log;
  */
 class UserService
 {
+    protected LiveChatGroupService $liveChatGroupService;
+
+    public function __construct(LiveChatGroupService $liveChatGroupService)
+    {
+        $this->liveChatGroupService = $liveChatGroupService;
+    }
+
     /**
      * Helper to Detect Disk (S3 vs Public)
      */
@@ -121,6 +129,12 @@ class UserService
             }
 
             DB::commit();
+
+            try {
+                $this->liveChatGroupService->addUserToGroups($user);
+            } catch (\Exception $e) {
+                Log::warning("Failed to auto-join live groups: " . $e->getMessage());
+            }
 
             $token = $user->createToken('MyApp')->plainTextToken;
             $user->load('interests.category');

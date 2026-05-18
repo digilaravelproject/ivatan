@@ -27,11 +27,19 @@ class UserChatParticipant extends Model
         'user_id',
         'is_admin',
         'last_read_message_id',
-        'joined_at'
+        'joined_at',
+        'is_banned',
+        'banned_at',
+        'is_muted',
+        'muted_until',
     ];
 
     protected $casts = [
         'joined_at' => 'datetime',
+        'banned_at' => 'datetime',
+        'muted_until' => 'datetime',
+        'is_banned' => 'boolean',
+        'is_muted' => 'boolean',
     ];
 
     public function chat()

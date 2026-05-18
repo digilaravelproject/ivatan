@@ -9,6 +9,7 @@ use App\Models\Chat\UserChatMessage;
 use App\Models\Chat\UserChatParticipant;
 use App\Models\User;
 use App\Models\UserBlock;
+use App\Services\LiveChatGroupService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -17,10 +18,14 @@ use Illuminate\Support\Str;
 class ChatService
 {
     protected NotificationService $notificationService;
+    protected LiveChatGroupService $liveChatGroupService;
 
-    public function __construct(NotificationService $notificationService)
-    {
+    public function __construct(
+        NotificationService $notificationService,
+        LiveChatGroupService $liveChatGroupService
+    ) {
         $this->notificationService = $notificationService;
+        $this->liveChatGroupService = $liveChatGroupService;
     }
 
     /**
@@ -205,6 +210,11 @@ class ChatService
      */
     public function sendMessage(User $sender, UserChat $chat, array $data)
     {
+        // === LIVE GROUP CHECKS (ban, mute, chat_mode) ===
+        if ($chat->live_chat_group_id) {
+            $this->liveChatGroupService->checkCanSend($sender, $chat);
+        }
+
         // === BLOCK CHECK for private chats ===
         if ($chat->type === 'private') {
             $otherParticipant = $chat->participants()

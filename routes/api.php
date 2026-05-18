@@ -399,6 +399,14 @@ Route::prefix('v1')->group(function () {
 
 
         // ================================
+        // Live Chat Groups Routes
+        // ================================
+        Route::prefix('live-chat-groups')->controller(\App\Http\Controllers\Api\LiveChatGroupController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{liveChatGroup}', 'show');
+        });
+
+        // ================================
         // Chats Routes
         // ================================
 

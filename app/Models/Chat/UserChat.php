@@ -17,10 +17,12 @@ class UserChat extends Model
         'uuid',
         'type', // private, group
         'name',
-        'avatar_path', // New Column
+        'avatar_path',
         'owner_id',
         'meta',
-        'last_message_at'
+        'last_message_at',
+        'live_chat_group_id',
+        'chat_mode',
     ];
 
     protected $casts = [
@@ -49,5 +51,10 @@ class UserChat extends Model
     public function lastMessage()
     {
         return $this->hasOne(UserChatMessage::class, 'chat_id')->latestOfMany();
+    }
+
+    public function liveChatGroup()
+    {
+        return $this->belongsTo(\App\Models\LiveChatGroup::class, 'live_chat_group_id');
     }
 }
