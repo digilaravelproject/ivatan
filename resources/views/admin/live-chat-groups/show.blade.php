@@ -50,6 +50,23 @@
             <div class="bg-white rounded-lg shadow p-6">
                 <h3 class="text-lg font-semibold mb-3">Participants ({{ $participants->count() }})</h3>
 
+                <div class="mb-4 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                    <div class="text-sm text-gray-600">
+                        Total registered users: <strong>{{ \App\Models\User::count() }}</strong>
+                        @php $notAdded = \App\Models\User::count() - $participants->count(); @endphp
+                        @if($notAdded > 0)
+                            <br><span class="text-orange-600">{{ $notAdded }} users not yet added</span>
+                        @endif
+                    </div>
+                    <form action="{{ route('admin.live-chat-groups.sync-users', $liveChatGroup) }}" method="POST" onsubmit="return confirm('Add all {{ \App\Models\User::count() - $participants->count() }} remaining users to this group?')">
+                        @csrf
+                        <button type="submit" class="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Sync All Users
+                        </button>
+                    </form>
+                </div>
+
                 <div class="space-y-3">
                     @forelse($participants as $participant)
                     <div class="flex items-center justify-between p-2 rounded hover:bg-gray-50 {{ $participant->is_banned ? 'opacity-50' : '' }}">

@@ -90,6 +90,35 @@ class LiveChatGroupService
         }
     }
 
+    public function syncGroupUsers(LiveChatGroup $group): int
+    {
+        if (!$group->chat) throw new \Exception('Live chat group has no associated chat.');
+
+        $added = 0;
+        User::chunk(200, function ($users) use ($group, &$added) {
+            foreach ($users as $user) {
+                $exists = UserChatParticipant::where('chat_id', $group->chat->id)
+                    ->where('user_id', $user->id)
+                    ->exists();
+
+                if (!$exists) {
+                    UserChatParticipant::create([
+                        'chat_id' => $group->chat->id,
+                        'user_id' => $user->id,
+                        'is_admin' => false,
+                    ]);
+                    $added++;
+                }
+            }
+        });
+
+        if ($added > 0) {
+            $this->sendSystemMessage($group->chat->id, "{$added} new users were added to the group.");
+        }
+
+        return $added;
+    }
+
     public function addAllExistingUsers(): int
     {
         $groups = LiveChatGroup::active()->get();

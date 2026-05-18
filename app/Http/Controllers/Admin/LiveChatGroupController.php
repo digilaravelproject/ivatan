@@ -137,6 +137,17 @@ class LiveChatGroupController extends Controller
         }
     }
 
+    public function syncUsers(LiveChatGroup $liveChatGroup)
+    {
+        try {
+            $added = $this->liveChatGroupService->syncGroupUsers($liveChatGroup);
+            return back()->with('success', "Sync complete. {$added} new users added.");
+        } catch (\Exception $e) {
+            Log::error('Failed to sync users: ' . $e->getMessage());
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
     public function muteParticipant(Request $request, LiveChatGroup $liveChatGroup)
     {
         $request->validate([

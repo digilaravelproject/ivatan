@@ -39,7 +39,7 @@ class LiveChatGroup extends Model
 
     public function chat()
     {
-        return $this->belongsTo(UserChat::class, 'chat_id');
+        return $this->hasOne(UserChat::class, 'live_chat_group_id');
     }
 
     public function participants()
@@ -47,9 +47,9 @@ class LiveChatGroup extends Model
         return $this->hasManyThrough(
             UserChatParticipant::class,
             UserChat::class,
+            'live_chat_group_id',
+            'chat_id',
             'id',
-            'chat_id',
-            'chat_id',
             'id'
         );
     }
