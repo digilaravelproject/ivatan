@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Models\Ecommerce\UserOrder;
 use App\Models\Ecommerce\UserPayment;
 use App\Models\Ecommerce\UserShipping;
+use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -143,6 +145,24 @@ class ProcessOrderPayment implements ShouldQueue
 
                 // You can also log the final success if all goes well
                 Log::info('ProcessOrderPayment job completed', ['order_id' => $order->id]);
+
+                // Send payment success notification (non-blocking)
+                try {
+                    $buyer = User::find($order->buyer_id);
+                    if ($buyer) {
+                        $notificationService = app(NotificationService::class);
+                        $notificationService->sendToUser($buyer, 'payment_success', [
+                            'title'      => 'Payment Successful',
+                            'message'    => 'Your payment of ₹' . number_format($order->total_amount, 2) . ' for order #' . $order->id . ' was successful.',
+                            'order_id'   => $order->id,
+                            'order_uuid' => $order->uuid,
+                            'amount'     => $order->total_amount,
+                            'action_url' => null,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Payment notification failed', ['error' => $e->getMessage()]);
+                }
             });
         } catch (Throwable $e) {
             Log::error('Exception in ProcessOrderPayment job', [

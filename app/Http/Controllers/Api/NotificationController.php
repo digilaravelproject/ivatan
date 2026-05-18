@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Notification\MarkReadRequest;
+use App\Models\DeviceToken;
 use App\Services\NotificationService;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -138,8 +139,6 @@ class NotificationController extends Controller
      */
     public function sendTest(Request $request)
     {
-        // $this->authorize('sendNotifications', User::class);
-
         $data = $request->validate([
             'user_id'  => 'required|exists:users,id',
             'category' => 'required|string|max:100',
@@ -155,5 +154,40 @@ class NotificationController extends Controller
         );
 
         return response()->json(['success' => true]);
+    }
+
+    public function registerToken(Request $request)
+    {
+        $request->validate([
+            'token'  => 'required|string|max:500',
+            'device' => 'nullable|string|in:ios,android,web|max:50',
+        ]);
+
+        $user = $request->user();
+
+        DeviceToken::updateOrCreate(
+            ['user_id' => $user->id, 'token' => $request->token],
+            [
+                'device'       => $request->device,
+                'last_used_at' => now(),
+            ]
+        );
+
+        return response()->json(['success' => true, 'message' => 'Device token registered.']);
+    }
+
+    public function deleteToken(Request $request)
+    {
+        $request->validate([
+            'token' => 'required|string|max:500',
+        ]);
+
+        $user = $request->user();
+
+        DeviceToken::where('user_id', $user->id)
+            ->where('token', $request->token)
+            ->delete();
+
+        return response()->json(['success' => true, 'message' => 'Device token removed.']);
     }
 }

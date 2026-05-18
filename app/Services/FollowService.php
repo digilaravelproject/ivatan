@@ -8,15 +8,15 @@ use Illuminate\Support\Facades\Log;
 
 class FollowService
 {
-    /**
-     * Follow a user.
-     * * @param User $follower The user performing the follow action (Auth user).
-     * @param int|string $followingId The ID of the user to be followed.
-     * @return array ['success' => bool, 'message' => string, 'code' => ?string]
-     */
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function followUser(User $follower, $followingId): array
     {
-        // 1. Self-follow check
         if ((int)$follower->id === (int)$followingId) {
             return [
                 'success' => false,
@@ -28,7 +28,6 @@ class FollowService
         DB::beginTransaction();
 
         try {
-            // Retrieve user to follow with exclusive lock to prevent race conditions
             $userToFollow = User::lockForUpdate()->find($followingId);
 
             if (!$userToFollow) {
@@ -36,7 +35,6 @@ class FollowService
                 return ['success' => false, 'message' => 'User not found.', 'code' => 'NOT_FOUND'];
             }
 
-            // Already following check
             if ($follower->isFollowing($userToFollow)) {
                 DB::rollBack();
                 return [
@@ -46,14 +44,26 @@ class FollowService
                 ];
             }
 
-            // Attach relation
             $follower->following()->attach($followingId);
 
-            // Manual count updates for performance and atomicity
             $follower->increment('following_count');
             $userToFollow->increment('followers_count');
 
             DB::commit();
+
+            // Send notification after commit
+            try {
+                $this->notificationService->sendToUser($userToFollow, 'follow', [
+                    'title'        => 'New Follower',
+                    'message'      => $follower->name . ' started following you',
+                    'actor_id'     => $follower->id,
+                    'actor_name'   => $follower->name,
+                    'actor_avatar' => $follower->profile_photo_url,
+                    'action_url'   => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Follow notification failed', ['error' => $e->getMessage()]);
+            }
 
             return ['success' => true, 'message' => 'Followed successfully.'];
         } catch (\Exception $e) {
@@ -63,15 +73,8 @@ class FollowService
         }
     }
 
-    /**
-     * Unfollow a user.
-     * * @param User $follower The user performing the unfollow action (Auth user).
-     * @param int|string $followingId The ID of the user to be unfollowed.
-     * @return array ['success' => bool, 'message' => string, 'code' => ?string]
-     */
     public function unfollowUser(User $follower, $followingId): array
     {
-        // 1. Self-unfollow check
         if ((int)$follower->id === (int)$followingId) {
             return [
                 'success' => false,
@@ -83,7 +86,6 @@ class FollowService
         DB::beginTransaction();
 
         try {
-            // Retrieve user to unfollow with exclusive lock
             $userToUnfollow = User::lockForUpdate()->find($followingId);
 
             if (!$userToUnfollow) {
@@ -91,7 +93,6 @@ class FollowService
                 return ['success' => false, 'message' => 'User not found.', 'code' => 'NOT_FOUND'];
             }
 
-            // Check if user is currently following
             if (!$follower->isFollowing($userToUnfollow)) {
                 DB::rollBack();
                 return [
@@ -101,10 +102,8 @@ class FollowService
                 ];
             }
 
-            // Detach relation
             $follower->following()->detach($followingId);
 
-            // Decrement counts (with check to prevent count from going below zero)
             if ($follower->following_count > 0) {
                 $follower->decrement('following_count');
             }

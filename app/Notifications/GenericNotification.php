@@ -124,4 +124,23 @@ class GenericNotification extends Notification implements ShouldQueue
             'sent_at' => now()->toISOString(),
         ]);
     }
+
+    public function toFcm(object $notifiable): ?array
+    {
+        $config = config("notifications.categories.{$this->category}", []);
+
+        if (!($config['push'] ?? true)) {
+            return null;
+        }
+
+        return [
+            'title' => $this->payload['title'] ?? $config['title'] ?? 'Notification',
+            'body' => $this->payload['message'] ?? '',
+            'data' => [
+                'category' => $this->category,
+                'payload' => json_encode($this->payload),
+                'sent_at' => now()->toISOString(),
+            ],
+        ];
+    }
 }

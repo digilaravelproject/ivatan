@@ -3,13 +3,23 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\UserPost;
 use App\Models\Comment;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class AdminPostController extends Controller
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function index(Request $request)
     {
         $type = $request->get('type', 'post');
@@ -178,6 +188,24 @@ class AdminPostController extends Controller
             $post->status = $request->status;
             $post->visibility = $request->visibility;
             $post->save();
+
+            // Notify post author if flagged/deleted by admin
+            if (in_array($request->status, ['deleted', 'flagged'])) {
+                try {
+                    $author = User::find($post->user_id);
+                    if ($author) {
+                        $this->notificationService->sendToUser($author, 'post_flagged', [
+                            'title'       => 'Post Update',
+                            'message'     => 'Your post has been ' . $request->status . ' by the admin.',
+                            'post_id'     => $post->id,
+                            'status'      => $request->status,
+                            'action_url'  => null,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Post flag notification failed', ['error' => $e->getMessage()]);
+                }
+            }
 
             return redirect()->route('admin.userpost.details', $id)
                 ->with('success', 'Post updated successfully.');

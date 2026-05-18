@@ -450,6 +450,10 @@ Route::prefix('v1')->group(function () {
         // optional test endpoint
         Route::post('notifications/send-test', [NotificationController::class, 'sendTest']);
 
+        // Device token endpoints for push notifications
+        Route::post('notifications/device-tokens', [NotificationController::class, 'registerToken']);
+        Route::delete('notifications/device-tokens', [NotificationController::class, 'deleteToken']);
+
 
         // ================================
         // Ad Routes

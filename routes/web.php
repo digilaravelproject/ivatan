@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\FollowController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\HistoryController;
 use App\Http\Controllers\Admin\LiveChatGroupController;
+use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 
 // Public Routes
 Route::get('/', fn() => view('web.index'))->name('web.index');
@@ -229,6 +230,19 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         route::get('/{adPackage}/edit', 'edit')->name('ad-packages.edit');
         route::put('/{adPackage}', 'update')->name('ad-packages.update');
         route::delete('/{adPackage}', 'destroy')->name('ad-packages.destroy');
+    });
+
+    // =====================
+    // Notifications (Admin)
+    // =====================
+    Route::prefix('notifications')->name('notifications.')->controller(AdminNotificationController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::get('/unread-count', 'unreadCount')->name('unread-count');
+        Route::get('/recent', 'recent')->name('recent');
+        Route::post('/send', 'sendToUser')->name('send');
+        Route::post('/broadcast', 'sendBroadcast')->name('broadcast');
+        Route::get('/{id}', 'show')->name('show');
     });
 
     // =====================

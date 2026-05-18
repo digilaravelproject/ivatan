@@ -132,6 +132,12 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->belongsToMany(Interest::class, 'interest_user', 'user_id', 'interest_id');
     }
+
+    public function deviceTokens()
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function posts()
     {
         return $this->hasMany(UserPost::class);

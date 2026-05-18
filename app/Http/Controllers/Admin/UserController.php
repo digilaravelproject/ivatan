@@ -6,9 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\AdminLog;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage; // ✅ Added to fix "Unknown Class" error
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Class UserController
@@ -18,6 +19,13 @@ use Illuminate\Support\Facades\Storage; // ✅ Added to fix "Unknown Class" erro
  */
 class UserController extends Controller
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     /**
      * Display a listing of users with search and filtering.
      *
@@ -104,6 +112,18 @@ class UserController extends Controller
             $user->save();
 
             $this->logAdminAction('block', $user, $request);
+
+            try {
+                $this->notificationService->sendToUser($user, 'admin_action', [
+                    'title'       => 'Account Suspended',
+                    'message'     => 'Your account has been suspended by the admin.',
+                    'action'      => 'blocked',
+                    'action_url'  => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("Block notification failed for user {$user->id}: " . $e->getMessage());
+            }
+
             return back()->with('success', 'User blocked successfully.');
         } catch (\Exception $e) {
             Log::error("Error blocking user {$user->id}: " . $e->getMessage());
@@ -127,6 +147,18 @@ class UserController extends Controller
             $user->save();
 
             $this->logAdminAction('unblock', $user, $request);
+
+            try {
+                $this->notificationService->sendToUser($user, 'admin_action', [
+                    'title'       => 'Account Reinstated',
+                    'message'     => 'Your account has been reinstated by the admin.',
+                    'action'      => 'unblocked',
+                    'action_url'  => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("Unblock notification failed for user {$user->id}: " . $e->getMessage());
+            }
+
             return back()->with('success', 'User unblocked successfully.');
         } catch (\Exception $e) {
             Log::error("Error unblocking user {$user->id}: " . $e->getMessage());
@@ -148,6 +180,18 @@ class UserController extends Controller
             $user->is_verified = 1;
             $user->save();
             $this->logAdminAction('verify', $user, $request);
+
+            try {
+                $this->notificationService->sendToUser($user, 'admin_action', [
+                    'title'       => 'Account Verified',
+                    'message'     => 'Your account has been verified by the admin.',
+                    'action'      => 'verified',
+                    'action_url'  => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("Verify notification failed for user {$user->id}: " . $e->getMessage());
+            }
+
             return back()->with('success', 'User verified successfully.');
         } catch (\Exception $e) {
             Log::error("Error verifying user {$user->id}: " . $e->getMessage());
@@ -169,6 +213,18 @@ class UserController extends Controller
             $user->is_verified = 0;
             $user->save();
             $this->logAdminAction('unverify', $user, $request);
+
+            try {
+                $this->notificationService->sendToUser($user, 'admin_action', [
+                    'title'       => 'Verification Removed',
+                    'message'     => 'Your account verification has been removed by the admin.',
+                    'action'      => 'unverified',
+                    'action_url'  => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("Unverify notification failed for user {$user->id}: " . $e->getMessage());
+            }
+
             return back()->with('success', 'User unverified successfully.');
         } catch (\Exception $e) {
             Log::error("Error unverifying user {$user->id}: " . $e->getMessage());
@@ -272,6 +328,17 @@ class UserController extends Controller
             $user->save();
             $this->logAdminAction('toggle_seller_status', $user, $request);
 
+            try {
+                $this->notificationService->sendToUser($user, 'admin_action', [
+                    'title'       => 'Seller Status Updated',
+                    'message'     => 'Your seller status has been updated to ' . ($user->is_seller ? 'enabled' : 'disabled') . ' by admin.',
+                    'action'      => 'seller_' . ($user->is_seller ? 'enabled' : 'disabled'),
+                    'action_url'  => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("Seller toggle notification failed for user {$user->id}: " . $e->getMessage());
+            }
+
             return back()->with('success', $user->is_seller ? "{$user->name} is now a seller." : "{$user->name} is no longer a seller.");
         } catch (\Exception $e) {
             return back()->with('error', 'Action failed.');
@@ -285,6 +352,17 @@ class UserController extends Controller
             $user->is_employer = !$user->is_employer;
             $user->save();
             $this->logAdminAction('toggle_Employer_status', $user, $request);
+
+            try {
+                $this->notificationService->sendToUser($user, 'admin_action', [
+                    'title'       => 'Employer Status Updated',
+                    'message'     => 'Your employer status has been updated to ' . ($user->is_employer ? 'enabled' : 'disabled') . ' by admin.',
+                    'action'      => 'employer_' . ($user->is_employer ? 'enabled' : 'disabled'),
+                    'action_url'  => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("Employer toggle notification failed for user {$user->id}: " . $e->getMessage());
+            }
 
             return back()->with('success', $user->is_employer ? "{$user->name} is now an Employer." : "{$user->name} is no longer an Employer.");
         } catch (\Exception $e) {

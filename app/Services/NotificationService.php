@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Channels\FcmChannel;
+use App\Models\DeviceToken;
 use App\Models\User;
 use App\Notifications\GenericNotification;
 use Illuminate\Notifications\AnonymousNotifiable;
@@ -11,57 +13,26 @@ use Illuminate\Database\Eloquent\Model;
 
 class NotificationService
 {
-    /**
-     * Send a notification to a single notifiable (e.g., User model).
-     *
-     * @param Authenticatable|Model $notifiable
-     * @param string $category Custom category for the notification
-     * @param array $payload Custom data payload for the notification
-     * @param array|null $channels Optional override for notification channels
-     */
-    // public function sendToUser($notifiable, string $category, array $payload = [], ?array $channels = null): void
-    // {
-    //     $notification = new GenericNotification($category, $payload);
-
-    //     // If you need to override channels, you could handle this via payload and logic inside the notification
-    //     if ($channels) {
-    //         $notification->viaOverride($channels); // You can define this method in GenericNotification
-    //     }
-
-    //     Notification::send($notifiable, $notification);
-    // }
-
     public function sendToUser(User $notifiable, string $category, array $payload = [], ?array $channels = null): void
     {
-        if (! $notifiable instanceof User) {
+        if (!$notifiable instanceof User) {
             \Log::warning('Notifiable is not a User instance');
             return;
         }
 
-        // \Log::info("Class uses:", class_uses_recursive($notifiable));
-
-        // \Log::info('Notifiable class: ' . get_class($notifiable));
-        \Log::info('Implements Notifiable?', [
-            'result' => method_exists($notifiable, 'routeNotificationForDatabase'),
-        ]);
-
-        \Log::info('Sending notification', [
-            'user_id' => $notifiable->id ?? null,
-            'category' => $category,
-            'payload' => $payload,
-            'channels' => $channels,
-        ]);
-
-        if (method_exists($notifiable, 'notify')) {
-    \Log::info('User can be notified.');
-} else {
-    \Log::warning('User cannot be notified.');
-}
-
         $notification = new GenericNotification($category, $payload);
 
-        if ($channels) {
+        if ($channels !== null) {
             $notification->viaOverride($channels);
+        } else {
+            $defaultChannels = config("notifications.categories.{$category}.channels", config('notifications.default_channels', ['database', 'broadcast']));
+
+            $hasDeviceTokens = DeviceToken::where('user_id', $notifiable->id)->exists();
+            if ($hasDeviceTokens) {
+                $defaultChannels[] = FcmChannel::class;
+            }
+
+            $notification->viaOverride($defaultChannels);
         }
 
         try {
@@ -71,29 +42,33 @@ class NotificationService
         }
     }
 
-
-    /**
-     * Send a notification to multiple users (e.g., a collection or array of notifiables).
-     *
-     * @param iterable $notifiables
-     * @param string $category
-     * @param array $payload
-     */
     public function sendToUsers(iterable $notifiables, string $category, array $payload = []): void
     {
         $notification = new GenericNotification($category, $payload);
 
-        Notification::send($notifiables, $notification);
+        $usersWithTokens = [];
+        if ($notifiables instanceof \Illuminate\Support\Collection) {
+            $userIdsWithTokens = DeviceToken::whereIn('user_id', $notifiables->pluck('id'))->pluck('user_id')->unique()->toArray();
+            $usersWithTokens = $notifiables->whereIn('id', $userIdsWithTokens)->pluck('id')->toArray();
+        }
+
+        foreach ($notifiables as $notifiable) {
+            if ($notifiable instanceof User) {
+                $channels = config("notifications.categories.{$category}.channels", config('notifications.default_channels', ['database', 'broadcast']));
+                if (in_array($notifiable->id, $usersWithTokens)) {
+                    $channels[] = FcmChannel::class;
+                }
+                $clone = new GenericNotification($category, $payload);
+                $clone->viaOverride($channels);
+                try {
+                    $notifiable->notify($clone);
+                } catch (\Throwable $e) {
+                    \Log::error('Notification send failed', ['error' => $e->getMessage()]);
+                }
+            }
+        }
     }
 
-    /**
-     * Send a notification to an external route (e.g., email, phone) using AnonymousNotifiable.
-     *
-     * @param string $routeValue Route destination (email address, phone number, etc.)
-     * @param string $category
-     * @param array $payload
-     * @param string $channel Notification channel name ('mail', 'nexmo', etc.)
-     */
     public function sendToRoute(string $routeValue, string $category, array $payload = [], string $channel = 'mail'): void
     {
         $anon = (new AnonymousNotifiable())->route($channel, $routeValue);

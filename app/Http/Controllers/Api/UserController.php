@@ -8,18 +8,22 @@ use App\Http\Requests\Api\User\LoginRequest;
 use App\Http\Requests\Api\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Services\Api\User\UserService;
+use App\Services\NotificationService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
     use ApiResponse;
 
     protected $userService;
+    protected NotificationService $notificationService;
 
-    public function __construct(UserService $userService)
+    public function __construct(UserService $userService, NotificationService $notificationService)
     {
         $this->userService = $userService;
+        $this->notificationService = $notificationService;
     }
 
     public function register(RegisterUserRequest $request)
@@ -27,7 +31,18 @@ class UserController extends Controller
         try {
             $result = $this->userService->register($request->validated());
             $user = $result['user'];
-            $user->is_own_profile = true; // Tag for resource
+            $user->is_own_profile = true;
+
+            // Send welcome notification (non-blocking)
+            try {
+                $this->notificationService->sendToUser($user, 'welcome', [
+                    'title'      => 'Welcome to Ivatan!',
+                    'message'    => 'Your account has been created successfully. Start exploring!',
+                    'action_url' => null,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Welcome notification failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            }
 
             return $this->success([
                 'user' => new UserResource($user),

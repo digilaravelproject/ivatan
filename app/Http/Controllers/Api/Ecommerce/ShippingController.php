@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\Ecommerce;
 use App\Http\Controllers\Controller;
 use App\Models\Ecommerce\UserOrder;
 use App\Models\Ecommerce\UserShipping;
+use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use App\Services\Ecommerce\OrderService;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Class ShippingController
@@ -27,10 +30,12 @@ use App\Services\Ecommerce\OrderService;
 class ShippingController extends Controller
 {
     protected $orderService;
+    protected NotificationService $notificationService;
 
-    public function __construct(OrderService $orderService)
+    public function __construct(OrderService $orderService, NotificationService $notificationService)
     {
         $this->orderService = $orderService;
+        $this->notificationService = $notificationService;
     }
 
     /**
@@ -113,6 +118,22 @@ class ShippingController extends Controller
             // 🛑 Catch Order Cancellation Flow
             if ($shipping->status === 'cancelled') {
                 $this->orderService->cancelOrder($order->id, $user);
+
+                // Notify buyer about cancellation (non-blocking)
+                try {
+                    $buyer = User::find($order->buyer_id);
+                    if ($buyer) {
+                        $this->notificationService->sendToUser($buyer, 'order_cancelled', [
+                            'title'       => 'Order Cancelled',
+                            'message'     => 'Your order #' . $order->id . ' has been cancelled.',
+                            'order_id'    => $order->id,
+                            'order_uuid'  => $order->uuid,
+                            'action_url'  => null,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Cancellation notification failed', ['error' => $e->getMessage()]);
+                }
             }
 
             // ✅ Successful response
