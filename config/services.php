@@ -39,8 +39,8 @@ return [
         'secret' => env('RAZORPAY_SECRET'),
     ],
     'ffmpeg' => [
-        'ffmpeg_path' => env('FFMPEG_PATH'),
-        'ffprobe_path' => env('FFPROBE_PATH'),
+        'ffmpeg_path' => env('FFMPEG_PATH', '/usr/bin/ffmpeg'),
+        'ffprobe_path' => env('FFPROBE_PATH', '/usr/bin/ffprobe'),
     ],
 
 
