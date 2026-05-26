@@ -11,8 +11,8 @@ return new class extends Migration {
             // ✅ Option 1: Default NULL
             // $table->json('interests')->nullable()->default(null);
 
-            // ✅ Option 2: Default ["entertainment"]
-            $table->json('interests')->nullable()->default(json_encode(['entertainment']));
+            // ✅ JSON default not supported on MySQL < 8.0.13, using nullable instead
+            $table->json('interests')->nullable();
         });
     }
 
