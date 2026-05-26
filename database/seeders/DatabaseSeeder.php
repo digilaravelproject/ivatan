@@ -22,7 +22,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // $this->call(RoleSeeder::class);
+        $this->call(SystemDatabaseSeeder::class);
+
         // Create some users (including admin)
         $userCollection = User::factory()->count(10)->create();
 
