@@ -19,9 +19,21 @@ class ServerHealthController extends Controller
         $internalHost = config('reverb.servers.reverb.host', '127.0.0.1');
         $internalPort = config('reverb.servers.reverb.port', 8080);
 
-        $externalHost = env('REVERB_HOST', config('reverb.apps.apps.0.options.host', 'ivatan.in'));
-        $externalPort = env('REVERB_PORT', config('reverb.apps.apps.0.options.port', 443));
-        $scheme = env('REVERB_SCHEME', config('reverb.apps.apps.0.options.scheme', 'https'));
+        // 0.0.0.0 can't be used for fsockopen - convert to 127.0.0.1
+        $connectHost = in_array($internalHost, ['0.0.0.0', '', null]) ? '127.0.0.1' : $internalHost;
+
+        $externalHost = env('REVERB_HOST')
+            ?: config('reverb.apps.apps.0.options.host')
+            ?: config('broadcasting.connections.reverb.options.host')
+            ?: gethostname();
+        $externalPort = env('REVERB_PORT')
+            ?: config('reverb.apps.apps.0.options.port')
+            ?: config('broadcasting.connections.reverb.options.port')
+            ?: 443;
+        $scheme = env('REVERB_SCHEME')
+            ?: config('reverb.apps.apps.0.options.scheme')
+            ?: config('broadcasting.connections.reverb.options.scheme')
+            ?: 'https';
 
         $appKey = config('reverb.apps.apps.0.key', config('broadcasting.connections.reverb.key'));
 
@@ -29,7 +41,7 @@ class ServerHealthController extends Controller
         $error = null;
 
         try {
-            $socket = @fsockopen($internalHost, $internalPort, $errno, $errstr, 3);
+            $socket = @fsockopen($connectHost, $internalPort, $errno, $errstr, 3);
             if ($socket) {
                 $connected = true;
                 fclose($socket);
@@ -56,6 +68,7 @@ class ServerHealthController extends Controller
             'process_running' => $processRunning,
             'internal_host' => $internalHost,
             'internal_port' => $internalPort,
+            'connect_host' => $connectHost,
             'external_host' => $externalHost,
             'external_port' => $externalPort,
             'scheme' => $scheme,

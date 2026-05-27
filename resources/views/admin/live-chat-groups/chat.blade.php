@@ -115,8 +115,14 @@ function liveChat() {
         autoScroll: true,
 
         init() {
+            console.log('[Chat] Initializing...');
             this.fetchMessages();
-            this.initEcho();
+            try {
+                this.initEcho();
+            } catch (e) {
+                console.error('[Chat] Echo init failed:', e);
+                this.connected = false;
+            }
             this.$watch('messages', () => {
                 this.messages = this.messages.filter(
                     (msg, i, arr) => msg.id && i === arr.findIndex(m => m.id === msg.id)
@@ -126,21 +132,30 @@ function liveChat() {
 
         fetchMessages() {
             this.loading = true;
+            console.log('[Chat] Fetching messages for group:', this.groupId);
             axios.get('/admin/live-chat-groups/' + this.groupId + '/chat/messages')
                 .then(res => {
-                    this.messages = res.data.messages;
+                    this.messages = res.data.messages || [];
                     this.loading = false;
+                    console.log('[Chat] Messages loaded:', this.messages.length);
                     this.$nextTick(() => this.scrollToBottom());
                 })
-                .catch(() => { this.loading = false; });
+                .catch(err => {
+                    console.error('[Chat] Fetch failed:', err.response?.status, err.message);
+                    this.loading = false;
+                });
         },
 
         initEcho() {
-            if (typeof window.Echo === 'undefined') return;
+            if (typeof window.Echo === 'undefined') {
+                console.warn('[Chat] Echo not loaded');
+                return;
+            }
+            console.log('[Chat] Subscribing to chat.' + this.chatId);
 
             this.echo = window.Echo.private('chat.' + this.chatId)
                 .listen('.message.sent', (e) => {
-                    // Don't duplicate messages we just sent
+                    console.log('[Chat] Message received:', e.id);
                     if (e.sender && e.sender.id === this.userId) return;
                     if (this.messages.some(m => m.id === e.id)) return;
 
@@ -161,8 +176,14 @@ function liveChat() {
                         if (this.autoScroll) this.scrollToBottom();
                     });
                 })
-                .subscribed(() => { this.connected = true; })
-                .error(() => { this.connected = false; });
+                .subscribed(() => {
+                    console.log('[Chat] Subscribed!');
+                    this.connected = true;
+                })
+                .error((err) => {
+                    console.error('[Chat] Subscription error:', err);
+                    this.connected = false;
+                });
         },
 
         sendMessage() {
