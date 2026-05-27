@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Config;
 
 class ServerHealthController extends Controller
 {
@@ -18,9 +19,9 @@ class ServerHealthController extends Controller
         $internalHost = config('reverb.servers.reverb.host', '127.0.0.1');
         $internalPort = config('reverb.servers.reverb.port', 8080);
 
-        $externalHost = config('reverb.apps.apps.0.options.host', config('broadcasting.connections.reverb.options.host', $internalHost));
-        $externalPort = config('reverb.apps.apps.0.options.port', config('broadcasting.connections.reverb.options.port', 443));
-        $scheme = config('reverb.apps.apps.0.options.scheme', 'https');
+        $externalHost = env('REVERB_HOST', config('reverb.apps.apps.0.options.host', 'ivatan.in'));
+        $externalPort = env('REVERB_PORT', config('reverb.apps.apps.0.options.port', 443));
+        $scheme = env('REVERB_SCHEME', config('reverb.apps.apps.0.options.scheme', 'https'));
 
         $appKey = config('reverb.apps.apps.0.key', config('broadcasting.connections.reverb.key'));
 
