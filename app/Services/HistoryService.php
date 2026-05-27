@@ -57,7 +57,7 @@ class HistoryService
         return View::select('views.id', 'views.user_id', 'views.viewable_type', 'views.viewable_id', 'views.created_at')
             ->join('user_posts', function ($join) {
                 $join->on('views.viewable_id', '=', 'user_posts.id')
-                    ->where('views.viewable_type', '=', 'App\\Models\\UserPost');
+                    ->where('views.viewable_type', '=', (new UserPost)->getMorphClass());
             })
             ->where('views.user_id', $userId)
             ->whereIn('user_posts.type', $allowedTypes)
