@@ -7,6 +7,17 @@ const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
 const normalizeScheme = (scheme) => (scheme || (import.meta.env.PROD ? 'https' : 'http')).replace(':', '');
 const isTlsScheme = (scheme) => ['https', 'wss'].includes(normalizeScheme(scheme));
 const toPort = (port, fallback) => Number(port || fallback);
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+const authOptions = {
+    authEndpoint: '/broadcasting/auth',
+    auth: {
+        headers: {
+            ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    },
+};
+
 function normalizeHost(host) {
     const value = (host || '')
         .replace(/^wss?:\/\//, '')
@@ -40,6 +51,7 @@ function createReverbConfig() {
     }
 
     return {
+        ...authOptions,
         broadcaster: 'reverb',
         key,
         wsHost: host,
@@ -69,6 +81,7 @@ function createPusherConfig() {
     }
 
     return {
+        ...authOptions,
         broadcaster: 'pusher',
         key,
         cluster,
