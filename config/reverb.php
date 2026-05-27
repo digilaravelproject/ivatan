@@ -58,6 +58,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public Reverb Client Endpoint
+    |--------------------------------------------------------------------------
+    |
+    | These values describe the browser-facing WebSocket endpoint used by the
+    | Vite/Echo client. They may differ from the internal Reverb process host.
+    |
+    */
+
+    'client' => [
+        'host' => env('VITE_REVERB_HOST', env('REVERB_HOST')),
+        'port' => env('VITE_REVERB_PORT', env('REVERB_PORT', 443)),
+        'scheme' => env('VITE_REVERB_SCHEME', env('REVERB_SCHEME', 'https')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Reverb Applications
     |--------------------------------------------------------------------------
     |

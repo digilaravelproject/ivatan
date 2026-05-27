@@ -22,18 +22,15 @@ class ServerHealthController extends Controller
         // 0.0.0.0 can't be used for fsockopen - convert to 127.0.0.1
         $connectHost = in_array($internalHost, ['0.0.0.0', '', null]) ? '127.0.0.1' : $internalHost;
 
-        $externalHost = env('VITE_REVERB_HOST')
-            ?: env('REVERB_HOST')
+        $externalHost = config('reverb.client.host')
             ?: config('reverb.apps.apps.0.options.host')
             ?: config('broadcasting.connections.reverb.options.host')
             ?: gethostname();
-        $externalPort = env('VITE_REVERB_PORT')
-            ?: env('REVERB_PORT')
+        $externalPort = config('reverb.client.port')
             ?: config('reverb.apps.apps.0.options.port')
             ?: config('broadcasting.connections.reverb.options.port')
             ?: 443;
-        $scheme = env('VITE_REVERB_SCHEME')
-            ?: env('REVERB_SCHEME')
+        $scheme = config('reverb.client.scheme')
             ?: config('reverb.apps.apps.0.options.scheme')
             ?: config('broadcasting.connections.reverb.options.scheme')
             ?: 'https';
