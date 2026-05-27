@@ -38,7 +38,7 @@
             </div>
         </template>
 
-        <template x-for="msg in messages" :key="msg.id">
+        <template x-for="(msg, index) in messages" :key="msg.id ? `msg-${msg.id}` : `temp-${index}`">
             <div class="flex" :class="msg.sender_id === userId ? 'justify-end' : 'justify-start'">
                 <div class="max-w-[75%]" :class="msg.sender_id === userId ? 'order-1' : ''">
                     {{-- Sender name --}}
@@ -117,6 +117,11 @@ function liveChat() {
         init() {
             this.fetchMessages();
             this.initEcho();
+            this.$watch('messages', () => {
+                this.messages = this.messages.filter(
+                    (msg, i, arr) => msg.id && i === arr.findIndex(m => m.id === msg.id)
+                );
+            });
         },
 
         fetchMessages() {
@@ -137,6 +142,7 @@ function liveChat() {
                 .listen('.message.sent', (e) => {
                     // Don't duplicate messages we just sent
                     if (e.sender && e.sender.id === this.userId) return;
+                    if (this.messages.some(m => m.id === e.id)) return;
 
                     this.messages.push({
                         id: e.id,
