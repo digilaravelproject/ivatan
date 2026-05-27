@@ -115,7 +115,6 @@ function liveChat() {
         autoScroll: true,
 
         init() {
-            console.log('[Chat] Initializing...');
             this.fetchMessages();
             try {
                 this.initEcho();
@@ -130,12 +129,10 @@ function liveChat() {
 
         fetchMessages() {
             this.loading = true;
-            console.log('[Chat] Fetching messages for group:', this.groupId);
             axios.get('/admin/live-chat-groups/' + this.groupId + '/chat/messages')
                 .then(res => {
                     this.messages = this.deduplicate(res.data.messages || []);
                     this.loading = false;
-                    console.log('[Chat] Messages loaded:', this.messages.length);
                     this.$nextTick(() => this.scrollToBottom());
                 })
                 .catch(err => {
@@ -146,14 +143,12 @@ function liveChat() {
 
         initEcho() {
             if (typeof window.Echo === 'undefined') {
-                console.warn('[Chat] Echo not loaded');
+                console.error('[Chat] Echo not loaded');
                 return;
             }
-            console.log('[Chat] Subscribing to chat.' + this.chatId);
 
             this.echo = window.Echo.private('chat.' + this.chatId)
                 .listen('.message.sent', (e) => {
-                    console.log('[Chat] Message received:', e.id);
                     if (e.sender && e.sender.id === this.userId) return;
                     if (this.messages.some(m => m.id === e.id)) return;
 
@@ -175,7 +170,6 @@ function liveChat() {
                     });
                 })
                 .subscribed(() => {
-                    console.log('[Chat] Subscribed!');
                     this.connected = true;
                 })
                 .error((err) => {
