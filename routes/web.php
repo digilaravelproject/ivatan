@@ -64,6 +64,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::get('/chart/{type}/{days?}', 'chart')->name('chart');
         Route::get('/activity', 'activityFeed')->name('activityfeed');
     });
+    // Server Health
+    Route::controller(ServerHealthController::class)->prefix('server-health')->name('server-health.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/check/reverb', 'checkReverb')->name('check.reverb');
+        Route::get('/check/queue', 'checkQueue')->name('check.queue');
+        Route::get('/check/system', 'checkSystem')->name('check.system');
+    });
+
     // ACreate interest routes
     // Interest CRUD
     Route::resource('interests', InterestController::class)->only(['index', 'store', 'destroy']);
