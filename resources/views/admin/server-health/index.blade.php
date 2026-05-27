@@ -33,12 +33,24 @@
                           :class="reverb.process_running ? 'text-green-600' : 'text-red-600'"></span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-500">Host</span>
-                    <span class="font-mono" x-text="reverb.host"></span>
+                    <span class="text-gray-500">Internal Host</span>
+                    <span class="font-mono" x-text="reverb.internal_host"></span>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-500">Port</span>
-                    <span class="font-mono" x-text="reverb.port"></span>
+                    <span class="text-gray-500">Internal Port</span>
+                    <span class="font-mono" x-text="reverb.internal_port"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">External Host</span>
+                    <span class="font-mono" x-text="reverb.external_host"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">External Port</span>
+                    <span class="font-mono" x-text="reverb.external_port"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Scheme</span>
+                    <span class="font-mono" x-text="reverb.scheme"></span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-500">App Key</span>
@@ -150,7 +162,7 @@
 <script>
 function serverHealth() {
     return {
-        reverb: { loading: true, connected: false, process_running: false, host: '', port: 0, app_key: '', error: null },
+        reverb: { loading: true, connected: false, process_running: false, internal_host: '', internal_port: 0, external_host: '', external_port: 0, scheme: 'https', app_key: '', error: null },
         queue: { loading: true, worker_running: false, pending_jobs: 0, failed_jobs: 0, queue_driver: '', queue_name: '' },
         system: { loading: true, php_version: '', laravel_version: '', os: '', environment: '', debug_mode: false, disk_total: '', disk_free: '', disk_used: '', disk_percent: 0, memory_used: null, memory_total: null, timezone: '' },
         lastChecked: '',

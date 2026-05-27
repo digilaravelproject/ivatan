@@ -15,15 +15,20 @@ class ServerHealthController extends Controller
 
     public function checkReverb()
     {
-        $reverbHost = config('reverb.servers.reverb.hostname') ?: config('reverb.servers.reverb.host', '127.0.0.1');
-        $reverbPort = config('reverb.servers.reverb.port', 8080);
+        $internalHost = config('reverb.servers.reverb.host', '127.0.0.1');
+        $internalPort = config('reverb.servers.reverb.port', 8080);
+
+        $externalHost = config('reverb.apps.apps.0.options.host', config('broadcasting.connections.reverb.options.host', $internalHost));
+        $externalPort = config('reverb.apps.apps.0.options.port', config('broadcasting.connections.reverb.options.port', 443));
+        $scheme = config('reverb.apps.apps.0.options.scheme', 'https');
+
         $appKey = config('reverb.apps.apps.0.key', config('broadcasting.connections.reverb.key'));
 
         $connected = false;
         $error = null;
 
         try {
-            $socket = @fsockopen($reverbHost, $reverbPort, $errno, $errstr, 3);
+            $socket = @fsockopen($internalHost, $internalPort, $errno, $errstr, 3);
             if ($socket) {
                 $connected = true;
                 fclose($socket);
@@ -48,8 +53,11 @@ class ServerHealthController extends Controller
         return response()->json([
             'connected' => $connected,
             'process_running' => $processRunning,
-            'host' => $reverbHost,
-            'port' => $reverbPort,
+            'internal_host' => $internalHost,
+            'internal_port' => $internalPort,
+            'external_host' => $externalHost,
+            'external_port' => $externalPort,
+            'scheme' => $scheme,
             'app_key' => $appKey ? substr($appKey, 0, 8) . '...' : null,
             'error' => $error,
             'checked_at' => now()->toISOString(),
