@@ -6,7 +6,7 @@ use App\Enums\PostType;
 use App\Models\User;
 use App\Models\UserPost;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -70,14 +70,14 @@ class PostFeedService
         ]);
     }
 
-    public function mixedFeed(): LengthAwarePaginator
+    public function mixedFeed(): Paginator
     {
         return $this->applyBaseQueryOptimizations(UserPost::query(), $this->authUser())
             ->forYou()
             ->simplePaginate(15);
     }
 
-    public function postsFeed(): LengthAwarePaginator
+    public function postsFeed(): Paginator
     {
         return $this->applyBaseQueryOptimizations(
             UserPost::query()->whereIn('type', PostType::imageFeedTypes()),
@@ -87,7 +87,7 @@ class PostFeedService
             ->simplePaginate(15);
     }
 
-    public function videosFeed(): LengthAwarePaginator
+    public function videosFeed(): Paginator
     {
         return $this->applyBaseQueryOptimizations(
             UserPost::query()->ofType(PostType::Video->value),
@@ -97,7 +97,7 @@ class PostFeedService
             ->simplePaginate(15);
     }
 
-    public function reelsFeed(): LengthAwarePaginator
+    public function reelsFeed(): Paginator
     {
         return $this->applyBaseQueryOptimizations(
             UserPost::query()->ofType(PostType::Reel->value),
@@ -154,7 +154,7 @@ class PostFeedService
         return $relatedPosts;
     }
 
-    public function getUserPosts(int $userId, string $filter): LengthAwarePaginator
+    public function getUserPosts(int $userId, string $filter): Paginator
     {
         $query = UserPost::query()->where('user_id', $userId);
 
@@ -170,14 +170,14 @@ class PostFeedService
             ->simplePaginate(12);
     }
 
-    public function globalTrendingFeed(mixed $seed): LengthAwarePaginator
+    public function globalTrendingFeed(mixed $seed): Paginator
     {
         return $this->applyBaseQueryOptimizations(UserPost::query(), $this->authUser())
             ->orderByRaw("RAND($seed)")
             ->simplePaginate(15);
     }
 
-    public function trendingInterestsFeed(Request $request): LengthAwarePaginator
+    public function trendingInterestsFeed(Request $request): Paginator
     {
         $seed = $request->input('seed') ?: time();
         $user = $this->authUser();
@@ -216,7 +216,7 @@ class PostFeedService
         return $posts;
     }
 
-    public function forYouFeed(Request $request): LengthAwarePaginator
+    public function forYouFeed(Request $request): Paginator
     {
         $seed = $request->input('seed') ?: time();
         $user = $this->authUser();
