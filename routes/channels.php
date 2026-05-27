@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
-});
+}, ['guards' => ['web', 'admin']]);
 
 Broadcast::channel('chat.{chatId}', function ($user, $chatId) {
     if ($user->is_admin || $user->hasRole('admin')) {
@@ -13,5 +13,5 @@ Broadcast::channel('chat.{chatId}', function ($user, $chatId) {
     }
 
     return UserChatParticipant::where('chat_id', $chatId)->where('user_id', $user->id)->exists();
-});
+}, ['guards' => ['web', 'admin']]);
 
