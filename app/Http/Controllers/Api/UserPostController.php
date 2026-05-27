@@ -6,224 +6,87 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\UserPost;
-use App\Models\PostPreference;
+use App\Models\User;
 use App\Services\LikeService;
 use App\Services\ReportService;
-use App\Services\BlockService;
-use App\Services\PostPreferenceService;
+use App\Services\PostMediaService;
+use App\Services\PostFeedService;
+use App\Services\ViewTrackingService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Jobs\ProcessMediaJob;
-use App\Models\User;
-use App\Services\ViewTrackingService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Illuminate\Validation\ValidationException;
-
 
 class UserPostController extends Controller
 {
-    /**
-     * Get the authenticated user.
-     */
-    private function getAuthUser()
+    public function __construct(
+        private PostFeedService    $feedService,
+        private PostMediaService   $mediaService,
+        private LikeService        $likeService,
+        private ReportService      $reportService,
+        private ViewTrackingService $viewService,
+    ) {}
+
+    private function authUser(): User
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = Auth::user();
         return $user;
     }
 
-    /**
-     * Apply common query optimizations (Eager Loading & N+1 fixes).
-     * Also applies feed filters: blocked users, not-interested posts, similar content reduction.
-     */
-    protected function applyBaseQueryOptimizations($query)
-    {
-        /** @var \App\Models\User|null $user */
-        $user = Auth::guard('sanctum')->user();
-        $userId = $user ? $user->id : null;
+    // -------------------------------------------------------------------------
+    // FEEDS
+    // -------------------------------------------------------------------------
 
-        // =====================================================================
-        // FEED FILTERING: Block + Not-Interested + Similar Content Reduction
-        // Single-point filter — applies to ALL feed endpoints automatically.
-        // =====================================================================
-        if ($user) {
-            // 1. Exclude posts from blocked users (bidirectional)
-            $blockedIds = $user->getAllBlockedIds();
-            if (!empty($blockedIds)) {
-                $query->whereNotIn('user_posts.user_id', $blockedIds);
-            }
-
-            // 2. Exclude specific posts marked as "not interested"
-            $preferenceService = app(PostPreferenceService::class);
-            $notInterestedPostIds = $preferenceService->getNotInterestedPostIds($user);
-            if (!empty($notInterestedPostIds)) {
-                $query->whereNotIn('user_posts.id', $notInterestedPostIds);
-            }
-
-            // 3. Reduce similar content: deprioritize posts from authors
-            //    whose content was marked not-interested.
-            //    We use a scoring penalty via orderByRaw instead of excluding entirely.
-            $notInterestedAuthorIds = $preferenceService->getNotInterestedAuthorIds($user);
-            if (!empty($notInterestedAuthorIds)) {
-                $idList = implode(',', array_map('intval', $notInterestedAuthorIds));
-                $query->orderByRaw("CASE WHEN user_posts.user_id IN ({$idList}) THEN 1 ELSE 0 END ASC");
-            }
-        }
-
-        // =====================================================================
-        // EAGER LOADING & N+1 Prevention
-        // =====================================================================
-        $baseQuery = $query->withExists('likes');
-
-        // Add bookmark exists check for authenticated users
-        if ($userId) {
-            $baseQuery->withExists([
-                'bookmarks as bookmarks_exists' => function ($bq) use ($userId) {
-                    $bq->where('user_id', $userId);
-                }
-            ]);
-        }
-
-        return $baseQuery->with([
-            'media',
-            'user' => function ($q) use ($userId) {
-                $q->with(['interests', 'media']); // Eager load media for profile_photo_url logic
-                if ($userId) {
-                    $q->withExists([
-                        'followers as is_followed_by_me' => function ($f) use ($userId) {
-                            $f->where('follower_id', $userId);
-                        }
-                    ]);
-                }
-            }
-        ]);
-    }
-
-    /**
-     * Mixed Feed (Home/Explore) - "For You" Logic.
-     * Shows a mix of active posts based on engagement and randomness.
-     */
     public function index(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $query = UserPost::query();
-            $posts = $this->applyBaseQueryOptimizations($query)
-                ->forYou() // Algorithmic scope
-                ->simplePaginate(15);
-
-            return PostResource::collection($posts);
+            return PostResource::collection($this->feedService->mixedFeed());
         } catch (\Exception $e) {
             Log::error("Feed Fetch Error: " . $e->getMessage());
             return response()->json(['error' => 'An error occurred while fetching the feed.'], 500);
         }
     }
 
-    /**
-     * Posts Feed.
-     * Shows Images, Text, and Carousels sorted by trending score.
-     */
     public function postsFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $query = UserPost::query()
-                ->whereIn('type', ['post', 'carousel', 'video']);
-
-            $posts = $this->applyBaseQueryOptimizations($query)
-                ->trending()
-                ->simplePaginate(15);
-
-            return PostResource::collection($posts);
+            return PostResource::collection($this->feedService->postsFeed());
         } catch (\Exception $e) {
             Log::error("Posts Feed Error: " . $e->getMessage());
             return response()->json(['error' => 'An error occurred while fetching posts.'], 500);
         }
     }
 
-    /**
-     * Videos Feed.
-     * Shows only long-form videos sorted by engagement.
-     */
     public function videosFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $query = UserPost::query()->ofType('video');
-
-            $videos = $this->applyBaseQueryOptimizations($query)
-                ->trending()
-                ->simplePaginate(15);
-
-            return PostResource::collection($videos);
+            return PostResource::collection($this->feedService->videosFeed());
         } catch (\Exception $e) {
             Log::error("Videos Feed Error: " . $e->getMessage());
             return response()->json(['error' => 'An error occurred while fetching videos.'], 500);
         }
     }
 
-    /**
-     * Get Related Videos.
-     * Logic: Suggests videos from the same user or sharing similar interests.
-     */
+    public function reelsFeed(Request $request): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            return PostResource::collection($this->feedService->reelsFeed());
+        } catch (\Exception $e) {
+            Log::error("Reels Feed Error: " . $e->getMessage());
+            return response()->json(['error' => 'An error occurred while fetching reels.'], 500);
+        }
+    }
+
     public function getRelatedVideos(Request $request, $id): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $post = UserPost::findOrFail($id);
-
-            // Fetch related videos/reels:
-            // 1. Must be video or reel
-            // 2. Exclude current post
-            // 3. Prioritize same user OR same interests
-
-            $query = UserPost::query()
-                ->whereIn('type', ['video', 'reel'])
-                ->where('id', '!=', $post->id);
-
-            // Try to find posts from the same user or same interest
-            $userId = $post->user_id;
-
-            // Get current post's user interests (as a proxy for post interests if post_interests table doesn't exist)
-            $interestIds = DB::table('interest_user')
-                ->where('user_id', $userId)
-                ->pluck('interest_id');
-
-            $query->where(function ($q) use ($userId, $interestIds) {
-                $q->where('user_id', $userId);
-                if ($interestIds->isNotEmpty()) {
-                    $q->orWhereExists(function ($sub) use ($interestIds) {
-                        $sub->select(DB::raw(1))
-                            ->from('interest_user')
-                            ->whereColumn('interest_user.user_id', 'user_posts.user_id')
-                            ->whereIn('interest_user.interest_id', $interestIds);
-                    });
-                }
-            });
-
-            $relatedPosts = $this->applyBaseQueryOptimizations($query)
-                ->inRandomOrder()
-                ->limit(10)
-                ->get();
-
-            // Fallback: If not enough related videos, get trending videos
-            if ($relatedPosts->count() < 5) {
-                $trendingQuery = UserPost::query()
-                    ->whereIn('type', ['video', 'reel'])
-                    ->where('id', '!=', $post->id)
-                    ->whereNotIn('id', $relatedPosts->pluck('id'));
-
-                $trendingPosts = $this->applyBaseQueryOptimizations($trendingQuery)
-                    ->trending()
-                    ->limit(10 - $relatedPosts->count())
-                    ->get();
-
-                $relatedPosts = $relatedPosts->merge($trendingPosts);
-            }
-
-            return PostResource::collection($relatedPosts);
+            return PostResource::collection($this->feedService->getRelatedVideos($id));
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['error' => 'Post not found.'], 404);
         } catch (\Exception $e) {
@@ -232,46 +95,76 @@ class UserPostController extends Controller
         }
     }
 
-    /**
-     * Reels Feed.
-     * Shows short videos (reels) sorted by popularity.
-     */
-    public function reelsFeed(Request $request): AnonymousResourceCollection|JsonResponse
+    public function globalTrendingFeed(Request $request): AnonymousResourceCollection|JsonResponse
     {
         try {
-            $query = UserPost::query()->ofType('reel');
+            $seed = $request->input('seed') ?: time();
 
-            $reels = $this->applyBaseQueryOptimizations($query)
-                ->trending()
-                ->simplePaginate(15);
+            $posts = $this->feedService->globalTrendingFeed($seed);
 
-            return PostResource::collection($reels);
+            return PostResource::collection($posts)->additional([
+                'meta' => [
+                    'seed' => (int) $seed,
+                    'message' => 'Pass this seed to the next page to maintain order.'
+                ]
+            ]);
         } catch (\Exception $e) {
-            Log::error("Reels Feed Error: " . $e->getMessage());
-            return response()->json(['error' => 'An error occurred while fetching reels.'], 500);
+            Log::error("Global Trending Feed Error: " . $e->getMessage());
+            return response()->json(['error' => 'An error occurred while fetching trending feed.'], 500);
+        }
+    }
+
+    public function trendingInterestsFeed(Request $request): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            $seed = $request->input('seed') ?: time();
+
+            $posts = $this->feedService->trendingInterestsFeed($request);
+
+            return PostResource::collection($posts)->additional([
+                'meta' => [
+                    'seed' => (int) $seed,
+                    'message' => 'Pass this seed to the next page to maintain order.'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Interests Trending Feed Error: " . $e->getMessage());
+            return $this->globalTrendingFeed($request);
+        }
+    }
+
+    public function forYouFeed(Request $request): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            $seed = $request->input('seed') ?: time();
+
+            $posts = $this->feedService->forYouFeed($request);
+
+            return PostResource::collection($posts)->additional([
+                'meta' => [
+                    'seed' => (int) $seed,
+                    'message' => 'Pass this seed to the next page to maintain order.'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error("For You Feed Error: " . $e->getMessage());
+            return $this->globalTrendingFeed($request);
         }
     }
 
     // -------------------------------------------------------------------------
-    // CRUD ACTIONS
+    // CRUD
     // -------------------------------------------------------------------------
 
-    /**
-     * Create a new post and handle media uploads.
-     * Automatically sorts files into 'images' or 'videos' collections.
-     */
     public function store(StorePostRequest $request): JsonResponse
     {
         try {
-            $user = $this->getAuthUser();
+            $user = $this->authUser();
 
             $post = DB::transaction(function () use ($request, $user) {
-                $uuid = Str::uuid();
-
-                // Create Post Record
                 $post = UserPost::create([
                     'user_id' => $user->id,
-                    'uuid' => $uuid,
+                    'uuid' => Str::uuid(),
                     'type' => $request->type,
                     'caption' => $request->caption,
                     'visibility' => $request->visibility ?? 'public',
@@ -281,7 +174,6 @@ class UserPostController extends Controller
                     'comment_count' => 0,
                 ]);
 
-                // Handle Media Uploads
                 if ($request->hasFile('media')) {
                     $mediaFiles = $request->file('media');
 
@@ -289,44 +181,24 @@ class UserPostController extends Controller
                         $mediaFiles = [$mediaFiles];
                     }
 
-                    foreach ($mediaFiles as $file) {
-                        // Detect MIME type on server side for accuracy
-                        $mimeType = $file->getMimeType();
+                    $uploadInfo = $this->mediaService->uploadMedia($post, $mediaFiles);
 
-                        $collection = null;
+                    if ($uploadInfo->hasAny()) {
+                        $detectedType = $this->mediaService->detectPostType($uploadInfo, $request->type);
 
-                        // Assign collection based on file content, not post type.
-                        // This matches the Model's validation rules.
-                        if (str_starts_with($mimeType, 'image/')) {
-                            $collection = 'images';
-                        } elseif (str_starts_with($mimeType, 'video/')) {
-                            $collection = 'videos';
-                        }
-
-                        // Upload if valid collection found
-                        if ($collection) {
-                            $media = $post->addMedia($file)->toMediaCollection($collection);
-
-                            // Trigger background processing
-                            if ($media instanceof Media) {
-                                try {
-                                    ProcessMediaJob::dispatch($media);
-                                } catch (\Exception $e) {
-                                    Log::error("Media Processing Job Failed: " . $e->getMessage());
-                                }
-                            }
-                        } else {
-                            Log::warning("Skipped file upload: Unsupported MIME type {$mimeType}");
+                        if ($detectedType) {
+                            $post->update(['type' => $detectedType]);
                         }
                     }
                 }
+
                 return $post;
             });
 
             return response()->json([
                 'message' => 'Post created successfully',
                 'data' => new PostResource($post->load('media', 'user')),
-            ], 201); // Created
+            ], 201);
         } catch (\Exception $e) {
             Log::error("Store Post Error: " . $e->getMessage());
             Log::error($e->getTraceAsString());
@@ -340,25 +212,45 @@ class UserPostController extends Controller
         }
     }
 
+    public function show(Request $request, UserPost $post): JsonResponse
+    {
+        try {
+            $this->viewService->track($post, $request);
+            return response()->json(new PostResource($post->load('media', 'user')));
+        } catch (AuthorizationException $e) {
+            return response()->json(['message' => 'You are not authorized to view this post.'], 403);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Post not found.'], 404);
+        }
+    }
+
+    public function destroy(UserPost $post): JsonResponse
+    {
+        try {
+            $post->delete();
+            return response()->json(['message' => 'Post deleted successfully']);
+        } catch (AuthorizationException $e) {
+            return response()->json(['message' => 'Unauthorized action.'], 403);
+        } catch (\Exception $e) {
+            Log::error("Delete Post Error: " . $e->getMessage());
+            return response()->json(['error' => 'Failed to delete post.'], 500);
+        }
+    }
+
     public function getPostsByUser(Request $request, $username): AnonymousResourceCollection|JsonResponse
     {
         try {
-            // 1. Find the target user
             $targetUser = User::where('username', $username)->first();
 
             if (!$targetUser) {
                 return response()->json(['message' => 'User not found.'], 404);
             }
 
-            // 2. Identify the current logged-in user
-            /** @var \App\Models\User|null $currentUser */
+            /** @var User|null $currentUser */
             $currentUser = Auth::guard('sanctum')->user();
 
-            // 3. Privacy Check Logic
             $isMine = $currentUser && $currentUser->id === $targetUser->id;
 
-            // === BLOCK CHECK ===
-            // If any block exists between users, show restricted profile
             if ($currentUser && !$isMine && $currentUser->hasBlockRelationWith($targetUser)) {
                 $isBlockedByMe = $currentUser->hasBlocked($targetUser);
                 return response()->json([
@@ -383,16 +275,14 @@ class UserPostController extends Controller
                             'current_filter' => $request->input('filter', 'all'),
                         ]
                     ]
-                ], 200); // 200, not 403 — profile page loads, just empty
+                ], 200);
             }
 
-            // Check following status
             $isFollowing = false;
             if ($currentUser && !$isMine) {
                 $isFollowing = $currentUser->isFollowing($targetUser);
             }
 
-            // If account is private and viewer is neither owner nor follower, deny access
             if ($targetUser->account_privacy === 'private' && !$isMine && !$isFollowing) {
                 return response()->json([
                     'message' => 'This account is private. Follow to see their posts.',
@@ -401,37 +291,17 @@ class UserPostController extends Controller
                 ], 403);
             }
 
-            // 4. Build the query
-            $query = UserPost::query()
-                ->where('user_id', $targetUser->id);
-
-            $query = $this->applyBaseQueryOptimizations($query);
-
-            // 5. Apply filtering logic
-            // Frontend sends: ?filter=posts OR ?filter=videos OR ?filter=all
             $filter = $request->input('filter', 'all');
+            $posts = $this->feedService->getUserPosts($targetUser->id, $filter);
 
-            if ($filter === 'posts') {
-                // Filter 1: Only Images and Carousels
-                $query->whereIn('type', ['post', 'carousel']);
-            } elseif ($filter === 'videos') {
-                // Filter 2: Only Videos and Reels
-                $query->whereIn('type', ['video', 'reel']);
-            }
-
-            // 6. Sorting & Pagination
-            $posts = $query->orderBy('created_at', 'DESC')
-                ->simplePaginate(12);
-
-            // 7. Return Resource
             return PostResource::collection($posts)->additional([
                 'meta' => [
                     'user_stats' => [
-                        'post_count' => $targetUser->posts()->active()->count(), // Always show full count for active posts
+                        'post_count' => $targetUser->posts()->active()->count(),
                         'is_private' => $targetUser->account_privacy === 'private',
                         'is_following' => $isFollowing,
                         'is_blocked' => false,
-                        'current_filter' => $filter // Inform frontend about the applied filter
+                        'current_filter' => $filter,
                     ]
                 ]
             ]);
@@ -440,52 +310,16 @@ class UserPostController extends Controller
             return response()->json(['error' => 'An error occurred.'], 500);
         }
     }
-    /**
-     * Show a single post.
-     */
-    public function show(Request $request, UserPost $post, ViewTrackingService $viewService): JsonResponse
-    {
-        try {
-            // $post->increment('view_count');
-            $viewService->track($post, $request);
-            return response()->json(new PostResource($post->load('media', 'user')));
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => 'You are not authorized to view this post.'], 403);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Post not found.'], 404);
-        }
-    }
-
-    /**
-     * Delete a post.
-     */
-    public function destroy(UserPost $post): JsonResponse
-    {
-        try {
-            // $this->authorize('delete', $post);
-            $post->delete();
-            return response()->json(['message' => 'Post deleted successfully']);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => 'Unauthorized action.'], 403);
-        } catch (\Exception $e) {
-            Log::error("Delete Post Error: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to delete post.'], 500);
-        }
-    }
 
     // -------------------------------------------------------------------------
     // INTERACTIONS
     // -------------------------------------------------------------------------
 
-    /**
-     * Toggle Like/Unlike on a post.
-     */
     public function toggleLike($id, LikeService $likeService): JsonResponse
     {
         try {
             $post = UserPost::findOrFail($id);
-            $user = $this->getAuthUser();
-
+            $user = $this->authUser();
             $hasLiked = $post->likes()->where('user_id', $user->id)->exists();
 
             if ($hasLiked) {
@@ -503,7 +337,7 @@ class UserPostController extends Controller
                 'message' => $message,
                 'data' => [
                     'is_liked' => $isLiked,
-                    'likes_count' => $likeService->likeCount($post)
+                    'likes_count' => $likeService->likeCount($post),
                 ]
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -514,10 +348,6 @@ class UserPostController extends Controller
         }
     }
 
-    /**
-     * Report a post.
-     */
-
     public function reportPost(Request $request, $id, ReportService $reportService): JsonResponse
     {
         try {
@@ -527,8 +357,7 @@ class UserPostController extends Controller
             ]);
 
             $post = UserPost::findOrFail($id);
-            $user = $this->getAuthUser();
-
+            $user = $this->authUser();
             $alreadyReported = $post->reports()
                 ->where('user_id', $user->id)
                 ->exists();
@@ -540,18 +369,13 @@ class UserPostController extends Controller
                 ], 409);
             }
 
-            $reportService->report(
-                $post,
-                $user,
-                $request->reason,
-                $request->description
-            );
+            $reportService->report($post, $user, $request->reason, $request->description);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Post reported successfully.',
                 'data' => [
-                    'reports_count' => $reportService->reportCount($post)
+                    'reports_count' => $reportService->reportCount($post),
                 ]
             ]);
         } catch (ValidationException $e) {
@@ -564,147 +388,6 @@ class UserPostController extends Controller
         } catch (\Exception $e) {
             Log::error("Report Error: " . $e->getMessage());
             return response()->json(['error' => 'Something went wrong.'], 400);
-        }
-    }
-
-    /**
-     * Global Trending Feed.
-     * Shows all active posts sorted by trending score and freshness.
-     */
-    public function globalTrendingFeed(Request $request): AnonymousResourceCollection|JsonResponse
-    {
-        try {
-            $seed = $request->input('seed') ?: time();
-
-            $query = UserPost::query();
-
-            $posts = $this->applyBaseQueryOptimizations($query)
-                ->orderByRaw("RAND($seed)")
-                ->simplePaginate(15);
-
-            return PostResource::collection($posts)->additional([
-                'meta' => [
-                    'seed' => (int) $seed,
-                    'message' => 'Pass this seed to the next page to maintain order.'
-                ]
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Global Trending Feed Error: " . $e->getMessage());
-            return response()->json(['error' => 'An error occurred while fetching trending feed.'], 500);
-        }
-    }
-
-    /**
-     * Trending Feed based on User Interests.
-     * Shows posts from users who share interests with the authenticated user.
-     * Fallback to global trending if no results found.
-     */
-    public function trendingInterestsFeed(Request $request): AnonymousResourceCollection|JsonResponse
-    {
-        try {
-            $seed = $request->input('seed') ?: time();
-
-            /** @var \App\Models\User|null $user */
-            $user = Auth::guard('sanctum')->user();
-
-            if (!$user) {
-                return $this->globalTrendingFeed($request);
-            }
-
-            $interestIds = $user->interests()->pluck('interests.id');
-
-            if ($interestIds->isEmpty()) {
-                return $this->globalTrendingFeed($request);
-            }
-
-            // Find other users with these interests
-            $relatedUserIds = DB::table('interest_user')
-                ->whereIn('interest_id', $interestIds)
-                ->where('user_id', '!=', $user->id)
-                ->pluck('user_id')
-                ->unique();
-
-            if ($relatedUserIds->isEmpty()) {
-                return $this->globalTrendingFeed($request);
-            }
-
-            $query = UserPost::query()->whereIn('user_id', $relatedUserIds);
-
-            $posts = $this->applyBaseQueryOptimizations($query)
-                ->orderByRaw("RAND($seed)")
-                ->simplePaginate(15);
-
-            // If the interest-based feed is empty (on the first page), fallback to global
-            if ($posts->isEmpty() && (int) $request->input('page', 1) === 1) {
-                return $this->globalTrendingFeed($request);
-            }
-
-            return PostResource::collection($posts)->additional([
-                'meta' => [
-                    'seed' => (int) $seed,
-                    'message' => 'Pass this seed to the next page to maintain order.'
-                ]
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Interests Trending Feed Error: " . $e->getMessage());
-            // Always fallback to global on error to ensure user sees something
-            return $this->globalTrendingFeed($request);
-        }
-    }
-
-    /**
-     * "For You" Feed.
-     * Interest-based shuffling with seeded randomness to prevent duplicates on pagination.
-     */
-    public function forYouFeed(Request $request): AnonymousResourceCollection|JsonResponse
-    {
-        try {
-            // Seed management: Either use provided seed or generate new one for first page
-            $seed = $request->input('seed') ?: time();
-
-            /** @var \App\Models\User|null $user */
-            $user = Auth::guard('sanctum')->user();
-
-            $query = UserPost::query();
-
-            // Filter by interests if user has them
-            if ($user) {
-                $interestIds = $user->interests()->pluck('interests.id');
-                if ($interestIds->isNotEmpty()) {
-                    $relatedUserIds = DB::table('interest_user')
-                        ->whereIn('interest_id', $interestIds)
-                        ->pluck('user_id')
-                        ->unique();
-
-                    if ($relatedUserIds->isNotEmpty()) {
-                        $query->whereIn('user_id', $relatedUserIds);
-                    }
-                }
-            }
-
-            // Apply optimizations and seeded shuffle
-            $posts = $this->applyBaseQueryOptimizations($query)
-                ->orderByRaw("RAND($seed)")
-                ->simplePaginate(15);
-
-            // Fallback to global shuffle if interest-based feed is empty on Page 1
-            if ($posts->isEmpty() && (int) $request->input('page', 1) === 1) {
-                $query = UserPost::query();
-                $posts = $this->applyBaseQueryOptimizations($query)
-                    ->orderByRaw("RAND($seed)")
-                    ->simplePaginate(15);
-            }
-
-            return PostResource::collection($posts)->additional([
-                'meta' => [
-                    'seed' => (int) $seed,
-                    'message' => 'Pass this seed to the next page to maintain order.'
-                ]
-            ]);
-        } catch (\Exception $e) {
-            Log::error("For You Feed Error: " . $e->getMessage());
-            // Fallback to global trending on error for stability
-            return $this->globalTrendingFeed($request);
         }
     }
 }
