@@ -22,6 +22,7 @@ use App\Http\Controllers\Admin\FollowController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\HistoryController;
 use App\Http\Controllers\Admin\LiveChatGroupController;
+use App\Http\Controllers\Admin\ServerHealthController;
 use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 
 // Public Routes
