@@ -124,9 +124,7 @@ function liveChat() {
                 this.connected = false;
             }
             this.$watch('messages', () => {
-                this.messages = this.messages.filter(
-                    (msg, i, arr) => msg.id && i === arr.findIndex(m => m.id === msg.id)
-                );
+                this.$nextTick(() => this.scrollToBottom());
             });
         },
 
@@ -135,7 +133,7 @@ function liveChat() {
             console.log('[Chat] Fetching messages for group:', this.groupId);
             axios.get('/admin/live-chat-groups/' + this.groupId + '/chat/messages')
                 .then(res => {
-                    this.messages = res.data.messages || [];
+                    this.messages = this.deduplicate(res.data.messages || []);
                     this.loading = false;
                     console.log('[Chat] Messages loaded:', this.messages.length);
                     this.$nextTick(() => this.scrollToBottom());
@@ -214,6 +212,15 @@ function liveChat() {
             if (!el) return;
             const threshold = 50;
             this.autoScroll = (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold);
+        },
+
+        deduplicate(msgs) {
+            const seen = new Set();
+            return msgs.filter(msg => {
+                if (!msg.id || seen.has(msg.id)) return false;
+                seen.add(msg.id);
+                return true;
+            });
         },
 
         formatTime(iso) {
