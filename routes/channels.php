@@ -8,7 +8,10 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 });
 
 Broadcast::channel('chat.{chatId}', function ($user, $chatId) {
-    if ($user->hasRole('admin')) return ['id' => $user->id, 'name' => $user->name];
+    if ($user->is_admin || $user->hasRole('admin')) {
+        return true;
+    }
+
     return UserChatParticipant::where('chat_id', $chatId)->where('user_id', $user->id)->exists();
 });
 
