@@ -15,6 +15,7 @@ class PostFeedService
 {
     public function __construct(
         private PostPreferenceService $preferenceService,
+        private ViewTrackingService $viewService,
     ) {}
 
     private function authUser(): ?User
@@ -70,41 +71,65 @@ class PostFeedService
         ]);
     }
 
+    private function trackFeedViews(Paginator $posts): void
+    {
+        $request = request();
+        foreach ($posts as $post) {
+            $this->viewService->track($post, $request);
+        }
+    }
+
     public function mixedFeed(): Paginator
     {
-        return $this->applyBaseQueryOptimizations(UserPost::query(), $this->authUser())
+        $posts = $this->applyBaseQueryOptimizations(UserPost::query(), $this->authUser())
             ->forYou()
             ->simplePaginate(15);
+
+        $this->trackFeedViews($posts);
+
+        return $posts;
     }
 
     public function postsFeed(): Paginator
     {
-        return $this->applyBaseQueryOptimizations(
+        $posts = $this->applyBaseQueryOptimizations(
             UserPost::query()->whereIn('type', PostType::imageFeedTypes()),
             $this->authUser()
         )
             ->trending()
             ->simplePaginate(15);
+
+        $this->trackFeedViews($posts);
+
+        return $posts;
     }
 
     public function videosFeed(): Paginator
     {
-        return $this->applyBaseQueryOptimizations(
+        $posts = $this->applyBaseQueryOptimizations(
             UserPost::query()->ofType(PostType::Video->value),
             $this->authUser()
         )
             ->trending()
             ->simplePaginate(15);
+
+        $this->trackFeedViews($posts);
+
+        return $posts;
     }
 
     public function reelsFeed(): Paginator
     {
-        return $this->applyBaseQueryOptimizations(
+        $posts = $this->applyBaseQueryOptimizations(
             UserPost::query()->ofType(PostType::Reel->value),
             $this->authUser()
         )
             ->trending()
             ->simplePaginate(15);
+
+        $this->trackFeedViews($posts);
+
+        return $posts;
     }
 
     public function getRelatedVideos(string $id): Collection
@@ -166,15 +191,23 @@ class PostFeedService
             $query->whereIn('type', PostType::userVideoFilterTypes());
         }
 
-        return $query->orderBy('created_at', 'DESC')
+        $posts = $query->orderBy('created_at', 'DESC')
             ->simplePaginate(12);
+
+        $this->trackFeedViews($posts);
+
+        return $posts;
     }
 
     public function globalTrendingFeed(mixed $seed): Paginator
     {
-        return $this->applyBaseQueryOptimizations(UserPost::query(), $this->authUser())
+        $posts = $this->applyBaseQueryOptimizations(UserPost::query(), $this->authUser())
             ->orderByRaw("RAND($seed)")
             ->simplePaginate(15);
+
+        $this->trackFeedViews($posts);
+
+        return $posts;
     }
 
     public function trendingInterestsFeed(Request $request): Paginator
@@ -213,6 +246,8 @@ class PostFeedService
             return $this->globalTrendingFeed($seed);
         }
 
+        $this->trackFeedViews($posts);
+
         return $posts;
     }
 
@@ -246,6 +281,8 @@ class PostFeedService
                 ->orderByRaw("RAND($seed)")
                 ->simplePaginate(15);
         }
+
+        $this->trackFeedViews($posts);
 
         return $posts;
     }
