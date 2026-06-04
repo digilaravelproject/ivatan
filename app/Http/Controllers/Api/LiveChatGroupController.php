@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\LiveChatGroupResource;
 use App\Models\LiveChatGroup;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -64,20 +65,13 @@ class LiveChatGroupController extends Controller
             return $this->error('You are not a member of this group.', 403);
         }
 
-        $liveChatGroup->load(['creator', 'chat.participants.user']);
+        $liveChatGroup->load([
+            'creator' => fn ($q) => $q->select(['id', 'name']),
+            'chat'    => fn ($q) => $q->select(['id', 'uuid', 'name', 'type', 'chat_mode', 'live_chat_group_id']),
+        ]);
 
         return $this->success([
-            'group' => [
-                'id' => $liveChatGroup->id,
-                'name' => $liveChatGroup->name,
-                'slug' => $liveChatGroup->slug,
-                'description' => $liveChatGroup->description,
-                'chat_mode' => $liveChatGroup->chat_mode,
-                'is_active' => $liveChatGroup->is_active,
-                'chat_id' => $liveChatGroup->chat?->id,
-                'created_by' => $liveChatGroup->creator?->name,
-                'created_at' => $liveChatGroup->created_at,
-            ],
+            'group' => new LiveChatGroupResource($liveChatGroup),
         ]);
     }
 }
