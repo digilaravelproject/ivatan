@@ -162,6 +162,11 @@ class UserService
             return false;
         }
 
+        if ($user->trashed()) {
+            Log::warning("Login blocked — account soft-deleted for identifier: {$identifier}");
+            return false;
+        }
+
         $user->last_login_at = now();
         $user->save();
 
@@ -169,6 +174,53 @@ class UserService
         $user->load('interests.category');
 
         return compact('user', 'token');
+    }
+
+    /**
+     * Request Account Deletion
+     */
+    public function requestDeletion(User $user): void
+    {
+        DB::beginTransaction();
+        try {
+            $user->tokens()->delete();
+
+            $user->delete();
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("Account deletion failed for user {$user->id}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Request Account Restore
+     */
+    public function requestRestore(string $email, string $password): User
+    {
+        $user = User::withTrashed()->where('email', $email)->first();
+
+        if (!$user) {
+            throw new \Exception('No account found with this email address.');
+        }
+
+        if (!Hash::check($password, $user->password)) {
+            throw new \Exception('Invalid credentials.');
+        }
+
+        if (!$user->trashed()) {
+            throw new \Exception('Your account is already active.');
+        }
+
+        if ($user->deleted_at->lt(now()->subDays(30))) {
+            throw new \Exception('The 30-day restoration period has passed. Your account has been permanently deleted.');
+        }
+
+        $user->restore();
+
+        return $user;
     }
 
     public function isUsernameAvailable(string $username): bool

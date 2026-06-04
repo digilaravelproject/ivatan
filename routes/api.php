@@ -121,6 +121,13 @@ Route::prefix('v1')->group(function () {
 
         Route::delete('/auth/logout', [UserController::class, 'logout']);
         Route::post('/auth/update', [UserController::class, 'update']);
+
+        // ================================
+        // Account Deletion & Restore
+        // ================================
+        Route::post('/auth/delete-account', [UserController::class, 'requestDeletion']);
+        Route::post('/auth/restore-account', [UserController::class, 'requestRestore']);
+
         // Fetch User by Username
         Route::get('users/{username}', [UserController::class, 'show']);
 

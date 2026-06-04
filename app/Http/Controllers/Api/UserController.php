@@ -119,6 +119,37 @@ class UserController extends Controller
             return $this->error($e->getMessage());
         }
     }
+    public function requestDeletion(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $this->userService->requestDeletion($user);
+            return $this->success([], 'Your account has been scheduled for deletion. It will be permanently deleted after 30 days. You can contact support to restore it within this window.');
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function requestRestore(Request $request)
+    {
+        try {
+            $request->validate([
+                'email'    => 'required|email',
+                'password' => 'required|string',
+            ]);
+
+            $user = $this->userService->requestRestore($request->email, $request->password);
+
+            return $this->success([
+                'user' => new UserResource($user),
+            ], 'Your account has been restored. Please log in to continue.');
+        } catch (\Exception $e) {
+            \Log::error($e);
+            return $this->error($e->getMessage());
+        }
+    }
+
     // Add Show User by Username
     public function show($username)
     {

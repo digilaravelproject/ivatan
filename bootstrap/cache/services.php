@@ -46,7 +46,8 @@
     42 => 'Spatie\\Permission\\PermissionServiceProvider',
     43 => 'App\\Providers\\AppServiceProvider',
     44 => 'App\\Providers\\AuthServiceProvider',
-    45 => 'App\\Providers\\TelescopeServiceProvider',
+    45 => 'App\\Providers\\EventServiceProvider',
+    46 => 'App\\Providers\\TelescopeServiceProvider',
   ),
   'eager' => 
   array (
@@ -77,7 +78,8 @@
     24 => 'Spatie\\Permission\\PermissionServiceProvider',
     25 => 'App\\Providers\\AppServiceProvider',
     26 => 'App\\Providers\\AuthServiceProvider',
-    27 => 'App\\Providers\\TelescopeServiceProvider',
+    27 => 'App\\Providers\\EventServiceProvider',
+    28 => 'App\\Providers\\TelescopeServiceProvider',
   ),
   'deferred' => 
   array (
