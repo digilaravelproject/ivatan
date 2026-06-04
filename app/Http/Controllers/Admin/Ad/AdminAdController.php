@@ -5,14 +5,24 @@ namespace App\Http\Controllers\Admin\Ad;
 use App\Http\Controllers\Controller;
 use App\Models\Ad;
 use App\Models\AdPayment;
+use App\Models\User;
 use App\Services\AdPaymentService;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 
 class AdminAdController extends Controller
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function index()
     {
         $ads = Ad::with('package', 'user')->latest()->paginate(20);
@@ -66,14 +76,20 @@ class AdminAdController extends Controller
 
             DB::commit();
 
+            try {
+                $creator = User::find($ad->user_id);
+                if ($creator) {
+                    $this->notificationService->sendToUser($creator, 'content_approved', [
+                        'title'       => 'Ad Approved',
+                        'message'     => 'Your advertisement has been approved. Please complete the payment to activate it.',
+                        'ad_id'       => $ad->id,
+                        'action_url'  => null,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Ad approval notification failed', ['error' => $e->getMessage()]);
+            }
 
-            // return response()->json([
-            //     'success' => true,
-            //     'message' => 'Ad approved and payment order created',
-            //     'order' => $order,
-            //     'payment' => $payment,
-            //     'ad' => $ad,
-            // ]);
             return redirect()
                 ->route('admin.ads.pending')
                 ->with('success', 'Ad approved and payment order created.');
@@ -89,7 +105,21 @@ class AdminAdController extends Controller
     {
         $ad->status = 'rejected';
         $ad->save();
-        // return response()->json(['success' => true, 'message' => 'Ad rejected']);
+
+        try {
+            $creator = User::find($ad->user_id);
+            if ($creator) {
+                $this->notificationService->sendToUser($creator, 'content_rejected', [
+                    'title'       => 'Ad Rejected',
+                    'message'     => 'Your advertisement has been rejected by the admin.',
+                    'ad_id'       => $ad->id,
+                    'action_url'  => null,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Ad rejection notification failed', ['error' => $e->getMessage()]);
+        }
+
         return redirect()
             ->route('admin.ads.pending')
             ->with('success', 'Ad rejected.');

@@ -45,9 +45,7 @@ class GenericNotification extends Notification implements ShouldQueue
      * @return $this
      */
     public function viaOverride(array $channels): static
-    { \Log::info('Notification channels:', [
-            'channels' => $this->channelOverride ?? ['database', 'broadcast']
-        ]);
+    {
         $this->channelOverride = $channels;
         return $this;
     }
@@ -64,10 +62,6 @@ class GenericNotification extends Notification implements ShouldQueue
     // }
     public function via(object $notifiable): array
     {
-        \Log::info('Notification channels:', [
-            'channels' => $this->channelOverride ?? ['database', 'broadcast']
-        ]);
-
         return $this->channelOverride ?? ['database', 'broadcast'];
     }
 
@@ -97,10 +91,6 @@ class GenericNotification extends Notification implements ShouldQueue
      */
     public function toArray(object $notifiable): array
     {
-         \Log::info("Saving notification to database", [
-        'category' => $this->category,
-        'payload' => $this->payload,
-    ]);
         return [
             'category' => $this->category,
             'payload' => $this->payload,

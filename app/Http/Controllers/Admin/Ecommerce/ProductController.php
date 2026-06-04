@@ -4,10 +4,19 @@ namespace App\Http\Controllers\Admin\Ecommerce;
 
 use App\Http\Controllers\Controller;
 use App\Models\Ecommerce\UserProduct;
+use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
 
     /**
      * Show list of products with optional status filter and search.
@@ -49,17 +58,27 @@ class ProductController extends Controller
     public function approve(UserProduct $product, Request $request)
     {
         $product->status = 'approved';
-        $product->admin_note = $product->admin_note ?? null; // keep existing note if any
+        $product->admin_note = $product->admin_note ?? null;
         $product->save();
 
-        // optional: dispatch notification job to seller
+        try {
+            $seller = User::find($product->seller_id);
+            if ($seller) {
+                $this->notificationService->sendToUser($seller, 'content_approved', [
+                    'title'       => 'Product Approved',
+                    'message'     => "Your product \"{$product->title}\" has been approved and is now live.",
+                    'target_type' => 'product',
+                    'target_id'   => $product->id,
+                    'action_url'  => null,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Product approval notification failed', ['error' => $e->getMessage()]);
+        }
 
         return redirect()->back()->with('success', 'Product approved successfully.');
     }
 
-    /**
-     * Reject product with admin note
-     */
     public function reject(UserProduct $product, Request $request)
     {
         $request->validate([
@@ -70,7 +89,21 @@ class ProductController extends Controller
         $product->admin_note = $request->admin_note;
         $product->save();
 
-        // optional: notify seller about rejection and note
+        try {
+            $seller = User::find($product->seller_id);
+            if ($seller) {
+                $this->notificationService->sendToUser($seller, 'content_rejected', [
+                    'title'       => 'Product Rejected',
+                    'message'     => "Your product \"{$product->title}\" has been rejected.",
+                    'reason'      => $request->admin_note,
+                    'target_type' => 'product',
+                    'target_id'   => $product->id,
+                    'action_url'  => null,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Product rejection notification failed', ['error' => $e->getMessage()]);
+        }
 
         return redirect()->back()->with('success', 'Product rejected and seller notified.');
     }

@@ -27,10 +27,7 @@ class UpdateUnreadNotificationCount implements ShouldQueue
 
         $notifiable = $event->notifiable;
 
-        \Log::info('Notifiable class: ' . get_class($notifiable));
-
         $hasMethod = method_exists($notifiable, 'routeNotificationForDatabase');
-        \Log::info('Implements Notifiable?', ['result' => $hasMethod]);
 
         if (! $hasMethod) {
             return;
@@ -42,11 +39,6 @@ class UpdateUnreadNotificationCount implements ShouldQueue
         }
 
         $userId = $notifiable->getKey();
-
-        \Log::info('Saving notification to database', [
-            'category' => $event->notification->category ?? null,
-            'payload' => $event->notification->payload ?? [],
-        ]);
 
         DB::transaction(function () use ($userId) {
             $updated = DB::table('notification_unread_counts')

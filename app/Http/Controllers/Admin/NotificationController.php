@@ -167,22 +167,25 @@ class NotificationController extends Controller
         ]);
 
         try {
-            $users = User::where('is_blocked', 0)->get();
+            $total = 0;
 
-            foreach ($users as $user) {
-                try {
-                    $this->notificationService->sendToUser($user, $request->category, [
-                        'title'      => $request->title,
-                        'message'    => $request->message,
-                        'action_url' => $request->action_url,
-                    ]);
-                } catch (\Throwable $e) {
-                    Log::error("Broadcast notification failed for user {$user->id}: " . $e->getMessage());
+            User::where('is_blocked', 0)->chunk(100, function ($users) use ($request, &$total) {
+                foreach ($users as $user) {
+                    try {
+                        $this->notificationService->sendToUser($user, $request->category, [
+                            'title'      => $request->title,
+                            'message'    => $request->message,
+                            'action_url' => $request->action_url,
+                        ]);
+                        $total++;
+                    } catch (\Throwable $e) {
+                        Log::error("Broadcast notification failed for user {$user->id}: " . $e->getMessage());
+                    }
                 }
-            }
+            });
 
             return redirect()->route('admin.notifications.index')
-                ->with('success', "Broadcast sent to {$users->count()} users.");
+                ->with('success', "Broadcast sent to {$total} users.");
         } catch (\Exception $e) {
             Log::error('Admin broadcast notification failed: ' . $e->getMessage());
             return back()->with('error', 'Failed to send broadcast.')->withInput();

@@ -67,6 +67,21 @@ return [
             'channels' => ['database', 'broadcast'],
             'push'     => true,
         ],
+        'enquiry_update' => [
+            'title'    => 'Enquiry Update',
+            'channels' => ['database', 'broadcast'],
+            'push'     => true,
+        ],
+        'content_approved' => [
+            'title'    => 'Content Approved',
+            'channels' => ['database', 'broadcast'],
+            'push'     => true,
+        ],
+        'content_rejected' => [
+            'title'    => 'Content Rejected',
+            'channels' => ['database', 'broadcast'],
+            'push'     => true,
+        ],
     ],
 
     'default_channels' => ['database', 'broadcast'],
