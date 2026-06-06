@@ -1,7 +1,7 @@
 # Notification System — API Documentation for Flutter
 
 > **Version**: 1.0  
-> **Last Updated**: 2026-06-04  
+> **Last Updated**: 2026-06-06  
 > **Stack**: Laravel 12 + Reverb (WebSocket) + Firebase Cloud Messaging (Push)
 
 ---
@@ -107,6 +107,53 @@
 
 ### API Response Shape (List/Index)
 
+The `index()` endpoint returns a paginated response with the following structure:
+
+```json
+{
+  "success": true,
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "type": "App\\Notifications\\GenericNotification",
+        "data": {
+          "category": "like",
+          "payload": {
+            "title": "New Like",
+            "message": "John liked your post",
+            "actor_id": 5,
+            "actor_name": "John",
+            "actor_avatar": "https://example.com/avatar.jpg",
+            "target_type": "App\\Models\\UserPost",
+            "target_id": 42,
+            "action_url": null
+          },
+          "sent_at": "2026-06-04T10:30:00.000000Z"
+        },
+        "read_at": null,
+        "created_at": "2026-06-04T10:30:00.000000Z"
+      }
+    ],
+    "first_page_url": "https://your-domain.com/api/v1/notifications?page=1",
+    "from": 1,
+    "last_page": 5,
+    "per_page": 20,
+    "to": 20,
+    "total": 100
+  }
+}
+```
+
+> **Note**: The `data` field in each notification item contains the raw `toArray()` output from `GenericNotification`:
+> - `category` — notification category (e.g., `like`, `comment`, `follow`)
+> - `payload` — custom payload passed when sending the notification
+> - `sent_at` — ISO timestamp when notification was sent
+> - The `type`, `read_at`, `created_at` fields are from the base `notifications` table columns
+
+### API Response Shape (List/Index)
+
 ```json
 {
   "success": true,
@@ -148,7 +195,7 @@
 
 ## 3. API Endpoints
 
-All notification endpoints require **Bearer token authentication** (Sanctum).
+All notification endpoints require **Bearer token authentication** (Sanctum) and are prefixed with `/api/v1`.
 
 **Headers:**
 ```
@@ -156,12 +203,14 @@ Authorization: Bearer <sanctum_token>
 Accept: application/json
 ```
 
+**Base URL:** `https://your-domain.com/api/v1`
+
 ---
 
 ### 3.1 List Notifications
 
 ```
-GET /api/notifications
+GET /api/v1/notifications
 ```
 
 **Query Parameters:**
@@ -200,7 +249,11 @@ GET /api/notifications
         "created_at": "2026-06-04T10:30:00.000000Z"
       }
     ],
+    "first_page_url": "https://your-domain.com/api/v1/notifications?page=1",
+    "from": 1,
+    "last_page": 5,
     "per_page": 20,
+    "to": 20,
     "total": 100
   }
 }
@@ -209,7 +262,7 @@ GET /api/notifications
 **Flutter Usage:**
 ```dart
 final response = await http.get(
-  Uri.parse('$baseUrl/api/notifications?only=unread&per_page=20'),
+  Uri.parse('$baseUrl/api/v1/notifications?only=unread&per_page=20'),
   headers: {'Authorization': 'Bearer $token'},
 );
 final data = jsonDecode(response.body);
@@ -220,7 +273,7 @@ final data = jsonDecode(response.body);
 ### 3.2 Unread Count
 
 ```
-GET /api/notifications/unread-count
+GET /api/v1/notifications/unread-count
 ```
 
 **Response `200 OK`:**
@@ -236,11 +289,14 @@ GET /api/notifications/unread-count
 ```dart
 // Use this to show a badge count on the notification icon
 final response = await http.get(
-  Uri.parse('$baseUrl/api/notifications/unread-count'),
+  Uri.parse('$baseUrl/api/v1/notifications/unread-count'),
   headers: {'Authorization': 'Bearer $token'},
 );
-final count = jsonDecode(response.body)['unread'];
-// badgeIcon.show(count);
+final body = jsonDecode(response.body);
+if (body['success'] == true) {
+  final count = body['unread'] as int;
+  // badgeIcon.show(count);
+}
 ```
 
 ---
@@ -248,7 +304,7 @@ final count = jsonDecode(response.body)['unread'];
 ### 3.3 Mark as Read
 
 ```
-POST /api/notifications/mark-read
+POST /api/v1/notifications/mark-read
 Content-Type: application/json
 ```
 
@@ -268,24 +324,35 @@ Content-Type: application/json
 }
 ```
 
-**Error Response `404`:**
+**Error Response (Notification Not Found):**
+Returns a **500 Internal Server Error** (throws `ModelNotFoundException`) since the controller uses `throw new ModelNotFoundException('Notification not found.')` which is not caught locally.
 
 ```json
 {
+  "success": false,
   "message": "Notification not found."
 }
 ```
 
+> **Note**: The `mark-read` endpoint does not return a 404. It throws an exception that results in a 500 response. Consider catching this on the Flutter side or the backend should be updated to return 404.
+
 **Flutter Usage:**
 ```dart
 final response = await http.post(
-  Uri.parse('$baseUrl/api/notifications/mark-read'),
+  Uri.parse('$baseUrl/api/v1/notifications/mark-read'),
   headers: {
     'Authorization': 'Bearer $token',
     'Content-Type': 'application/json',
   },
   body: jsonEncode({'notification_id': notificationId}),
 );
+final body = jsonDecode(response.body);
+if (body['success'] == true) {
+  // Marked read successfully
+} else if (response.statusCode == 500) {
+  // Notification not found (returns 500, not 404)
+  // Handle error
+}
 ```
 
 ---
@@ -293,7 +360,7 @@ final response = await http.post(
 ### 3.4 Mark All as Read
 
 ```
-POST /api/notifications/mark-all-read
+POST /api/v1/notifications/mark-all-read
 ```
 
 **Response `200 OK`:**
@@ -306,10 +373,14 @@ POST /api/notifications/mark-all-read
 
 **Flutter Usage (e.g., on notification screen open):**
 ```dart
-await http.post(
-  Uri.parse('$baseUrl/api/notifications/mark-all-read'),
+final response = await http.post(
+  Uri.parse('$baseUrl/api/v1/notifications/mark-all-read'),
   headers: {'Authorization': 'Bearer $token'},
 );
+final body = jsonDecode(response.body);
+if (body['success'] == true) {
+  // All marked read
+}
 ```
 
 ---
@@ -317,7 +388,7 @@ await http.post(
 ### 3.5 Register Device Token (FCM)
 
 ```
-POST /api/notifications/device-tokens
+POST /api/v1/notifications/device-tokens
 Content-Type: application/json
 ```
 
@@ -353,8 +424,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 final fcm = FirebaseMessaging.instance;
 final fcmToken = await fcm.getToken();
 
-await http.post(
-  Uri.parse('$baseUrl/api/notifications/device-tokens'),
+final response = await http.post(
+  Uri.parse('$baseUrl/api/v1/notifications/device-tokens'),
   headers: {
     'Authorization': 'Bearer $token',
     'Content-Type': 'application/json',
@@ -364,6 +435,10 @@ await http.post(
     'device': Platform.isAndroid ? 'android' : 'ios',
   }),
 );
+final body = jsonDecode(response.body);
+if (body['success'] == true) {
+  // Token registered
+}
 
 // Listen for token refresh
 fcm.onTokenRefresh.listen((newToken) {
@@ -376,7 +451,7 @@ fcm.onTokenRefresh.listen((newToken) {
 ### 3.6 Delete Device Token
 
 ```
-DELETE /api/notifications/device-tokens
+DELETE /api/v1/notifications/device-tokens
 Content-Type: application/json
 ```
 
@@ -404,14 +479,18 @@ Call this on user logout to stop receiving push notifications.
 final fcm = FirebaseMessaging.instance;
 final fcmToken = await fcm.getToken();
 
-await http.delete(
-  Uri.parse('$baseUrl/api/notifications/device-tokens'),
+final response = await http.delete(
+  Uri.parse('$baseUrl/api/v1/notifications/device-tokens'),
   headers: {
     'Authorization': 'Bearer $token',
     'Content-Type': 'application/json',
   },
   body: jsonEncode({'token': fcmToken}),
 );
+final body = jsonDecode(response.body);
+if (body['success'] == true) {
+  // Token removed
+}
 ```
 
 ---
@@ -419,7 +498,7 @@ await http.delete(
 ### 3.7 Send Test Notification (Debug)
 
 ```
-POST /api/notifications/send-test
+POST /api/v1/notifications/send-test
 Content-Type: application/json
 ```
 
@@ -458,12 +537,11 @@ When a notification is sent, it broadcasts on a **private channel**:
 
 **Event:** `Illuminate\Notifications\Events\BroadcastNotificationCreated`
 
-**Payload:**
+**Payload** (from `GenericNotification::toBroadcast()`):
 
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "type": "App\\Notifications\\GenericNotification",
   "category": "like",
   "payload": {
     "title": "New Like",
@@ -479,6 +557,8 @@ When a notification is sent, it broadcasts on a **private channel**:
   "sent_at": "2026-06-04T10:30:00.000000Z"
 }
 ```
+
+> **Note**: Unlike the database record, the broadcast payload does **NOT** include `type` (the FQCN). It uses a generated UUID for `id` and includes `category`, `payload`, `notifiable_id`, and `sent_at`.
 
 **Flutter Setup with Laravel Echo:**
 
@@ -641,7 +721,7 @@ class NotificationService {
   
   static Future<void> _sendTokenToServer(String fcmToken, String apiToken) async {
     await http.post(
-      Uri.parse('$baseUrl/api/notifications/device-tokens'),
+      Uri.parse('$baseUrl/api/v1/notifications/device-tokens'),
       headers: {
         'Authorization': 'Bearer $apiToken',
         'Content-Type': 'application/json',
@@ -658,7 +738,7 @@ class NotificationService {
     final token = await fcm.getToken();
     if (token != null) {
       await http.delete(
-        Uri.parse('$baseUrl/api/notifications/device-tokens'),
+        Uri.parse('$baseUrl/api/v1/notifications/device-tokens'),
         headers: {
           'Authorization': 'Bearer $apiToken',
           'Content-Type': 'application/json',
@@ -766,39 +846,47 @@ The `category` field in the data payload is the key to determining what screen t
 
 ## 6. Notification Categories
 
-All notification categories and the activities that trigger them:
+All notification categories defined in `config/notifications.php`:
 
-| Category | Triggered By | Payload Fields |
-|----------|-------------|----------------|
-| `like` | Someone likes your post/reel | `title`, `message`, `actor_id`, `actor_name`, `actor_avatar`, `target_type`, `target_id` |
-| `comment` | Someone comments on your post (or replies to your comment) | `title`, `message`, `actor_id`, `actor_name`, `actor_avatar`, `body`, `target_type`, `target_id` |
-| `follow` | Someone follows you | `title`, `message`, `actor_id`, `actor_name`, `actor_avatar` |
-| `new_order` | Customer places an order (sent to seller) | `title`, `message`, `order_id`, `order_uuid`, `amount`, `buyer_name`, `buyer_id` |
-| `payment_success` | Payment completed successfully | Sent via `ProcessOrderPayment` job — includes order/payment details |
-| `order_status` | Seller updates order status (sent to buyer) | Order and status details |
-| `order_cancelled` | Order is cancelled | Cancellation details |
-| `chat_message` | New chat message received | `chat_id`, `sender_name`, `content` |
-| `admin_action` | Admin blocks/unblocks/verifies user | `title`, `message`, action details |
-| `content_approved` | Admin approves your product/service/ad | `title`, `message`, `target_type`, `target_id` |
-| `content_rejected` | Admin rejects your product/service/ad | `title`, `message`, `reason`, `target_type`, `target_id` |
-| `post_flagged` | Admin flags/deletes your post | `title`, `message`, `post_id`, `status` |
-| `enquiry_update` | Seller replies to your enquiry | `enquiry_id`, `status`, `message`, `reply` |
-| `welcome` | User registration | `title`, `message` |
-| `broadcast` | Admin broadcast to all users | `title`, `message` |
-| `custom` | Admin sends direct message to user | `title`, `message` |
+| Category | Push Enabled | Default Channels | Description |
+|----------|-------------|------------------|-------------|
+| `like` | ✅ Yes | `database`, `broadcast` | Someone likes your post/reel |
+| `comment` | ✅ Yes | `database`, `broadcast` | Someone comments on your post |
+| `follow` | ✅ Yes | `database`, `broadcast` | Someone follows you |
+| `new_order` | ✅ Yes | `database`, `broadcast` | Customer places an order (to seller) |
+| `payment_success` | ✅ Yes | `database`, `broadcast` | Payment completed successfully |
+| `order_status` | ✅ Yes | `database`, `broadcast` | Seller updates order status |
+| `order_cancelled` | ✅ Yes | `database`, `broadcast` | Order is cancelled |
+| `admin_action` | ✅ Yes | `database`, `broadcast` | Admin blocks/unblocks/verifies user |
+| `chat_message` | ✅ Yes | `database`, `broadcast` | New chat message received |
+| `custom` | ❌ No | `database`, `broadcast` | Admin sends direct message |
+| `broadcast` | ✅ Yes | `database`, `broadcast` | Admin broadcast to all users |
+| `post_flagged` | ✅ Yes | `database`, `broadcast` | Admin flags/deletes your post |
+| `welcome` | ✅ Yes | `database`, `broadcast` | User registration welcome |
+| `enquiry_update` | ✅ Yes | `database`, `broadcast` | Seller replies to your enquiry |
+| `content_approved` | ✅ Yes | `database`, `broadcast` | Admin approves product/service/ad |
+| `content_rejected` | ✅ Yes | `database`, `broadcast` | Admin rejects product/service/ad |
+
+> **Note**: The `push` column indicates if FCM push is enabled for that category (controlled by `config/notifications.php`). Categories with `push: false` will not send FCM push notifications even if the user has registered device tokens.
 
 ---
 
-## 7. Unread Count Caching System
+## 7. Unread Count System (Hybrid Approach)
 
-The system maintains a **cached unread count** in the `notification_unread_counts` table for fast badge display without scanning the full `notifications` table.
+The system uses a **hybrid approach** for unread counts:
 
-### Flow
+### How It Works
 
-1. **On notification sent**: The `UpdateUnreadNotificationCount` listener increments `unread_count` for the recipient user
-2. **On mark-as-read**: The API decrements `unread_count` by 1
-3. **On mark-all-as-read**: The API resets `unread_count` to 0
-4. **On request**: The `unreadCount()` API returns the cached value
+| Operation | Method | Description |
+|-----------|--------|-------------|
+| **Get unread count** | `unreadCount()` | Queries `$user->unreadNotifications()->count()` directly from DB (no cache) |
+| **Mark as read** | `markRead()` | Marks notification read, then **decrements** `notification_unread_counts` cache table |
+| **Mark all read** | `markAllRead()` | Marks all read, then **resets** `notification_unread_counts` to 0 |
+| **On notification sent** | `NotificationService::sendToUser()` | Listener **increments** `notification_unread_counts` cache |
+
+### Why Hybrid?
+- **Read path** (unreadCount): Direct DB query ensures accuracy — no stale cache
+- **Write paths** (mark-read, mark-all-read, send): Update cache table for potential future use or admin dashboards
 
 ### Flutter Badge Strategy
 
@@ -827,6 +915,8 @@ void markAllAsRead() async {
   _updateBadge(0);
 }
 ```
+
+> **Important**: Since `unreadCount()` queries the DB directly, it always returns the correct count. The cache table is a write optimization and should not be relied upon for reads.
 
 ---
 
@@ -910,28 +1000,28 @@ Future<Map<String, dynamic>> _apiCall(Future<http.Response> Function() call) asy
 
 1. [ ] Initialize Firebase: `Firebase.initializeApp()`
 2. [ ] Request notification permissions (iOS)
-3. [ ] Get FCM token and call `POST /api/notifications/device-tokens`
+3. [ ] Get FCM token and call `POST /api/v1/notifications/device-tokens`
 4. [ ] Set up FCM token refresh listener: `firebaseMessaging.onTokenRefresh`
 5. [ ] Set up foreground message handler: `FirebaseMessaging.onMessage`
 6. [ ] Set up background message handler: `FirebaseMessaging.onMessageOpenedApp`
 7. [ ] Connect to Reverb WebSocket via Laravel Echo
 8. [ ] Subscribe to private channel: `echo.private('App.Models.User.$userId')`
 9. [ ] Listen for `.notification` events to update badge in real-time
-10. [ ] Fetch initial unread count: `GET /api/notifications/unread-count`
+10. [ ] Fetch initial unread count: `GET /api/v1/notifications/unread-count`
 
 ### On Logout
 
-1. [ ] Call `DELETE /api/notifications/device-tokens` with current FCM token
+1. [ ] Call `DELETE /api/v1/notifications/device-tokens` with current FCM token
 2. [ ] Disconnect Reverb WebSocket connection
 3. [ ] Clear local notification state
 
 ### Notification Screen
 
-- [ ] Call `GET /api/notifications` with pagination (20 per page)
-- [ ] Show `data[].payload.title` and `data[].payload.message`
-- [ ] Show `data[].created_at` as relative time
-- [ ] Show unread indicator when `data[].read_at` is null
-- [ ] On tap: call `POST /api/notifications/mark-read` and navigate based on `category`
+- [ ] Call `GET /api/v1/notifications` with pagination (20 per page)
+- [ ] Show `data.data[].data.payload.title` and `data.data[].data.payload.message`
+- [ ] Show `data.data[].created_at` as relative time
+- [ ] Show unread indicator when `data.data[].read_at` is null
+- [ ] On tap: call `POST /api/v1/notifications/mark-read` and navigate based on `category`
 - [ ] Pull-to-refresh support
 - [ ] Infinite scroll (pagination)
 
@@ -955,10 +1045,10 @@ Future<Map<String, dynamic>> _apiCall(Future<http.Response> Function() call) asy
 
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
-| `GET` | `/api/notifications` | ✅ Bearer | List notifications (paginated) |
-| `GET` | `/api/notifications/unread-count` | ✅ Bearer | Get unread badge count |
-| `POST` | `/api/notifications/mark-read` | ✅ Bearer | Mark single as read |
-| `POST` | `/api/notifications/mark-all-read` | ✅ Bearer | Mark all as read |
-| `POST` | `/api/notifications/send-test` | ✅ Bearer | Debug: send test notification |
-| `POST` | `/api/notifications/device-tokens` | ✅ Bearer | Register FCM device token |
-| `DELETE` | `/api/notifications/device-tokens` | ✅ Bearer | Remove FCM device token |
+| `GET` | `/api/v1/notifications` | ✅ Bearer | List notifications (paginated) |
+| `GET` | `/api/v1/notifications/unread-count` | ✅ Bearer | Get unread badge count |
+| `POST` | `/api/v1/notifications/mark-read` | ✅ Bearer | Mark single as read |
+| `POST` | `/api/v1/notifications/mark-all-read` | ✅ Bearer | Mark all as read |
+| `POST` | `/api/v1/notifications/send-test` | ✅ Bearer | Debug: send test notification |
+| `POST` | `/api/v1/notifications/device-tokens` | ✅ Bearer | Register FCM device token |
+| `DELETE` | `/api/v1/notifications/device-tokens` | ✅ Bearer | Remove FCM device token |

@@ -574,5 +574,6 @@ Route::prefix('v1')->group(function () {
 // Razorpay Webhook (No auth, signature verified)
 // ================================
 Route::post('webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
+    ->name('webhook.razorpay')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->middleware('throttle:30,1');
