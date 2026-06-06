@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DeviceToken;
 use App\Models\User;
 use Kreait\Firebase\Factory;
+use Kreait\Firebase\ServiceAccount;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Exception\Messaging\InvalidMessage;
 use Kreait\Firebase\Exception\Messaging\NotFound;
@@ -22,8 +23,15 @@ class FcmPushService
         }
 
         try {
-            $factory = (new Factory())
-                ->withServiceAccount(config('firebase.credentials'));
+            $credentialsPath = config('firebase.credentials');
+            
+            if (!file_exists($credentialsPath)) {
+                Log::error('FCM credentials file not found: ' . $credentialsPath);
+                return null;
+            }
+
+            $serviceAccount = ServiceAccount::fromJsonFile($credentialsPath);
+            $factory = (new Factory())->withServiceAccount($serviceAccount);
 
             $this->messaging = $factory->createMessaging();
         } catch (\Throwable $e) {
