@@ -19,7 +19,7 @@ class LiveChatGroupResource extends JsonResource
             'chat_id'     => $this->chat?->id,
             'created_by'  => $this->when($this->relationLoaded('creator') && $this->creator, function () {
                 $creator = $this->creator;
-                $isDeleted = ($creator->trashed ?? false);
+                $isDeleted = $creator->trashed();
                 return $isDeleted ? [
                     'id' => null,
                     'name' => 'Deleted User',

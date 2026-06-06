@@ -359,18 +359,18 @@ class User extends Authenticatable implements HasMedia
 
         static::restoring(function (User $user) {
             // Cascade restore to user's content
-            $user->posts()->onlyTrashed()->each(fn($p) => $p->restore());
-            $user->stories()->onlyTrashed()->each(fn($s) => $s->restore());
-            $user->highlights()->onlyTrashed()->each(fn($h) => $h->restore());
-            $user->ads()->onlyTrashed()->each(fn($a) => $a->restore());
+            $user->posts()->withTrashed()->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
+            $user->stories()->withTrashed()->whereNotNull('deleted_at')->each(fn($s) => $s->restore());
+            $user->highlights()->withTrashed()->whereNotNull('deleted_at')->each(fn($h) => $h->restore());
+            $user->ads()->withTrashed()->whereNotNull('deleted_at')->each(fn($a) => $a->restore());
 
             // Ecommerce items
-            UserProduct::onlyTrashed()->where('seller_id', $user->id)->each(fn($p) => $p->restore());
-            UserService::onlyTrashed()->where('seller_id', $user->id)->each(fn($s) => $s->restore());
+            UserProduct::withTrashed()->whereNotNull('deleted_at')->where('seller_id', $user->id)->each(fn($p) => $p->restore());
+            UserService::withTrashed()->whereNotNull('deleted_at')->where('seller_id', $user->id)->each(fn($s) => $s->restore());
             UserJobPost::where('employer_id', $user->id)->where('status', 'inactive')->update(['status' => 'active']);
 
             // Profiles
-            $user->profiles()->onlyTrashed()->each(fn($p) => $p->restore());
+            $user->profiles()->withTrashed()->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
 
             // Note: Subscriptions remain expired (billing logic)
             // Note: DeviceTokens not restored (re-created on login)

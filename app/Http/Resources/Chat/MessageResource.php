@@ -45,7 +45,7 @@ class MessageResource extends JsonResource
             }),
             'sender' => function () {
                 $sender = $this->sender;
-                if (!$sender || ($sender->trashed ?? false)) {
+                if (!$sender || $sender->trashed()) {
                     return [
                         'id' => null,
                         'name' => 'Deleted User',

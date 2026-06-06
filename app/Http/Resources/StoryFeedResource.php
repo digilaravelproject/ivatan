@@ -9,7 +9,7 @@ class StoryFeedResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $isDeletedUser = ($this->trashed ?? false);
+        $isDeletedUser = $this->trashed();
 
         return [
             'user' => $isDeletedUser ? [

@@ -41,7 +41,7 @@ class CommentResource extends JsonResource
             // Relationships - show "Deleted User" placeholder if user is soft-deleted
             'user' => function () {
                 $user = $this->whenLoaded('user');
-                if (!$user || ($user->trashed ?? false)) {
+                if (!$user || $user->trashed()) {
                     return [
                         'id' => null,
                         'name' => 'Deleted User',

@@ -10,7 +10,7 @@ class ParticipantResource extends JsonResource
     public function toArray(Request $request): array
     {
         $user = $this->whenLoaded('user');
-        $isDeletedUser = $user && ($user->trashed ?? false);
+        $isDeletedUser = $user && $user->trashed();
 
         return [
             'id' => $this->id,

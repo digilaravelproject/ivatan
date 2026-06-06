@@ -19,7 +19,7 @@ class PostResource extends JsonResource
         $author = $this->user;
 
         // Check if author is deleted (soft-deleted)
-        $isDeletedUser = !$author || ($author->trashed ?? false);
+        $isDeletedUser = !$author || ($author && $author->trashed());
 
         // ✅ LOGIC 1: IS MINE
         $isMine = false;

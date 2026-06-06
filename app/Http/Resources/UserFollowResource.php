@@ -26,7 +26,7 @@ class UserFollowResource extends JsonResource
         $isAuthUser = Auth::check() && ((int)Auth::id() === (int)$this->id);
 
 
-        $isDeletedUser = ($this->trashed ?? false);
+        $isDeletedUser = $this->trashed();
 
         if ($isDeletedUser) {
             return [

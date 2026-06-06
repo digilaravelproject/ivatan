@@ -23,7 +23,7 @@ class ChatResource extends JsonResource
             $otherParticipant = $this->participants->firstWhere('user_id', '!=', $user->id);
             if ($otherParticipant && $otherParticipant->user) {
                 $otherUser = $otherParticipant->user;
-                $isDeleted = ($otherUser->trashed ?? false);
+                $isDeleted = $otherUser->trashed();
                 $name = $isDeleted ? 'Deleted User' : $otherUser->name;
                 $avatar = $isDeleted
                     ? 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128'
@@ -54,7 +54,7 @@ class ChatResource extends JsonResource
                 // Return simplified participant list if loaded
                 return $this->participants->map(fn($p) => {
                     $user = $p->user;
-                    $isDeleted = $user && ($user->trashed ?? false);
+                    $isDeleted = $user && $user->trashed();
                     return [
                         'user_id' => $isDeleted ? null : $p->user_id,
                         'name' => $isDeleted ? 'Deleted User' : $user->name,

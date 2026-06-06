@@ -16,7 +16,7 @@ class StoryHighlightResource extends JsonResource
             $coverUrl = $this->getFirstMediaUrl('cover_media');
         }
 
-        $isDeletedUser = ($this->user?->trashed ?? false);
+        $isDeletedUser = $this->user?->trashed();
 
         return [
             'id' => $this->id,

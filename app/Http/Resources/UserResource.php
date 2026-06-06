@@ -16,7 +16,7 @@ class UserResource extends JsonResource
         $user = $this->resource;
 
         // Handle soft-deleted user (trashed) - show "Deleted User" placeholder
-        if ($user->trashed ?? false) {
+        if ($user->trashed()) {
             return [
                 'id' => null,
                 'uuid' => null,
