@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 
@@ -71,6 +72,10 @@ trait ApiResponse
             'file' => $e->getFile(),
             'line' => $e->getLine(),
         ]);
+
+        if ($e instanceof ModelNotFoundException) {
+            return $this->error($fallbackMessage ?: 'Resource not found.', 404);
+        }
 
         return $this->error($fallbackMessage, 500);
     }

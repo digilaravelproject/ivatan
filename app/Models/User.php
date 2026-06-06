@@ -6,10 +6,15 @@ use App\Models\Chat\UserChat;
 use App\Models\Chat\UserChatMessage;
 use App\Models\Chat\UserChatParticipant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\MediaLibrary\HasMedia;
@@ -60,6 +65,7 @@ class User extends Authenticatable implements HasMedia
         'settings',
         'hide_email',
         'hide_phone',
+        'gateway_customer_id',
     ];
 
     protected $appends = ['profile_photo_url'];
@@ -312,6 +318,62 @@ class User extends Authenticatable implements HasMedia
     {
         $this->cachedBlockedIds = null;
         $this->cachedBlockedByIds = null;
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (User $user) {
+            if (empty($user->uuid)) {
+                $user->uuid = (string) Str::uuid();
+            }
+        });
+
+        static::deleting(function (User $user) {
+            if ($user->isForceDeleting()) {
+                return;
+            }
+
+            $user->profiles->each(fn(Profile $profile) => $profile->delete());
+            $user->subscriptions()->whereIn('status', ['active', 'past_due', 'pending'])
+                ->update(['status' => 'expired']);
+        });
+    }
+
+    // --- Profile & Subscription Relationships ---
+
+    public function profiles(): HasMany
+    {
+        return $this->hasMany(Profile::class);
+    }
+
+    public function activeProfile(): HasOne
+    {
+        return $this->hasOne(Profile::class)->where('is_active', true)->where('status', 'active');
+    }
+
+    public function defaultProfile(): HasOne
+    {
+        return $this->hasOne(Profile::class)->where('is_default', true);
+    }
+
+    public function profileSwitchRequests(): HasMany
+    {
+        return $this->hasMany(ProfileSwitchRequest::class);
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(UserSubscription::class);
+    }
+
+    public function activeSubscriptions(): HasMany
+    {
+        return $this->hasMany(UserSubscription::class)
+            ->whereIn('status', ['active', 'past_due'])
+            ->where(function ($q) {
+                $q->whereNull('ends_at')
+                  ->orWhere('ends_at', '>', now());
+            });
     }
 
     // --- Helpers ---

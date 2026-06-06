@@ -24,6 +24,11 @@ use App\Http\Controllers\Admin\HistoryController;
 use App\Http\Controllers\Admin\LiveChatGroupController;
 use App\Http\Controllers\Admin\ServerHealthController;
 use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
+use App\Http\Controllers\Admin\AdminSubscriptionController;
+use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
+use App\Http\Controllers\Admin\AdminInvoiceController;
+use App\Http\Controllers\Admin\AdminProfileApprovalController;
+use App\Http\Controllers\Admin\AdminSettingController;
 
 // Public Routes
 Route::get('/', fn() => view('web.index'))->name('web.index');
@@ -273,6 +278,52 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::get('/{liveChatGroup}/chat', 'chat')->name('chat');
         Route::get('/{liveChatGroup}/chat/messages', 'fetchMessages')->name('chat.messages');
         Route::post('/{liveChatGroup}/chat/messages', 'sendMessage')->name('chat.send');
+    });
+
+    // =====================
+    // Subscription Management (Admin)
+    // =====================
+    Route::prefix('subscriptions')->name('subscriptions.')->controller(AdminSubscriptionController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/user/{user}', 'userSubscriptions')->name('user');
+        Route::get('/{subscription}', 'show')->name('show');
+        Route::post('/{subscription}/cancel', 'cancel')->name('cancel');
+        Route::post('/assign', 'assign')->name('assign');
+    });
+
+    // =====================
+    // Subscription Plans (Admin)
+    // =====================
+    Route::resource('subscription-plans', AdminSubscriptionPlanController::class);
+
+    // =====================
+    // Invoices (Admin)
+    // =====================
+    Route::prefix('invoices')->name('invoices.')->controller(AdminInvoiceController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{invoice}', 'show')->name('show');
+        Route::post('/{invoice}/resend', 'resend')->name('resend');
+    });
+
+    // =====================
+    // Profile Approvals (Admin)
+    // =====================
+    Route::prefix('profile-approval')->name('profile-approval.')->controller(AdminProfileApprovalController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/{request}', 'show')->name('show');
+        Route::post('/{request}/approve', 'approve')->name('approve');
+        Route::post('/{request}/reject', 'reject')->name('reject');
+    });
+
+    // =====================
+    // Settings (Admin)
+    // =====================
+    Route::prefix('settings')->name('settings.')->controller(AdminSettingController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/update-payment', 'updatePayment')->name('update-payment');
+        Route::post('/test-connection', 'testConnection')->name('test-connection');
+        Route::post('/update-subscription', 'updateSubscription')->name('update-subscription');
+        Route::post('/update-general', 'updateGeneral')->name('update-general');
     });
 });
 

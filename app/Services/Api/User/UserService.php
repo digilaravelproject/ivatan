@@ -5,7 +5,11 @@ namespace App\Services\Api\User;
 use App\Models\User;
 use App\Models\Interest;
 use App\Models\Chat\UserChat;
+use App\Models\Profile;
+use App\Models\SubscriptionPlan;
+use App\Models\UserSubscription;
 use App\Services\LiveChatGroupService;
+use App\Services\Profile\ProfileService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +22,14 @@ use Illuminate\Support\Facades\Log;
 class UserService
 {
     protected LiveChatGroupService $liveChatGroupService;
+    protected ProfileService $profileService;
 
-    public function __construct(LiveChatGroupService $liveChatGroupService)
-    {
+    public function __construct(
+        LiveChatGroupService $liveChatGroupService,
+        ProfileService $profileService
+    ) {
         $this->liveChatGroupService = $liveChatGroupService;
+        $this->profileService = $profileService;
     }
 
     /**
@@ -128,6 +136,8 @@ class UserService
                 $user->interests()->attach($interestIds);
             }
 
+            $profile = $this->profileService->createPersonalProfile($user->id);
+
             DB::commit();
 
             try {
@@ -138,6 +148,7 @@ class UserService
 
             $token = $user->createToken('MyApp')->plainTextToken;
             $user->load('interests.category');
+            $user->load('profiles.activeSubscription.plan');
 
             return compact('user', 'token');
         } catch (\Exception $e) {

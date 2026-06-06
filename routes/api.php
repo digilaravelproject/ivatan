@@ -39,6 +39,10 @@ use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\MobileLoginController;
 use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Api\BannerController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\RazorpayWebhookController;
+use App\Http\Controllers\Admin\ProfileApprovalController;
 
 
 
@@ -94,6 +98,13 @@ Route::post('check-username', [UserController::class, 'checkUsernameAvailability
 Route::post('forgot-password/verify', [ForgotPasswordController::class, 'verifyOtp']);
 Route::post('forgot-password/reset', [ForgotPasswordController::class, 'resetPassword']);
 
+// ================================
+// Profile Types & Subscription Plans (Public)
+// ================================
+Route::get('profile-types', [ProfileController::class, 'availableTypes']);
+Route::get('subscription-plans', [SubscriptionController::class, 'plans']);
+Route::get('subscription-plans/{id}', [SubscriptionController::class, 'planDetails']);
+
 
 
 
@@ -123,10 +134,17 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/update', [UserController::class, 'update']);
 
         // ================================
-        // Account Deletion & Restore
+        // Account Deletion
         // ================================
         Route::post('/auth/delete-account', [UserController::class, 'requestDeletion']);
-        Route::post('/auth/restore-account', [UserController::class, 'requestRestore']);
+    });
+
+    // ================================
+    // Account Restore (no auth — user is soft-deleted)
+    // ================================
+    Route::post('/auth/restore-account', [UserController::class, 'requestRestore']);
+
+    Route::middleware('auth:sanctum')->group(function () {
 
         // Fetch User by Username
         Route::get('users/{username}', [UserController::class, 'show']);
@@ -447,6 +465,45 @@ Route::prefix('v1')->group(function () {
 
 
         // ================================
+        // Profile Routes
+        // ================================
+        Route::prefix('profiles')->controller(ProfileController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::get('/config', 'config');
+            Route::get('/active', 'active');
+            Route::get('/{id}', 'show');
+            Route::post('/', 'store')->middleware('throttle:10,1');
+            Route::delete('/{id}', 'destroy');
+
+            // Profile Switch
+            Route::post('/switch', 'switchProfile')->middleware('throttle:5,1');
+
+            // Profile Detail Endpoints
+            Route::get('/{id}/seller-details', 'sellerDetails');
+            Route::put('/{id}/seller-details', 'updateSellerDetails');
+            Route::get('/{id}/employer-details', 'employerDetails');
+            Route::get('/{id}/music-details', 'musicDetails');
+            Route::get('/{id}/creator-details', 'creatorDetails');
+
+            // Profile Subscriptions
+            Route::get('/{id}/subscriptions/active', [SubscriptionController::class, 'active']);
+            Route::get('/{id}/subscriptions/history', [SubscriptionController::class, 'history']);
+            Route::post('/{id}/subscriptions', [SubscriptionController::class, 'purchase'])->middleware('throttle:10,1');
+        });
+
+        // ================================
+        // Profile Switch Requests (User)
+        // ================================
+        Route::get('profile-switch-requests', [ProfileController::class, 'switchRequests']);
+
+        // ================================
+        // Subscription Routes
+        // ================================
+        Route::prefix('subscriptions')->controller(SubscriptionController::class)->group(function () {
+            Route::post('/{id}/cancel', 'cancel')->middleware('throttle:5,1');
+        });
+
+        // ================================
         // Notification Routes
         // ================================
         Route::get('notifications', [NotificationController::class, 'index']);
@@ -499,4 +556,23 @@ Route::prefix('v1')->group(function () {
         });
 
     });
+
+    // ================================
+    // Admin API Routes (auth:sanctum + is_admin)
+    // ================================
+    Route::middleware(['auth:sanctum', 'is_admin'])->prefix('admin')->group(function () {
+        // Profile Switch Approval
+        Route::controller(ProfileApprovalController::class)->prefix('profile-switch-requests')->group(function () {
+            Route::get('/', 'index');
+            Route::get('/{id}', 'show');
+            Route::post('/{id}/approve', 'approve')->middleware('throttle:30,1');
+        });
+    });
 });
+
+// ================================
+// Razorpay Webhook (No auth, signature verified)
+// ================================
+Route::post('webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->middleware('throttle:30,1');

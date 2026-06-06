@@ -13,3 +13,9 @@ Schedule::job(new UpdatePostTrendingScore)->everyThirtyMinutes();
 
 // Auto-restore abandoned carts (30+ mins old pending orders)
 Schedule::command('orders:restore-abandoned')->everyThirtyMinutes();
+
+// Expire past-due subscriptions daily
+Schedule::command('subscriptions:expire')->daily();
+
+// Payment gateway health check (every 5 minutes — logs only, no external alerting)
+Schedule::command('payments:health-check')->everyFiveMinutes()->withoutOverlapping();

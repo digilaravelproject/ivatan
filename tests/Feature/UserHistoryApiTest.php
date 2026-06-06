@@ -1,5 +1,7 @@
 <?php
 
+uses(Illuminate\Foundation\Testing\DatabaseTransactions::class);
+
 use App\Models\Comment;
 use App\Models\Ecommerce\UserOrder;
 use App\Models\Ecommerce\UserOrderItem;
@@ -9,12 +11,20 @@ use App\Models\Like;
 use App\Models\User;
 use App\Models\UserPost;
 use App\Models\View;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
+    // Clean up tables that may have data from other test files
+    View::query()->delete();
+    Like::query()->delete();
+    Comment::query()->delete();
+    UserOrderItem::query()->delete();
+    UserOrder::query()->delete();
+    UserProduct::query()->delete();
+    UserService::query()->delete();
+    UserPost::query()->delete();
+    User::where('email', 'not like', '%.example.com')->delete();
+
     $this->user = User::factory()->create();
     $this->actingAs($this->user, 'sanctum');
 
@@ -70,11 +80,12 @@ test('user can fetch comment history', function () {
 // ─── VIDEO VIEW HISTORY ─────────────────────────────────────────────
 
 test('video views filters reels only', function () {
+    View::query()->delete();
     $reel = UserPost::factory()->create(['user_id' => $this->user->id, 'type' => 'reel']);
     $video = UserPost::factory()->create(['user_id' => $this->user->id, 'type' => 'video']);
 
-    View::create(['user_id' => $this->user->id, 'viewable_type' => UserPost::class, 'viewable_id' => $reel->id]);
-    View::create(['user_id' => $this->user->id, 'viewable_type' => UserPost::class, 'viewable_id' => $video->id]);
+    View::create(['user_id' => $this->user->id, 'viewable_type' => (new UserPost)->getMorphClass(), 'viewable_id' => $reel->id]);
+    View::create(['user_id' => $this->user->id, 'viewable_type' => (new UserPost)->getMorphClass(), 'viewable_id' => $video->id]);
 
     $response = $this->getJson('/api/v1/history/video-views?filter=reels');
 
@@ -83,11 +94,12 @@ test('video views filters reels only', function () {
 });
 
 test('video views filters long video only', function () {
+    View::query()->delete();
     $reel = UserPost::factory()->create(['user_id' => $this->user->id, 'type' => 'reel']);
     $video = UserPost::factory()->create(['user_id' => $this->user->id, 'type' => 'video']);
 
-    View::create(['user_id' => $this->user->id, 'viewable_type' => UserPost::class, 'viewable_id' => $reel->id]);
-    View::create(['user_id' => $this->user->id, 'viewable_type' => UserPost::class, 'viewable_id' => $video->id]);
+    View::create(['user_id' => $this->user->id, 'viewable_type' => (new UserPost)->getMorphClass(), 'viewable_id' => $reel->id]);
+    View::create(['user_id' => $this->user->id, 'viewable_type' => (new UserPost)->getMorphClass(), 'viewable_id' => $video->id]);
 
     $response = $this->getJson('/api/v1/history/video-views?filter=long_video');
 
@@ -96,11 +108,12 @@ test('video views filters long video only', function () {
 });
 
 test('video views defaults to both', function () {
+    View::query()->delete();
     $reel = UserPost::factory()->create(['user_id' => $this->user->id, 'type' => 'reel']);
     $video = UserPost::factory()->create(['user_id' => $this->user->id, 'type' => 'video']);
 
-    View::create(['user_id' => $this->user->id, 'viewable_type' => UserPost::class, 'viewable_id' => $reel->id]);
-    View::create(['user_id' => $this->user->id, 'viewable_type' => UserPost::class, 'viewable_id' => $video->id]);
+    View::create(['user_id' => $this->user->id, 'viewable_type' => (new UserPost)->getMorphClass(), 'viewable_id' => $reel->id]);
+    View::create(['user_id' => $this->user->id, 'viewable_type' => (new UserPost)->getMorphClass(), 'viewable_id' => $video->id]);
 
     $response = $this->getJson('/api/v1/history/video-views');
 

@@ -1,5 +1,7 @@
 <?php
 
+uses(Illuminate\Foundation\Testing\DatabaseTransactions::class);
+
 use App\Models\User;
 
 test('login screen can be rendered', function () {
@@ -9,7 +11,9 @@ test('login screen can be rendered', function () {
 });
 
 test('users can authenticate using the login screen', function () {
+    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'admin']);
     $user = User::factory()->create();
+    $user->assignRole('admin');
 
     $response = $this->post('/login', [
         'email' => $user->email,
@@ -17,7 +21,7 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $response->assertRedirect(route('admin.dashboard.index'));
 });
 
 test('users can not authenticate with invalid password', function () {

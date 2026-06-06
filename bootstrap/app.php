@@ -15,7 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['is_admin' => IsAdmin::class]);
+        $middleware->alias([
+            'is_admin' => IsAdmin::class,
+            'profile.active' => \App\Http\Middleware\EnsureProfileActive::class,
+            'seller.subscription' => \App\Http\Middleware\EnsureSellerSubscription::class,
+        ]);
         //
     })
     ->withSchedule(function (Schedule $schedule): void {

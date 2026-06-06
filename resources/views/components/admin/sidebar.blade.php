@@ -198,6 +198,62 @@
         <span>Banners</span>
     </a>
 
+    <!-- Subscriptions Accordion -->
+    <div x-data="{ open: false }"
+        x-init="open = {{ request()->routeIs('admin.subscriptions.*') || request()->routeIs('admin.subscription-plans.*') || request()->routeIs('admin.invoices.*') ? 'true' : 'false' }}"
+        class="space-y-1">
+        <button @click="open = !open"
+            class="w-full flex items-center justify-between gap-2 py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors duration-300
+        {{ request()->routeIs('admin.subscriptions.*') || request()->routeIs('admin.subscription-plans.*') || request()->routeIs('admin.invoices.*') ? 'bg-gray-700 text-white' : '' }}">
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v1m0 2a3 3 0 00-3 3h6a3 3 0 00-3-3z" />
+                </svg>
+                <span>Subscriptions</span>
+            </div>
+            <svg :class="{ 'rotate-90': open }" class="w-4 h-4 transition-transform transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+        </button>
+        <div x-show="open" x-collapse class="pl-6 space-y-1">
+            <a href="{{ route('admin.subscriptions.index') }}" class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+            {{ request()->routeIs('admin.subscriptions.index') ? 'bg-gray-700 text-white' : 'text-gray-500' }}">
+                All Subscriptions
+            </a>
+            <a href="{{ route('admin.subscription-plans.index') }}" class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+            {{ request()->routeIs('admin.subscription-plans.*') ? 'bg-gray-700 text-white' : 'text-gray-500' }}">
+                Plans
+            </a>
+            <a href="{{ route('admin.invoices.index') }}" class="block py-2 px-4 rounded-lg hover:bg-gray-700 transition
+            {{ request()->routeIs('admin.invoices.*') ? 'bg-gray-700 text-white' : 'text-gray-500' }}">
+                Invoices
+            </a>
+        </div>
+    </div>
+
+    <!-- Profile Approvals -->
+    <a href="{{ route('admin.profile-approval.index') }}"
+        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
+        @if (request()->routeIs('admin.profile-approval.*')) bg-gray-700 text-white @endif
+        transition-colors duration-300">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Profile Approvals</span>
+    </a>
+
+    <!-- Settings -->
+    <a href="{{ route('admin.settings.index') }}"
+        class="flex items-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-700
+        @if (request()->routeIs('admin.settings.*')) bg-gray-700 text-white @endif
+        transition-colors duration-300">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span>Settings</span>
+    </a>
+
     {{-- <div
         x-data="{ open: {{ request()->routeIs('admin.ads.*') || request()->routeIs('admin.ad.ad-packages.*') ? 'true' : 'false' }} }"
         class="space-y-1"> --}}

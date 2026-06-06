@@ -1,5 +1,7 @@
 <?php
 
+uses(Illuminate\Foundation\Testing\DatabaseTransactions::class);
+
 use App\Models\User;
 
 test('profile page is displayed', function () {
@@ -64,7 +66,7 @@ test('user can delete their account', function () {
         ->assertRedirect('/');
 
     $this->assertGuest();
-    $this->assertNull($user->fresh());
+    $this->assertNull(User::find($user->id));
 });
 
 test('correct password must be provided to delete account', function () {
