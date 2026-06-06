@@ -5,6 +5,13 @@ namespace App\Models;
 use App\Models\Chat\UserChat;
 use App\Models\Chat\UserChatMessage;
 use App\Models\Chat\UserChatParticipant;
+use App\Models\Ad;
+use App\Models\Ecommerce\UserProduct;
+use App\Models\Ecommerce\UserService;
+use App\Models\Jobs\UserJobPost;
+use App\Models\UserPost;
+use App\Models\UserStory;
+use App\Models\UserStoryHighlight;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -12,6 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -19,11 +27,6 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
-use App\Models\Ecommerce\UserProduct;
-use App\Models\Ecommerce\UserService;
-use App\Models\Jobs\UserJobPost;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Collection;
 
 
 /**
@@ -359,18 +362,18 @@ class User extends Authenticatable implements HasMedia
 
         static::restoring(function (User $user) {
             // Cascade restore to user's content
-            $user->posts()->withTrashed()->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
-            $user->stories()->withTrashed()->whereNotNull('deleted_at')->each(fn($s) => $s->restore());
-            $user->highlights()->withTrashed()->whereNotNull('deleted_at')->each(fn($h) => $h->restore());
-            $user->ads()->withTrashed()->whereNotNull('deleted_at')->each(fn($a) => $a->restore());
+            UserPost::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
+            UserStory::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($s) => $s->restore());
+            UserStoryHighlight::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($h) => $h->restore());
+            Ad::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($a) => $a->restore());
 
             // Ecommerce items
-            UserProduct::withTrashed()->whereNotNull('deleted_at')->where('seller_id', $user->id)->each(fn($p) => $p->restore());
-            UserService::withTrashed()->whereNotNull('deleted_at')->where('seller_id', $user->id)->each(fn($s) => $s->restore());
+            UserProduct::withTrashed()->where('seller_id', $user->id)->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
+            UserService::withTrashed()->where('seller_id', $user->id)->whereNotNull('deleted_at')->each(fn($s) => $s->restore());
             UserJobPost::where('employer_id', $user->id)->where('status', 'inactive')->update(['status' => 'active']);
 
             // Profiles
-            $user->profiles()->withTrashed()->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
+            Profile::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
 
             // Note: Subscriptions remain expired (billing logic)
             // Note: DeviceTokens not restored (re-created on login)
