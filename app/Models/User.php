@@ -19,6 +19,9 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use App\Models\Ecommerce\UserProduct;
+use App\Models\Ecommerce\UserService;
+use App\Models\Jobs\UserJobPost;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
@@ -212,8 +215,9 @@ class User extends Authenticatable implements HasMedia
             ->withTimestamps();
     }
 
-    public function isFollowing(User $user)
+    public function isFollowing(?User $user): bool
     {
+        if (!$user) return false;
         return $this->following()->where('following_id', $user->id)->exists();
     }
 
@@ -335,9 +339,41 @@ class User extends Authenticatable implements HasMedia
                 return;
             }
 
+            // Cascade soft-delete to user's content
+            $user->posts()->each(fn($p) => $p->delete());
+            $user->stories()->each(fn($s) => $s->delete());
+            $user->highlights()->each(fn($h) => $h->delete());
+            $user->ads()->each(fn($a) => $a->delete());
+            $user->deviceTokens()->each(fn($t) => $t->delete());
+
+            // Ecommerce items
+            UserProduct::where('seller_id', $user->id)->each(fn($p) => $p->delete());
+            UserService::where('seller_id', $user->id)->each(fn($s) => $s->delete());
+            UserJobPost::where('employer_id', $user->id)->update(['status' => 'inactive']);
+
+            // Profiles & subscriptions
             $user->profiles->each(fn(Profile $profile) => $profile->delete());
             $user->subscriptions()->whereIn('status', ['active', 'past_due', 'pending'])
                 ->update(['status' => 'expired']);
+        });
+
+        static::restoring(function (User $user) {
+            // Cascade restore to user's content
+            $user->posts()->onlyTrashed()->each(fn($p) => $p->restore());
+            $user->stories()->onlyTrashed()->each(fn($s) => $s->restore());
+            $user->highlights()->onlyTrashed()->each(fn($h) => $h->restore());
+            $user->ads()->onlyTrashed()->each(fn($a) => $a->restore());
+
+            // Ecommerce items
+            UserProduct::onlyTrashed()->where('seller_id', $user->id)->each(fn($p) => $p->restore());
+            UserService::onlyTrashed()->where('seller_id', $user->id)->each(fn($s) => $s->restore());
+            UserJobPost::where('employer_id', $user->id)->where('status', 'inactive')->update(['status' => 'active']);
+
+            // Profiles
+            $user->profiles()->onlyTrashed()->each(fn($p) => $p->restore());
+
+            // Note: Subscriptions remain expired (billing logic)
+            // Note: DeviceTokens not restored (re-created on login)
         });
     }
 

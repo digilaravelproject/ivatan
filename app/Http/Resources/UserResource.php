@@ -14,6 +14,43 @@ class UserResource extends JsonResource
     public function toArray(Request $request): array
     {
         $user = $this->resource;
+
+        // Handle soft-deleted user (trashed) - show "Deleted User" placeholder
+        if ($user->trashed ?? false) {
+            return [
+                'id' => null,
+                'uuid' => null,
+                'username' => 'deleted_user',
+                'name' => 'Deleted User',
+                'email' => null,
+                'phone' => null,
+                'occupation' => null,
+                'bio' => 'This account has been deleted.',
+                'gender' => null,
+                'date_of_birth' => null,
+                'language_preference' => null,
+                'is_seller' => false,
+                'is_employer' => false,
+                'is_verified' => false,
+                'status' => 'deleted',
+                'reputation_score' => 0,
+                'followers_count' => 0,
+                'following_count' => 0,
+                'posts_count' => 0,
+                'profile_photo_url' => 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128',
+                'is_mine' => false,
+                'is_following' => false,
+                'is_follower' => false,
+                'chat_id' => null,
+                'interests' => [],
+                'profiles' => [],
+                'active_profile' => null,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+                'is_deleted_user' => true,
+            ];
+        }
+
         $currentUser = $request->user('sanctum');
 
         // Logic: Agar ye user ka apna data h toh full dikhao.

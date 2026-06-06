@@ -17,10 +17,18 @@ class LiveChatGroupResource extends JsonResource
             'chat_mode'   => $this->chat_mode,
             'is_active'   => (bool) $this->is_active,
             'chat_id'     => $this->chat?->id,
-            'created_by'  => $this->when($this->relationLoaded('creator') && $this->creator, [
-                'id'   => $this->creator->id,
-                'name' => $this->creator->name,
-            ]),
+            'created_by'  => $this->when($this->relationLoaded('creator') && $this->creator, function () {
+                $creator = $this->creator;
+                $isDeleted = ($creator->trashed ?? false);
+                return $isDeleted ? [
+                    'id' => null,
+                    'name' => 'Deleted User',
+                    'is_deleted_user' => true,
+                ] : [
+                    'id'   => $creator->id,
+                    'name' => $creator->name,
+                ];
+            }),
             'created_at'  => $this->created_at,
         ];
 

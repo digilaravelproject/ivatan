@@ -16,6 +16,8 @@ class StoryHighlightResource extends JsonResource
             $coverUrl = $this->getFirstMediaUrl('cover_media');
         }
 
+        $isDeletedUser = ($this->user?->trashed ?? false);
+
         return [
             'id' => $this->id,
             'title' => $this->title,
@@ -25,6 +27,21 @@ class StoryHighlightResource extends JsonResource
 
             // ✅ New: Cover URL added here
             'cover_media_url' => $coverUrl,
+
+            'user' => $isDeletedUser ? [
+                'id' => null,
+                'username' => 'deleted_user',
+                'name' => 'Deleted User',
+                'avatar' => 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128',
+                'is_verified' => false,
+                'is_deleted_user' => true,
+            ] : [
+                'id' => $this->user?->id,
+                'username' => $this->user?->username,
+                'name' => $this->user?->name,
+                'avatar' => $this->user?->profile_photo_url,
+                'is_verified' => $this->user?->is_verified ?? false,
+            ],
 
             'stories' => StoryResource::collection($this->whenLoaded('stories')),
             'created_at' => $this->created_at,

@@ -43,11 +43,22 @@ class MessageResource extends JsonResource
                     'sender_name' => $this->replyTo->sender->name ?? 'Unknown'
                 ];
             }),
-            'sender' => [
-                'id' => $this->sender_id,
-                'name' => $this->sender->name ?? 'System',
-                'avatar' => $this->sender->profile_photo_url ?? null,
-            ]
+            'sender' => function () {
+                $sender = $this->sender;
+                if (!$sender || ($sender->trashed ?? false)) {
+                    return [
+                        'id' => null,
+                        'name' => 'Deleted User',
+                        'avatar' => 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128',
+                        'is_deleted_user' => true,
+                    ];
+                }
+                return [
+                    'id' => $sender->id,
+                    'name' => $sender->name,
+                    'avatar' => $sender->profile_photo_url ?? null,
+                ];
+            },
         ];
     }
 }

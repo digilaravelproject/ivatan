@@ -11,48 +11,66 @@ class PostResource extends JsonResource
     {
 
         // 1. Logged-in User
-        // FIX: Added DocBlock to help IDE recognize User model
         /** @var \App\Models\User|null $authUser */
         $authUser = Auth::guard('sanctum')->user() ?? Auth::user();
 
-        // Post Author
-        /** @var \App\Models\User $author */
+        // Post Author (may be null if soft-deleted)
+        /** @var \App\Models\User|null $author */
         $author = $this->user;
+
+        // Check if author is deleted (soft-deleted)
+        $isDeletedUser = !$author || ($author->trashed ?? false);
 
         // ✅ LOGIC 1: IS MINE
         $isMine = false;
-        if ($authUser && $author) {
+        if ($authUser && $author && !$isDeletedUser) {
             $isMine = $authUser->id === $author->id;
         }
 
         // ✅ LOGIC: IS BLOCKED (bidirectional check)
         $isBlocked = false;
-        if ($authUser && $author && !$isMine) {
+        if ($authUser && $author && !$isMine && !$isDeletedUser) {
             $isBlocked = $authUser->hasBlockRelationWith($author);
         }
 
         // ✅ LOGIC 2: IS FOLLOWING
         $isFollowing = false;
-        if ($authUser) {
+        if ($authUser && $author && !$isDeletedUser) {
             if ($isMine) {
                 $isFollowing = true;
             } else {
-                // Optimization: Use pre-loaded attribute from Model to avoid N+1 query
                 $isFollowing = (bool)($author->is_followed_by_me ?? $authUser->isFollowing($author));
             }
         }
 
         // ✅ LOGIC 3: INTERESTS STRING
         $interestsString = "";
-
-        // Check if 'user.interests' relationship is loaded
-        if ($author && $author->relationLoaded('interests')) {
+        if ($author && !$isDeletedUser && $author->relationLoaded('interests')) {
             $interestsCollection = $author->getRelation('interests');
-
             $interestsString = collect($interestsCollection)
                 ->pluck('name')
                 ->implode(', ');
         }
+
+        // Author data - show "Deleted User" placeholder if author is soft-deleted
+        $authorData = $isDeletedUser ? [
+            'id' => null,
+            'name' => 'Deleted User',
+            'username' => 'deleted_user',
+            'occupation' => null,
+            'avatar' => 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128',
+            'is_verified' => false,
+            'interests' => '',
+            'is_deleted_user' => true,
+        ] : [
+            'id' => $author->id,
+            'name' => $author->name,
+            'username' => $author->username,
+            'occupation' => $author->occupation,
+            'avatar' => $author->profile_photo_url,
+            'is_verified' => $author->is_verified ?? false,
+            'interests' => $interestsString,
+        ];
 
         return [
             // 1. Post Identity
@@ -67,17 +85,7 @@ class PostResource extends JsonResource
             'is_following' => $isFollowing,
 
             // 2. Author Details
-            'user' => [
-                'id' => $author->id,
-                'name' => $author->name,
-                'username' => $author->username,
-                'occupation' => $author->occupation,
-                'avatar' => $author->profile_photo_url,
-                'is_verified' => $author->is_verified ?? false,
-
-                // Fully optimized interests string
-                'interests' => $interestsString,
-            ],
+            'user' => $authorData,
 
             // 3. Media Collection
             'media' => $this->media->map(function ($m) {

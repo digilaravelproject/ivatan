@@ -38,8 +38,21 @@ class CommentResource extends JsonResource
             'created_at' => $this->created_at->toIso8601String(),
             'created_human' => $this->created_at->diffForHumans(),
 
-            // Relationships
-            'user' => new UserResource($this->whenLoaded('user')),
+            // Relationships - show "Deleted User" placeholder if user is soft-deleted
+            'user' => function () {
+                $user = $this->whenLoaded('user');
+                if (!$user || ($user->trashed ?? false)) {
+                    return [
+                        'id' => null,
+                        'name' => 'Deleted User',
+                        'username' => 'deleted_user',
+                        'profile_photo_url' => 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128',
+                        'is_verified' => false,
+                        'is_deleted_user' => true,
+                    ];
+                }
+                return new UserResource($user);
+            },
 
             // Recursive nesting for replies (Isme bhi automatic is_mine true/false ho jayega)
             'replies' => CommentResource::collection($this->whenLoaded('replies')),

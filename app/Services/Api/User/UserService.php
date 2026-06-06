@@ -8,6 +8,9 @@ use App\Models\Chat\UserChat;
 use App\Models\Profile;
 use App\Models\SubscriptionPlan;
 use App\Models\UserSubscription;
+use App\Models\Ecommerce\UserProduct;
+use App\Models\Ecommerce\UserService as UserServiceModel;
+use App\Models\Jobs\UserJobPost;
 use App\Services\LiveChatGroupService;
 use App\Services\Profile\ProfileService;
 use Illuminate\Support\Facades\Hash;
@@ -233,6 +236,23 @@ class UserService
         }
 
         $user->restore();
+
+        // Cascade restore to user's content
+        $user->posts()->onlyTrashed()->each(fn($p) => $p->restore());
+        $user->stories()->onlyTrashed()->each(fn($s) => $s->restore());
+        $user->highlights()->onlyTrashed()->each(fn($h) => $h->restore());
+        $user->ads()->onlyTrashed()->each(fn($a) => $a->restore());
+
+        // Ecommerce items
+        UserProduct::onlyTrashed()->where('seller_id', $user->id)->each(fn($p) => $p->restore());
+        UserServiceModel::onlyTrashed()->where('seller_id', $user->id)->each(fn($s) => $s->restore());
+        UserJobPost::where('employer_id', $user->id)->where('status', 'inactive')->update(['status' => 'active']);
+
+        // Profiles
+        $user->profiles()->onlyTrashed()->each(fn($p) => $p->restore());
+
+        // Note: Subscriptions are marked expired, not restored automatically
+        // Note: DeviceTokens are permanently deleted (not restored)
 
         return $user;
     }

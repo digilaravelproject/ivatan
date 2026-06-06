@@ -23,9 +23,12 @@ class ChatResource extends JsonResource
             $otherParticipant = $this->participants->firstWhere('user_id', '!=', $user->id);
             if ($otherParticipant && $otherParticipant->user) {
                 $otherUser = $otherParticipant->user;
-                $name = $otherUser->name;
-                $avatar = $otherUser->profile_photo_url;
-                $isOnline = $otherUser->is_online;
+                $isDeleted = ($otherUser->trashed ?? false);
+                $name = $isDeleted ? 'Deleted User' : $otherUser->name;
+                $avatar = $isDeleted
+                    ? 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128'
+                    : $otherUser->profile_photo_url;
+                $isOnline = $isDeleted ? false : $otherUser->is_online;
             }
         }
 
@@ -49,12 +52,19 @@ class ChatResource extends JsonResource
             'participants_count' => $this->participants_count, // Use withCount in query
             'participants' => $this->when($this->relationLoaded('participants'), function () {
                 // Return simplified participant list if loaded
-                return $this->participants->map(fn($p) => [
-                    'user_id' => $p->user_id,
-                    'name' => $p->user->name,
-                    'avatar' => $p->user->profile_photo_url,
-                    'is_admin' => (bool) $p->is_admin
-                ]);
+                return $this->participants->map(fn($p) => {
+                    $user = $p->user;
+                    $isDeleted = $user && ($user->trashed ?? false);
+                    return [
+                        'user_id' => $isDeleted ? null : $p->user_id,
+                        'name' => $isDeleted ? 'Deleted User' : $user->name,
+                        'avatar' => $isDeleted
+                            ? 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128'
+                            : $user->profile_photo_url,
+                        'is_admin' => (bool) $p->is_admin,
+                        'is_deleted_user' => $isDeleted,
+                    ];
+                });
             }),
         ];
     }

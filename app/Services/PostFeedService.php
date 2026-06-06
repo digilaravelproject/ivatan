@@ -28,6 +28,9 @@ class PostFeedService
     {
         $userId = $user?->id;
 
+        // Exclude posts from soft-deleted users
+        $query->whereHas('user');
+
         if ($user) {
             $blockedIds = $user->getAllBlockedIds();
             if (!empty($blockedIds)) {

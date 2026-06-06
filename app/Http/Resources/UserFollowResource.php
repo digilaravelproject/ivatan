@@ -26,6 +26,21 @@ class UserFollowResource extends JsonResource
         $isAuthUser = Auth::check() && ((int)Auth::id() === (int)$this->id);
 
 
+        $isDeletedUser = ($this->trashed ?? false);
+
+        if ($isDeletedUser) {
+            return [
+                'id' => null,
+                'username' => 'deleted_user',
+                'name' => 'Deleted User',
+                'avtar' => 'https://ui-avatars.com/api/?name=Deleted+User&color=fff&background=999&size=128',
+                'is_verified' => false,
+                'is_followed_by_auth_user' => false,
+                'is_auth_user' => false,
+                'is_deleted_user' => true,
+            ];
+        }
+
         return [
             'id' => $this->id,
             'username' => $this->username,
