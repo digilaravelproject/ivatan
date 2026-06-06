@@ -92,7 +92,25 @@ Authorization: Bearer <sanctum_token>
 Accept: application/json
 ```
 
-**Request Body:** None required.
+**Request Body:** (optional)
+
+```json
+{
+  "reason": "Not using this app anymore"
+}
+```
+
+Or with multiple reasons (array):
+
+```json
+{
+  "reason": ["Not using this app anymore", "Privacy concerns", "Creating new account"]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `reason` | `string` \| `string[]` | **no** | Reason(s) for deleting the account. Can be a single string or an array of strings. Stored as JSON. |
 
 **Response `200 OK`:**
 ```json
@@ -114,121 +132,110 @@ Accept: application/json
 > 1. Clear stored token from secure storage
 > 2. Redirect to login screen
 > 3. Show a confirmation snackbar with the 30-day info
+>
+> **Admin panel**: The `deletion_reason` is visible in the admin panel at `/admin/users/trashed` — a "Deletion Reason" column shows all reasons provided by the user.
 
-**Flutter Usage:**
+**Flutter Usage (with reason picker):**
 ```dart
-Future<void> deleteAccount() async {
-  try {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/v1/auth/delete-account'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-    final body = jsonDecode(response.body);
-    if (body['success'] == true) {
-      // Clear local auth state
-      await secureStorage.delete(key: 'auth_token');
-      // Navigate to login
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
+class DeleteAccountScreen extends StatefulWidget {
+  @override
+  _DeleteAccountScreenState createState() => _DeleteAccountScreenState();
+}
+
+class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
+  final List<String> _selectedReasons = [];
+  bool _isLoading = false;
+
+  final List<Map<String, dynamic>> _reasonOptions = [
+    {'key': 'not_using', 'label': 'Not using this app'},
+    {'key': 'privacy', 'label': 'Privacy concerns'},
+    {'key': 'new_account', 'label': 'Creating a new account'},
+    {'key': 'too_many_notifications', 'label': 'Too many notifications'},
+    {'key': 'found_alternative', 'label': 'Found a better alternative'},
+    {'key': 'other', 'label': 'Other reason'},
+  ];
+
+  Future<void> _deleteAccount() async {
+    setState(() => _isLoading = true);
+    try {
+      final Map<String, dynamic> body = {};
+      if (_selectedReasons.isNotEmpty) {
+        body['reason'] = _selectedReasons.length == 1
+            ? _selectedReasons.first
+            : _selectedReasons;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/v1/auth/delete-account'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+        body: body.isEmpty ? null : body,
       );
-      // Show snackbar with message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(body['message'])),
-      );
+      final resBody = jsonDecode(response.body);
+      if (resBody['success'] == true) {
+        await secureStorage.delete(key: 'auth_token');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(resBody['message'])),
+        );
+      }
+    } catch (e) {
+      // Handle network errors
+    } finally {
+      setState(() => _isLoading = false);
     }
-  } catch (e) {
-    // Handle network errors
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Delete Account')),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please tell us why you\'re leaving:',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 16),
+            ..._reasonOptions.map((option) => CheckboxListTile(
+                  title: Text(option['label']),
+                  value: _selectedReasons.contains(option['key']),
+                  onChanged: (checked) {
+                    setState(() {
+                      if (checked == true) {
+                        _selectedReasons.add(option['key']);
+                      } else {
+                        _selectedReasons.remove(option['key']);
+                      }
+                    });
+                  },
+                )),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _deleteAccount,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('Delete My Account'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 ```
 
----
-
-### 3.2 Restore Account Within 30 Days
-
-```
-POST /api/v1/auth/restore-account
-Content-Type: application/json
-```
-
-> **Note**: This endpoint does NOT require authentication (user is deleted and can't have a token). It uses email + password verification instead.
-
-**Headers:**
-```
-Accept: application/json
-```
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "user-password"
-}
-```
-
-| Field | Type | Required | Validation |
-|-------|------|----------|------------|
-| `email` | string | **yes** | Must be a valid email format |
-| `password` | string | **yes** | Must match the stored password |
-
-**Response `200 OK` (account restored):**
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": 1,
-      "name": "John Doe",
-      "email": "user@example.com",
-      "username": "johndoe",
-      "profile_photo_url": "https://..."
-    }
-  },
-  "message": "Your account has been restored. Please log in to continue."
-}
-```
-
-**Error Response `400` (past 30 days):**
-```json
-{
-  "success": false,
-  "message": "The 30-day restoration period has passed. Your account has been permanently deleted."
-}
-```
-
-**Error Response `401` (wrong password):**
-```json
-{
-  "success": false,
-  "message": "Invalid credentials."
-}
-```
-
-**Error Response `404` (no account found):**
-```json
-{
-  "success": false,
-  "message": "No account found with this email address."
-}
-```
-
-**Flutter Usage:**
-
 ```dart
-class RestoreAccountScreen extends StatefulWidget {
-  @override
-  _RestoreAccountScreenState createState() => _RestoreAccountScreenState();
-}
-
-class _RestoreAccountScreenState extends State<RestoreAccountScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
-
   Future<void> _restoreAccount() async {
     setState(() => _isLoading = true);
     try {
@@ -557,8 +564,11 @@ class AuthProvider extends ChangeNotifier {
 | Restore with wrong password | Call restore with wrong password | `500` error "Invalid credentials." |
 | Restore after 30 days | Manually set `deleted_at` to 31 days ago, try restore | `500` error "Restoration period has passed." |
 | Login after restore | Login with restored account | Success, new token issued |
-| Admin view trashed | Admin goes to `/admin/users/trashed` | Sees list of soft-deleted users |
+| Admin view trashed | Admin goes to `/admin/users/trashed` | Sees list of soft-deleted users with deletion reason |
 | Admin restore | Admin restores user from admin panel | User can login again |
+| Delete with reason (string) | Send `reason` as single string | Stored as JSON array in DB, visible in admin panel |
+| Delete with reason (array) | Send `reason` as array of strings | All reasons stored, visible in admin panel |
+| Delete without reason | Send no `reason` field | `deletion_reason` is null, shows "N/A" in admin |
 
 ### Automated Test Coverage
 
@@ -588,6 +598,6 @@ The test suite at `tests/Feature/DeleteAccountFlowTest.php` covers:
 
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
-| `POST` | `/api/v1/auth/delete-account` | ✅ Bearer | Request account deletion |
+| `POST` | `/api/v1/auth/delete-account` | ✅ Bearer | Request account deletion (optional `reason` field) |
 | `POST` | `/api/v1/auth/restore-account` | ❌ None | Restore deleted account (email + password) |
 | `POST` | `/api/auth/login` | ❌ None | Standard login (blocked if deleted) |

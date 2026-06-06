@@ -66,6 +66,7 @@ class User extends Authenticatable implements HasMedia
         'hide_email',
         'hide_phone',
         'gateway_customer_id',
+        'deletion_reason',
     ];
 
     protected $appends = ['profile_photo_url'];
@@ -95,6 +96,7 @@ class User extends Authenticatable implements HasMedia
             'settings' => 'array',
             'hide_email' => 'boolean',
             'hide_phone' => 'boolean',
+            'deletion_reason' => 'array',
             'password' => 'hashed',
         ];
     }

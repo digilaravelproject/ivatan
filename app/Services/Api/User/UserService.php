@@ -190,10 +190,13 @@ class UserService
     /**
      * Request Account Deletion
      */
-    public function requestDeletion(User $user): void
+    public function requestDeletion(User $user, ?array $reason = null): void
     {
         DB::beginTransaction();
         try {
+            $user->deletion_reason = $reason;
+            $user->save();
+
             $user->tokens()->delete();
 
             $user->delete();

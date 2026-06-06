@@ -35,6 +35,63 @@ test('authenticated user can request account deletion', function () {
     expect($this->user->trashed())->toBeTrue();
 });
 
+test('delete account stores single reason as array', function () {
+    Sanctum::actingAs($this->user);
+
+    $response = $this->postJson('/api/v1/auth/delete-account', [
+        'reason' => 'Not using this app',
+    ]);
+
+    $response->assertOk();
+
+    $this->user->refresh();
+    expect($this->user->deletion_reason)->toBe(['Not using this app']);
+});
+
+test('delete account stores multiple reasons as array', function () {
+    Sanctum::actingAs($this->user);
+
+    $response = $this->postJson('/api/v1/auth/delete-account', [
+        'reason' => ['Not using this app', 'Privacy concerns', 'Too many notifications'],
+    ]);
+
+    $response->assertOk();
+
+    $this->user->refresh();
+    expect($this->user->deletion_reason)->toBe([
+        'Not using this app',
+        'Privacy concerns',
+        'Too many notifications',
+    ]);
+});
+
+test('delete account without reason stores null', function () {
+    Sanctum::actingAs($this->user);
+
+    $response = $this->postJson('/api/v1/auth/delete-account');
+
+    $response->assertOk();
+
+    $this->user->refresh();
+    expect($this->user->deletion_reason)->toBeNull();
+});
+
+test('admin can see deletion reason in trashed users', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole('admin');
+
+    Sanctum::actingAs($this->user);
+    $this->postJson('/api/v1/auth/delete-account', [
+        'reason' => ['Privacy concerns', 'Creating new account'],
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('admin.users.trashed'));
+
+    $response->assertOk();
+    $response->assertSee('Privacy concerns');
+    $response->assertSee('Creating new account');
+});
+
 test('deleted user cannot login after account deletion', function () {
     Sanctum::actingAs($this->user);
     $this->postJson('/api/v1/auth/delete-account');

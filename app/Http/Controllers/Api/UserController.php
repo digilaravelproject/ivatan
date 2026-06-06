@@ -122,8 +122,19 @@ class UserController extends Controller
     public function requestDeletion(Request $request)
     {
         try {
+            $request->validate([
+                'reason' => 'nullable',
+            ]);
+
             $user = $request->user();
-            $this->userService->requestDeletion($user);
+
+            $reason = $request->input('reason');
+            if ($reason !== null && !is_array($reason)) {
+                $reason = [$reason];
+            }
+
+            $this->userService->requestDeletion($user, $reason);
+
             return $this->success([], 'Your account has been scheduled for deletion. It will be permanently deleted after 30 days. You can contact support to restore it within this window.');
         } catch (\Exception $e) {
             \Log::error($e);

@@ -30,6 +30,7 @@
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Role</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Joined</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Deletion Reason</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-gray-500">Actions</th>
                     </tr>
                 </thead>
@@ -57,6 +58,13 @@
                                     <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">Inactive</span>
                                 @else
                                     <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">Active</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-700 max-w-xs">
+                                @if($user->deletion_reason)
+                                    {{ is_array($user->deletion_reason) ? implode(', ', $user->deletion_reason) : $user->deletion_reason }}
+                                @else
+                                    <span class="text-gray-400">N/A</span>
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-right space-x-2">
@@ -111,7 +119,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-6 text-center text-gray-500">No users found.</td>
+                            <td colspan="7" class="px-4 py-6 text-center text-gray-500">No users found.</td>
                         </tr>
                     @endforelse
                 </tbody>
