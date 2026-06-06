@@ -52,7 +52,7 @@ class ChatResource extends JsonResource
             'participants_count' => $this->participants_count, // Use withCount in query
             'participants' => $this->when($this->relationLoaded('participants'), function () {
                 // Return simplified participant list if loaded
-                return $this->participants->map(fn($p) => {
+                return $this->participants->map(function ($p) {
                     $user = $p->user;
                     $isDeleted = $user && $user->trashed();
                     return [
