@@ -34,8 +34,8 @@ class GenericNotification extends Notification implements ShouldQueue
         $this->category = $category;
         $this->payload = $payload;
 
-        // You can customize queue/connection here if needed
-        $this->onQueue(config('queue.default'));
+        // Use default queue name (from queue.connections.{connection}.queue), not connection name
+        $this->onQueue(config('queue.connections.database.queue', 'default'));
     }
 
     /**

@@ -17,6 +17,20 @@
         <div class="mb-4 p-3 bg-red-100 text-red-700 rounded">{{ session('error') }}</div>
     @endif
 
+    @if(isset($queueWorkerDown) && $queueWorkerDown)
+        <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div class="flex items-center gap-3">
+                <svg class="w-6 h-6 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div class="flex-1">
+                    <p class="font-medium text-red-800">Queue worker is not running!</p>
+                    <p class="text-sm text-red-600 mt-1">Notifications will not be delivered. Run <code class="px-1 bg-red-100 rounded">php artisan queue:work</code> or check Supervisor status.</p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <form method="GET" class="mb-4 flex gap-3 flex-wrap">
         <input type="text" name="search" placeholder="Search by user name or email..." value="{{ request('search') }}" class="rounded-lg border-gray-300 text-sm flex-1 min-w-[200px]">
         <select name="category" class="rounded-lg border-gray-300 text-sm">

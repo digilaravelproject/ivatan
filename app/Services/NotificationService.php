@@ -38,7 +38,12 @@ class NotificationService
         try {
             Notification::send($notifiable, $notification);
         } catch (\Throwable $e) {
-            \Log::error('Notification send failed', ['error' => $e->getMessage()]);
+            \Log::error('Notification send failed', [
+                'user_id' => $notifiable->id,
+                'category' => $category,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
         }
     }
 
@@ -63,7 +68,11 @@ class NotificationService
                 try {
                     $notifiable->notify($clone);
                 } catch (\Throwable $e) {
-                    \Log::error('Notification send failed', ['error' => $e->getMessage()]);
+                    \Log::error('Notification send failed', [
+                        'user_id' => $notifiable->id,
+                        'category' => $category,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             }
         }

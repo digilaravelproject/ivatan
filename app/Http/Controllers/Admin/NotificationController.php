@@ -70,7 +70,22 @@ class NotificationController extends Controller
 
         $categories = array_keys(config('notifications.categories', []));
 
-        return view('admin.notifications.index', compact('notifications', 'categories'));
+        $queueWorkerDown = $this->isQueueWorkerDown();
+
+        return view('admin.notifications.index', compact('notifications', 'categories', 'queueWorkerDown'));
+    }
+
+    private function isQueueWorkerDown(): bool
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $output = [];
+            exec('tasklist /FI "IMAGENAME eq php.exe" 2>NUL', $output, $exitCode);
+            return count($output) <= 1;
+        }
+
+        $output = [];
+        exec('ps aux | grep "queue:work" | grep -v grep 2>/dev/null', $output, $exitCode);
+        return count($output) === 0;
     }
 
     public function show(string $id)
