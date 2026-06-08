@@ -86,11 +86,11 @@ class UserResource extends JsonResource
                 return InterestResource::collection($this->getRelation('interests'));
             }),
             'profiles' => $this->when($this->relationLoaded('profiles'), function() {
-                return $this->getRelation('profiles')->toArray();
+                return \App\Http\Resources\Profile\ProfileResource::collection($this->getRelation('profiles'));
             }),
             'active_profile' => $this->when($this->relationLoaded('profiles'), function() {
                 $active = $this->getRelation('profiles')->firstWhere('is_active', true);
-                return $active ? $active->toArray() : null;
+                return $active ? new \App\Http\Resources\Profile\ProfileResource($active) : null;
             }),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

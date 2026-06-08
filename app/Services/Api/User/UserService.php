@@ -145,6 +145,21 @@ class UserService
 
             $profile = $this->profileService->createPersonalProfile($user->id);
 
+            $profileType = $data['profile_type'] ?? null;
+            if ($profileType && $profileType !== 'personal') {
+                $mappedType = $profileType === 'ecommerce' ? 'seller' : $profileType;
+                $details = [];
+                if ($mappedType === 'seller' && isset($data['profile_sub_type'])) {
+                    $subType = $data['profile_sub_type'];
+                    $details['seller_type'] = match ($subType) {
+                        'product' => 'products',
+                        'service' => 'services',
+                        default => $subType,
+                    };
+                }
+                $this->profileService->createProfile($user->id, $mappedType, $details);
+            }
+
             DB::commit();
 
             try {

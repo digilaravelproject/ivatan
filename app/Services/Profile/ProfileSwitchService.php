@@ -13,9 +13,9 @@ class ProfileSwitchService
         protected ProfileService $profileService
     ) {}
 
-    public function requestSwitch(int $userId, string $toProfileType, ?string $notes = null): ProfileSwitchRequest
+    public function requestSwitch(int $userId, string $toProfileType, ?string $notes = null, array $details = []): ProfileSwitchRequest
     {
-        return DB::transaction(function () use ($userId, $toProfileType, $notes) {
+        return DB::transaction(function () use ($userId, $toProfileType, $notes, $details) {
             $activeProfile = Profile::where('user_id', $userId)
                 ->where('is_active', true)
                 ->first();
@@ -51,13 +51,16 @@ class ProfileSwitchService
             $targetProfile = $existingProfile;
 
             if (!$targetProfile) {
-                $targetProfile = Profile::create([
-                    'user_id' => $userId,
-                    'type' => $toProfileType,
-                    'status' => 'pending_approval',
-                    'is_active' => false,
-                    'is_default' => false,
-                ]);
+                $targetProfile = $this->profileService->createProfile($userId, $toProfileType, $details);
+            } else {
+                if ($toProfileType === 'seller' && isset($details['seller_type'])) {
+                    $sellerDetails = $targetProfile->sellerDetails;
+                    if ($sellerDetails) {
+                        $sellerDetails->update(['seller_type' => $details['seller_type']]);
+                    } else {
+                        $targetProfile->sellerDetails()->create(['seller_type' => $details['seller_type']]);
+                    }
+                }
             }
 
             $pendingRequest = ProfileSwitchRequest::where('user_id', $userId)

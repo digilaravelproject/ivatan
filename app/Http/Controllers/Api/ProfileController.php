@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Profile\CreateProfileRequest;
 use App\Http\Requests\Api\Profile\SwitchProfileRequest;
 use App\Http\Requests\Api\Profile\UpdateSellerDetailsRequest;
 use App\Http\Resources\Profile\ProfileConfigResource;
+use App\Http\Resources\Profile\ProfileResource;
 use App\Services\Profile\ProfileConfigService;
 use App\Services\Profile\ProfileService;
 use App\Services\Profile\ProfileSwitchService;
@@ -38,8 +39,8 @@ class ProfileController extends Controller
                 ->get();
 
             return $this->success([
-                'profiles' => $profiles,
-                'active_profile' => $profiles->firstWhere('is_active', true),
+                'profiles' => ProfileResource::collection($profiles),
+                'active_profile' => ($active = $profiles->firstWhere('is_active', true)) ? new ProfileResource($active) : null,
             ], 'Profiles retrieved successfully.');
         } catch (Throwable $e) {
             Log::error('Failed to fetch profiles', ['error' => $e->getMessage()]);
@@ -54,7 +55,7 @@ class ProfileController extends Controller
                 ->with(['sellerDetails', 'employerDetails', 'musicDetails', 'creatorDetails', 'activeSubscription.plan', 'subscriptions.plan'])
                 ->findOrFail($id);
 
-            return $this->success(['profile' => $profile], 'Profile retrieved successfully.');
+            return $this->success(['profile' => new ProfileResource($profile)], 'Profile retrieved successfully.');
         } catch (Throwable $e) {
             Log::error('Failed to fetch profile', ['error' => $e->getMessage(), 'profile_id' => $id]);
             return $this->exceptionResponse($e, 'Profile not found.');
@@ -70,7 +71,7 @@ class ProfileController extends Controller
                 return $this->error('No active profile found.', 404);
             }
 
-            return $this->success(['profile' => $profile], 'Active profile retrieved successfully.');
+            return $this->success(['profile' => new ProfileResource($profile)], 'Active profile retrieved successfully.');
         } catch (Throwable $e) {
             Log::error('Failed to fetch active profile', ['error' => $e->getMessage()]);
             return $this->exceptionResponse($e, 'Failed to fetch active profile.');
@@ -110,7 +111,7 @@ class ProfileController extends Controller
                 ? 'Profile created successfully. Pending admin approval.'
                 : 'Profile created successfully.';
 
-            return $this->success(['profile' => $profile], $message, 201);
+            return $this->success(['profile' => new ProfileResource($profile)], $message, 201);
         } catch (Throwable $e) {
             Log::error('Failed to create profile', ['error' => $e->getMessage()]);
             return $this->exceptionResponse($e, 'Failed to create profile.');
@@ -136,10 +137,24 @@ class ProfileController extends Controller
     public function switchProfile(SwitchProfileRequest $request): JsonResponse
     {
         try {
+            $profileType = $request->to_profile_type;
+            $mappedType = $profileType === 'ecommerce' ? 'seller' : $profileType;
+
+            $details = [];
+            if ($mappedType === 'seller' && $request->has('profile_sub_type')) {
+                $subType = $request->profile_sub_type;
+                $details['seller_type'] = match ($subType) {
+                    'product' => 'products',
+                    'service' => 'services',
+                    default => $subType,
+                };
+            }
+
             $switchRequest = $this->profileSwitchService->requestSwitch(
                 $request->user()->id,
-                $request->to_profile_type,
-                $request->notes
+                $mappedType,
+                $request->notes,
+                $details
             );
 
             return $this->success([

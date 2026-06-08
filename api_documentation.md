@@ -57,7 +57,7 @@ All API responses follow this structure:
 
 ### 1.1 Register
 
-Creates a new user account with a personal profile.
+Creates a new user account with a personal profile, and optionally a secondary profile of choice.
 
 **POST** `/auth/register`
 
@@ -74,7 +74,9 @@ Creates a new user account with a personal profile.
     "password_confirmation": "password@123",
     "date_of_birth": "1995-06-15",
     "occupation": "Software Engineer",
-    "interests": ["Technology", "Music"]
+    "interests": ["Technology", "Music"],
+    "profile_type": "ecommerce",
+    "profile_sub_type": "product"
 }
 ```
 
@@ -89,6 +91,8 @@ Creates a new user account with a personal profile.
 | date_of_birth | string (date) | required |
 | occupation | string | nullable, max:255 |
 | interests | array | nullable — accepts IDs `[1, 2]` or names `["Technology"]` |
+| profile_type | string | nullable, in:personal,employer,seller,ecommerce,music,creator |
+| profile_sub_type | string | nullable, in:product,products,service,services,both. Valid only when `profile_type` is `seller` or `ecommerce`. Must strictly be null for other types. |
 
 **Success (201):**
 ```json
@@ -108,7 +112,7 @@ Creates a new user account with a personal profile.
     "status": false,
     "message": "The given data was invalid.",
     "errors": {
-        "email": ["The email has already been taken."]
+        "profile_sub_type": ["The profile sub type must be null unless the profile type is seller or ecommerce."]
     }
 }
 ```
@@ -735,7 +739,7 @@ Restores a soft-deleted account within the 30-day window. This endpoint is inten
 **Headers:** `Accept: application/json`, `Authorization: Bearer {token}`  
 **Rate Limit:** 5 requests per minute
 
-**Request Body:**
+**Request Body (Employer Switch):**
 ```json
 {
     "to_profile_type": "employer",
@@ -743,9 +747,19 @@ Restores a soft-deleted account within the 30-day window. This endpoint is inten
 }
 ```
 
+**Request Body (Seller/Ecommerce Switch):**
+```json
+{
+    "to_profile_type": "ecommerce",
+    "profile_sub_type": "product",
+    "notes": "I want to switch to ecommerce."
+}
+```
+
 | Field | Type | Rules |
 |-------|------|-------|
-| to_profile_type | string | required, in:personal,employer,seller,music,creator |
+| to_profile_type | string | required, in:personal,employer,seller,ecommerce,music,creator |
+| profile_sub_type | string | nullable, in:product,products,service,services,both. Valid only when `to_profile_type` is `seller` or `ecommerce`. Must strictly be null for other types. |
 | notes | string | nullable, max:2000 |
 
 **Success (201):**

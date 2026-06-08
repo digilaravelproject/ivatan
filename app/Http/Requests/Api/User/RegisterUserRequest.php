@@ -22,6 +22,18 @@ class RegisterUserRequest extends FormRequest
             'password' => 'required|string|min:8',
             'date_of_birth' => 'required|date',
             'occupation' => 'nullable|string|max:255',
+            'profile_type' => 'nullable|string|in:personal,employer,seller,ecommerce,music,creator',
+            'profile_sub_type' => [
+                'nullable',
+                'string',
+                \Illuminate\Validation\Rule::in(['product', 'products', 'service', 'services', 'both']),
+                function ($attribute, $value, $fail) {
+                    $profileType = $this->input('profile_type');
+                    if ($profileType !== 'seller' && $profileType !== 'ecommerce') {
+                        $fail('The profile sub type must be null unless the profile type is seller or ecommerce.');
+                    }
+                }
+            ],
 
             // Interests Validation Logic
             'interests' => 'nullable|array',
