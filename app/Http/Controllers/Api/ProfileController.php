@@ -82,16 +82,30 @@ class ProfileController extends Controller
     {
         try {
             $user = $request->user();
+            $type = $request->type;
+            $mappedType = $type === 'ecommerce' ? 'seller' : $type;
 
             $existingProfile = $user->profiles()
-                ->where('type', $request->type)
+                ->where('type', $mappedType)
                 ->exists();
 
             if ($existingProfile) {
-                return $this->error("You already have a {$request->type} profile.", 409);
+                return $this->error("You already have a {$type} profile.", 409);
             }
 
-            if ($request->type === 'seller' && $request->seller_type === 'both') {
+            $inputData = $request->all();
+            $inputData['type'] = $mappedType;
+
+            if ($mappedType === 'seller' && isset($inputData['profile_sub_type'])) {
+                $subType = $inputData['profile_sub_type'];
+                $inputData['seller_type'] = match ($subType) {
+                    'product' => 'products',
+                    'service' => 'services',
+                    default => $subType,
+                };
+            }
+
+            if ($mappedType === 'seller' && isset($inputData['seller_type']) && $inputData['seller_type'] === 'both') {
                 $hasActiveSub = $user->activeSubscriptions()->exists();
                 if (!$hasActiveSub) {
                     return $this->error(
@@ -103,11 +117,11 @@ class ProfileController extends Controller
 
             $profile = $this->profileService->createProfile(
                 $user->id,
-                $request->type,
-                $request->all()
+                $mappedType,
+                $inputData
             );
 
-            $message = in_array($request->type, ProfileService::APPROVAL_REQUIRED_TYPES)
+            $message = in_array($mappedType, ProfileService::APPROVAL_REQUIRED_TYPES)
                 ? 'Profile created successfully. Pending admin approval.'
                 : 'Profile created successfully.';
 
@@ -299,13 +313,13 @@ class ProfileController extends Controller
                     'has_subscription' => false,
                 ],
                 [
-                    'type' => 'seller',
-                    'label' => 'Product & Service Seller',
+                    'type' => 'ecommerce',
+                    'label' => 'Ecommerce Profile',
                     'description' => 'Sell products, services, or both.',
                     'is_default' => false,
                     'requires_approval' => true,
                     'has_subscription' => true,
-                    'seller_types' => ['products', 'services', 'both'],
+                    'sub_types' => ['product', 'service', 'both'],
                 ],
                 [
                     'type' => 'music',

@@ -26,7 +26,9 @@ class SubscriptionController extends Controller
             $query = SubscriptionPlan::where('is_active', true)->orderBy('sort_order');
 
             if ($request->filled('profile_type')) {
-                $query->where('profile_type', $request->profile_type);
+                $profileType = $request->profile_type;
+                $mappedType = $profileType === 'ecommerce' ? 'seller' : $profileType;
+                $query->where('profile_type', $mappedType);
             }
 
             $plans = $query->get();

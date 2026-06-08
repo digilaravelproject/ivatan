@@ -18,9 +18,9 @@ class CreateProfileRequest extends FormRequest
             'type' => [
                 'required',
                 'string',
-                Rule::in(['employer', 'seller', 'music', 'creator']),
+                Rule::in(['employer', 'ecommerce', 'music', 'creator']),
             ],
-            'seller_type' => 'required_if:type,seller|string|in:products,services,both',
+            'profile_sub_type' => 'required_if:type,ecommerce|string|in:product,service,both',
             'business_name' => 'nullable|string|max:255',
             'business_description' => 'nullable|string|max:2000',
             'business_email' => 'nullable|email|max:255',
@@ -42,7 +42,7 @@ class CreateProfileRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'seller_type.required_if' => 'Seller type is required when creating a seller profile.',
+            'profile_sub_type.required_if' => 'Profile sub type is required when creating an ecommerce profile.',
             'company_name.required_if' => 'Company name is required when creating an employer profile.',
             'channel_name.required_if' => 'Channel name is required when creating a creator profile.',
         ];

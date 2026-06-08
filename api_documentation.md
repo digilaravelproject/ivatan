@@ -482,13 +482,13 @@ Restores a soft-deleted account within the 30-day window. This endpoint is inten
                 "has_subscription": false
             },
             {
-                "type": "seller",
-                "label": "Product & Service Seller",
+                "type": "ecommerce",
+                "label": "Ecommerce Profile",
                 "description": "Sell products, services, or both.",
                 "is_default": false,
                 "requires_approval": true,
                 "has_subscription": true,
-                "seller_types": ["products", "services", "both"]
+                "sub_types": ["product", "service", "both"]
             },
             {
                 "type": "music",
@@ -623,11 +623,11 @@ Restores a soft-deleted account within the 30-day window. This endpoint is inten
 }
 ```
 
-**Request Body — Seller (products):**
+**Request Body — Ecommerce (product):**
 ```json
 {
-    "type": "seller",
-    "seller_type": "products",
+    "type": "ecommerce",
+    "profile_sub_type": "product",
     "business_name": "Aarav Electronics",
     "business_description": "Selling premium electronics",
     "business_email": "aarav.biz@example.com",
@@ -661,8 +661,8 @@ Restores a soft-deleted account within the 30-day window. This endpoint is inten
 
 | Field | Type | Rules |
 |-------|------|-------|
-| type | string | required, in:employer,seller,music,creator |
-| seller_type | string | required_if:type,seller, in:products,services,both |
+| type | string | required, in:employer,ecommerce,music,creator |
+| profile_sub_type | string | required_if:type,ecommerce, in:product,service,both |
 | company_name | string | required_if:type,employer, max:255 |
 | channel_name | string | required_if:type,creator, max:255 |
 | business_name | string | nullable, max:255 |
@@ -892,7 +892,7 @@ Returns the authenticated user's complete profile configuration including all pr
 
 ---
 
-### 3.10 Get Seller Details
+### 3.10 Get Ecommerce Details
 
 **GET** `/v1/profiles/{id}/seller-details`
 
@@ -900,7 +900,7 @@ Returns the authenticated user's complete profile configuration including all pr
 
 ---
 
-### 3.11 Update Seller Details
+### 3.11 Update Ecommerce Details
 
 **PUT** `/v1/profiles/{id}/seller-details`
 
@@ -909,7 +909,7 @@ Returns the authenticated user's complete profile configuration including all pr
 **Request Body:**
 ```json
 {
-    "seller_type": "products",
+    "profile_sub_type": "product",
     "business_name": "Aarav Electronics Updated",
     "business_description": "Updated description",
     "business_email": "aarav.biz@example.com",
@@ -920,7 +920,7 @@ Returns the authenticated user's complete profile configuration including all pr
 
 | Field | Type | Rules |
 |-------|------|-------|
-| seller_type | string | sometimes, in:products,services,both |
+| profile_sub_type | string | sometimes, in:product,service,both |
 | business_name | string | nullable, max:255 |
 | business_description | string | nullable, max:2000 |
 | business_email | email | nullable |

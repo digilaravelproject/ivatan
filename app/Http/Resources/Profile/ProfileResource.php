@@ -16,18 +16,22 @@ class ProfileResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
-            'type' => $this->type,
+            'type' => $this->type === 'seller' ? 'ecommerce' : $this->type,
             'status' => $this->status,
             'is_active' => (bool) $this->is_active,
             'is_default' => (bool) $this->is_default,
             'approved_at' => $this->approved_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
-            'seller_details' => $this->when($this->relationLoaded('sellerDetails') && $this->sellerDetails, function() {
+            'ecommerce_details' => $this->when($this->relationLoaded('sellerDetails') && $this->sellerDetails, function() {
                 return [
                     'id' => $this->sellerDetails->id,
                     'profile_id' => $this->sellerDetails->profile_id,
-                    'seller_type' => $this->sellerDetails->seller_type,
+                    'profile_sub_type' => match ($this->sellerDetails->seller_type) {
+                        'products' => 'product',
+                        'services' => 'service',
+                        default => $this->sellerDetails->seller_type,
+                    },
                 ];
             }),
             'employer_details' => $this->when($this->relationLoaded('employerDetails') && $this->employerDetails, function() {
