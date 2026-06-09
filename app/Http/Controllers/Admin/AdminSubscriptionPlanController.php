@@ -39,6 +39,11 @@ class AdminSubscriptionPlanController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        if ($request->has('features') && is_string($request->features)) {
+            $features = array_filter(array_map('trim', explode("\n", $request->features)));
+            $request->merge(['features' => $features]);
+        }
+
         $validated = $request->validate([
             'profile_type' => 'required|string|in:personal,seller,creator',
             'name' => 'required|string|max:255',
@@ -103,6 +108,11 @@ class AdminSubscriptionPlanController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $plan = SubscriptionPlan::findOrFail($id);
+
+        if ($request->has('features') && is_string($request->features)) {
+            $features = array_filter(array_map('trim', explode("\n", $request->features)));
+            $request->merge(['features' => $features]);
+        }
 
         $validated = $request->validate([
             'profile_type' => 'required|string|in:personal,seller,creator',
