@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Subscription\PurchaseSubscriptionRequest;
 use App\Models\SubscriptionPlan;
 use App\Services\Subscription\SubscriptionService;
 use App\Traits\ApiResponse;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -51,6 +52,8 @@ class SubscriptionController extends Controller
             $plan = SubscriptionPlan::where('is_active', true)->findOrFail($id);
 
             return $this->success(['plan' => $plan], 'Plan details retrieved successfully.');
+        } catch (ModelNotFoundException $e) {
+            return $this->error('The requested subscription plan was not found.', 404);
         } catch (Throwable $e) {
             return $this->exceptionResponse($e, 'Plan not found.');
         }
@@ -79,6 +82,14 @@ class SubscriptionController extends Controller
             return $this->success([
                 'subscription' => $subscription->load('plan'),
             ], 'Subscription purchased successfully.', 201);
+        } catch (ModelNotFoundException $e) {
+            Log::warning('Subscription purchase failed: Profile or plan not found', [
+                'user_id' => $request->user()->id ?? null,
+                'profile_id' => $profileId,
+                'plan_id' => $request->subscription_plan_id,
+                'error' => $e->getMessage()
+            ]);
+            return $this->error('The requested profile or subscription plan was not found.', 404);
         } catch (\InvalidArgumentException | \RuntimeException $e) {
             return $this->error($e->getMessage(), 422);
         } catch (Throwable $e) {
@@ -99,6 +110,13 @@ class SubscriptionController extends Controller
             }
 
             return $this->success(['subscription' => $subscription], 'Active subscription retrieved successfully.');
+        } catch (ModelNotFoundException $e) {
+            Log::warning('Failed to fetch active subscription: Profile not found', [
+                'user_id' => $request->user()->id ?? null,
+                'profile_id' => $profileId,
+                'error' => $e->getMessage()
+            ]);
+            return $this->error('The requested profile was not found.', 404);
         } catch (Throwable $e) {
             return $this->exceptionResponse($e, 'Failed to fetch active subscription.');
         }
@@ -112,6 +130,13 @@ class SubscriptionController extends Controller
             $history = $this->subscriptionService->getHistory($profileId);
 
             return $this->success(['history' => $history], 'Subscription history retrieved successfully.');
+        } catch (ModelNotFoundException $e) {
+            Log::warning('Failed to fetch subscription history: Profile not found', [
+                'user_id' => $request->user()->id ?? null,
+                'profile_id' => $profileId,
+                'error' => $e->getMessage()
+            ]);
+            return $this->error('The requested profile was not found.', 404);
         } catch (Throwable $e) {
             return $this->exceptionResponse($e, 'Failed to fetch subscription history.');
         }
@@ -127,6 +152,13 @@ class SubscriptionController extends Controller
             return $this->success([
                 'subscription' => $subscription,
             ], 'Subscription cancelled successfully.');
+        } catch (ModelNotFoundException $e) {
+            Log::warning('Subscription cancellation failed: Subscription not found', [
+                'user_id' => $request->user()->id ?? null,
+                'subscription_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            return $this->error('The requested subscription was not found.', 404);
         } catch (\RuntimeException $e) {
             return $this->error($e->getMessage(), 422);
         } catch (Throwable $e) {
@@ -135,3 +167,4 @@ class SubscriptionController extends Controller
         }
     }
 }
+
