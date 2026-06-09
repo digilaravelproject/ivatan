@@ -295,6 +295,9 @@ class ProfileController extends Controller
     public function availableTypes(): JsonResponse
     {
         try {
+            $user = auth('sanctum')->user();
+            $userProfiles = $user ? $user->profiles()->pluck('id', 'type')->toArray() : [];
+
             $types = [
                 [
                     'type' => 'personal',
@@ -338,6 +341,13 @@ class ProfileController extends Controller
                     'has_subscription' => true,
                 ],
             ];
+
+            // Map user's profile ID if they exist
+            $types = array_map(function ($item) use ($userProfiles) {
+                $dbType = $item['type'] === 'ecommerce' ? 'seller' : $item['type'];
+                $item['profile_id'] = $userProfiles[$dbType] ?? null;
+                return $item;
+            }, $types);
 
             return $this->success(['types' => $types], 'Profile types retrieved successfully.');
         } catch (Throwable $e) {
