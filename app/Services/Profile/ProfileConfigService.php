@@ -95,6 +95,7 @@ class ProfileConfigService
         $subscription = $profile->activeSubscription;
 
         return [
+            'profile_id' => $profile->id,
             'is_active' => (bool) $profile->is_active,
             'company_name' => $details?->company_name,
             'industry' => $details?->industry,
@@ -126,6 +127,7 @@ class ProfileConfigService
             ->get();
 
         return [
+            'profile_id' => $profile->id,
             'is_active' => (bool) $profile->is_active,
             'type' => $details?->seller_type,
             'seller_type_label' => $details?->seller_type === 'both'
@@ -161,6 +163,7 @@ class ProfileConfigService
         $details = $profile->musicDetails;
 
         return [
+            'profile_id' => $profile->id,
             'is_active' => (bool) $profile->is_active,
             'artist_name' => $details?->artist_name,
             'stage_name' => $details?->stage_name,
@@ -192,6 +195,7 @@ class ProfileConfigService
         $subscription = $profile->activeSubscription;
 
         return [
+            'profile_id' => $profile->id,
             'is_active' => (bool) $profile->is_active,
             'channel_name' => $details?->channel_name,
             'content_category' => $details?->content_category,
@@ -207,6 +211,7 @@ class ProfileConfigService
         $subscription = $profile->activeSubscription;
 
         return [
+            'profile_id' => $profile->id,
             'is_active' => (bool) $profile->is_active,
             'subscription' => $this->formatSubscription($subscription),
         ];
