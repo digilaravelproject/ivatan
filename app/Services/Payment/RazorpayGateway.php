@@ -109,34 +109,29 @@ class RazorpayGateway implements PaymentGatewayInterface
                 ],
             ];
 
-            // Use Laravel's Http client instead of the SDK to avoid "Array to string conversion" bugs when Razorpay API returns an error
-            $response = Http::withBasicAuth($this->key, $this->secret)
-                ->post("{$this->baseUrl}/plans", $planData);
-
-            if (!$response->successful()) {
-                $errorData = $response->json();
-                $errorMessage = $errorData['error']['description'] ?? 'Unknown Razorpay error';
-                Log::error('Razorpay: createSubscriptionPlan failed', [
-                    'status' => $response->status(),
-                    'error' => $errorData,
-                ]);
-                throw new \Exception($errorMessage);
-            }
-
-            $plan = $response->json();
+            // Use the official Razorpay SDK as requested
+            $plan = $this->api->plan->create($planData);
 
             return PaymentResult::success(
                 transactionId: $plan['id'],
                 status: 'created',
                 amount: $amount,
                 currency: $currency,
-                rawResponse: $plan,
+                rawResponse: $plan->toArray(),
             );
         } catch (\Throwable $e) {
-            Log::error('Razorpay: createSubscriptionPlan failed with exception', [
+            Log::error('Razorpay: createSubscriptionPlan failed', [
                 'error' => $e->getMessage(),
             ]);
-            throw PaymentGatewayException::gatewayError('razorpay', $e->getMessage());
+
+            $errorMessage = $e->getMessage();
+            
+            // Translate the Razorpay SDK's internal "Array to string conversion" bug into a clear message
+            if (str_contains($errorMessage, 'Array to string conversion')) {
+                $errorMessage = 'Razorpay API returned an unauthorized or malformed response. Please verify that your active API Key and Secret in Settings are correct and active.';
+            }
+
+            throw PaymentGatewayException::gatewayError('razorpay', $errorMessage);
         }
     }
 
