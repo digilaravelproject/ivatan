@@ -104,25 +104,39 @@ class RazorpayGateway implements PaymentGatewayInterface
                 'item' => [
                     'name' => $name,
                     'amount' => (int) round($amount * 100),
-                    'currency' => $currency,
+                    'currency' => strtoupper($currency),
                     'description' => "{$name} - {$intervalCount} {$interval}",
                 ],
             ];
 
-            $plan = $this->api->plan->create($planData);
+            // Use Laravel's Http client instead of the SDK to avoid "Array to string conversion" bugs when Razorpay API returns an error
+            $response = Http::withBasicAuth($this->key, $this->secret)
+                ->post("{$this->baseUrl}/plans", $planData);
+
+            if (!$response->successful()) {
+                $errorData = $response->json();
+                $errorMessage = $errorData['error']['description'] ?? 'Unknown Razorpay error';
+                Log::error('Razorpay: createSubscriptionPlan failed', [
+                    'status' => $response->status(),
+                    'error' => $errorData,
+                ]);
+                throw new \Exception($errorMessage);
+            }
+
+            $plan = $response->json();
 
             return PaymentResult::success(
                 transactionId: $plan['id'],
                 status: 'created',
                 amount: $amount,
                 currency: $currency,
-                rawResponse: $plan->toArray(),
+                rawResponse: $plan,
             );
-        } catch (\Razorpay\Api\Errors\Error $e) {
-            Log::error('Razorpay: createSubscriptionPlan failed', [
+        } catch (\Throwable $e) {
+            Log::error('Razorpay: createSubscriptionPlan failed with exception', [
                 'error' => $e->getMessage(),
             ]);
-            throw PaymentGatewayException::gatewayError('razorpay', $e->getMessage(), (string) $e->getCode());
+            throw PaymentGatewayException::gatewayError('razorpay', $e->getMessage());
         }
     }
 
