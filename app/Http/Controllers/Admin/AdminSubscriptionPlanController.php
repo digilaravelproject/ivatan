@@ -123,7 +123,8 @@ class AdminSubscriptionPlanController extends Controller
         $validated['is_default'] = $request->boolean('is_default', false);
         $validated['features'] = $validated['features'] ?? [];
 
-        if ($validated['price'] > 0) {
+        // If the price is > 0 and the plan doesn't have a gateway_plan_id yet, auto-create it
+        if ($validated['price'] > 0 && empty($plan->gateway_plan_id)) {
             try {
                 $gateway = $this->gatewayManager->driver();
                 $result = $gateway->createSubscriptionPlan(
@@ -145,7 +146,7 @@ class AdminSubscriptionPlanController extends Controller
         $plan->update($validated);
 
         $message = 'Subscription plan updated successfully.';
-        if ($validated['price'] > 0 && !$plan->gateway_plan_id) {
+        if ($validated['price'] > 0 && !$plan->gateway_plan_id && empty($validated['gateway_plan_id'])) {
             $message .= ' Warning: Gateway plan could not be synced. Update manually in Razorpay.';
         }
 
