@@ -347,13 +347,32 @@ class ProfileController extends Controller
 
     public function config(Request $request): JsonResponse
     {
+        $start = microtime(true);
         try {
-            $data = $this->profileConfigService->getConfig($request->user());
+            $user = $request->user();
+            $userTime = microtime(true) - $start;
+            
+            $configStart = microtime(true);
+            $data = $this->profileConfigService->getConfig($user);
+            $configTime = microtime(true) - $configStart;
 
-            return $this->success(
-                new ProfileConfigResource($data),
+            $resourceStart = microtime(true);
+            $resource = new ProfileConfigResource($data);
+            $response = $this->success(
+                $resource,
                 'Profile configuration retrieved successfully.'
             );
+            $resourceTime = microtime(true) - $resourceStart;
+            
+            $totalTime = microtime(true) - $start;
+            Log::info("Profile config performance", [
+                'user_fetch_ms' => $userTime * 1000,
+                'get_config_ms' => $configTime * 1000,
+                'resource_build_ms' => $resourceTime * 1000,
+                'total_controller_ms' => $totalTime * 1000,
+            ]);
+
+            return $response;
         } catch (Throwable $e) {
             Log::error('Failed to fetch profile config', ['error' => $e->getMessage()]);
             return $this->exceptionResponse($e, 'Failed to fetch profile configuration.');
