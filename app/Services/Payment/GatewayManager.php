@@ -48,8 +48,6 @@ class GatewayManager
         $gateway = app($gatewayClass);
         $gateway->configure($config);
 
-        Log::debug("GatewayManager: Resolved gateway driver", ['gateway' => $name]);
-
         return $gateway;
     }
 

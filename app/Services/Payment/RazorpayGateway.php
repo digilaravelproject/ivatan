@@ -228,7 +228,6 @@ class RazorpayGateway implements PaymentGatewayInterface
                 ->get("{$this->baseUrl}/payments", ['count' => 1]);
 
             if ($response->successful()) {
-                Log::info('Razorpay: Test connection successful');
                 return true;
             }
 
