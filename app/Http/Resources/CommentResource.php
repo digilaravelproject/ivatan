@@ -39,8 +39,8 @@ class CommentResource extends JsonResource
             'created_human' => $this->created_at->diffForHumans(),
 
             // Relationships - show "Deleted User" placeholder if user is soft-deleted
-            'user' => function () {
-                $user = $this->whenLoaded('user');
+            'user' => $this->whenLoaded('user', function () {
+                $user = $this->user;
                 if (!$user || $user->trashed()) {
                     return [
                         'id' => null,
@@ -52,7 +52,7 @@ class CommentResource extends JsonResource
                     ];
                 }
                 return new UserResource($user);
-            },
+            }),
 
             // Recursive nesting for replies (Isme bhi automatic is_mine true/false ho jayega)
             'replies' => CommentResource::collection($this->whenLoaded('replies')),
