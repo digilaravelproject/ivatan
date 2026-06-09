@@ -16,6 +16,7 @@ class ProfileConfigService
         return Cache::remember("profile_config:{$user->id}", 300, function () use ($user) {
             try {
                 $user->load([
+                    'media',
                     'profiles' => fn($q) => $q->with([
                         'sellerDetails',
                         'employerDetails',
@@ -114,15 +115,18 @@ class ProfileConfigService
         $featuredProduct = UserProduct::where('seller_id', $userId)
             ->where('status', 'active')
             ->orderByDesc('created_at')
+            ->select(['id', 'uuid', 'title', 'price', 'stock', 'seller_id', 'status', 'created_at'])
             ->first();
 
         $totalServices = UserService::where('seller_id', $userId)->count();
         $activeServices = UserService::where('seller_id', $userId)
             ->where('status', 'active')
             ->limit(5)
+            ->select(['id', 'uuid', 'title', 'price', 'seller_id', 'status'])
             ->get();
 
         return [
+            'is_active' => (bool) $profile->is_active,
             'type' => $details?->seller_type,
             'seller_type_label' => $details?->seller_type === 'both'
                 ? 'Products & Services'
