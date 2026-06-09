@@ -66,12 +66,13 @@ class AdminSubscriptionPlanController extends Controller
         if ($validated['price'] > 0) {
             try {
                 $gateway = $this->gatewayManager->driver();
+                list($period, $intervalCount) = $this->getRazorpayPeriodAndInterval($validated['duration_days']);
                 $result = $gateway->createSubscriptionPlan(
                     $validated['name'],
                     $validated['price'],
                     $validated['currency'],
-                    $this->intervalForDuration($validated['duration_days']),
-                    $validated['duration_days']
+                    $period,
+                    $intervalCount
                 );
 
                 if ($result->success && $result->transactionId) {
@@ -137,12 +138,13 @@ class AdminSubscriptionPlanController extends Controller
         if ($validated['price'] > 0 && empty($plan->gateway_plan_id)) {
             try {
                 $gateway = $this->gatewayManager->driver();
+                list($period, $intervalCount) = $this->getRazorpayPeriodAndInterval($validated['duration_days']);
                 $result = $gateway->createSubscriptionPlan(
                     $validated['name'],
                     $validated['price'],
                     $validated['currency'],
-                    $this->intervalForDuration($validated['duration_days']),
-                    $validated['duration_days']
+                    $period,
+                    $intervalCount
                 );
 
                 if ($result->success && $result->transactionId) {
@@ -181,14 +183,23 @@ class AdminSubscriptionPlanController extends Controller
             ->with('success', 'Subscription plan deleted successfully.');
     }
 
-    protected function intervalForDuration(int $durationDays): string
+    protected function getRazorpayPeriodAndInterval(int $durationDays): array
     {
-        return match (true) {
-            $durationDays >= 365 => 'yearly',
-            $durationDays >= 90  => 'monthly',
-            $durationDays >= 30  => 'monthly',
-            $durationDays >= 7   => 'weekly',
-            default              => 'daily',
-        };
+        if ($durationDays >= 365) {
+            $years = (int) round($durationDays / 365);
+            return ['yearly', $years];
+        }
+
+        if ($durationDays >= 30) {
+            $months = (int) round($durationDays / 30);
+            return ['monthly', $months];
+        }
+
+        if ($durationDays >= 7) {
+            $weeks = (int) round($durationDays / 7);
+            return ['weekly', $weeks];
+        }
+
+        return ['daily', $durationDays];
     }
 }
