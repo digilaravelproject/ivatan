@@ -16,7 +16,7 @@
             <div>
                 <label class="block text-sm font-medium mb-1">Profile Type</label>
                 <select name="profile_type" required class="w-full border rounded px-3 py-2">
-                    @foreach(['personal' => 'Personal', 'seller' => 'Seller', 'creator' => 'Creator'] as $val => $label)
+                    @foreach($profileTypes as $val => $label)
                     <option value="{{ $val }}" @selected($plan->profile_type === $val)>{{ $label }}</option>
                     @endforeach
                 </select>

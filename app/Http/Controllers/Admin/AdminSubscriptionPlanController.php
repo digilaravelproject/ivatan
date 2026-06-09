@@ -32,6 +32,8 @@ class AdminSubscriptionPlanController extends Controller
             'personal' => 'Personal',
             'seller' => 'Product & Service Seller',
             'creator' => 'Content Creator',
+            'employer' => 'Employer (Job Poster)',
+            'music' => 'Music Artist',
         ];
 
         return view('admin.subscription-plans.create', compact('profileTypes'));
@@ -45,7 +47,7 @@ class AdminSubscriptionPlanController extends Controller
         }
 
         $validated = $request->validate([
-            'profile_type' => 'required|string|in:personal,seller,creator',
+            'profile_type' => 'required|string|in:personal,seller,creator,employer,music',
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:subscription_plans',
             'description' => 'nullable|string|max:2000',
@@ -101,6 +103,8 @@ class AdminSubscriptionPlanController extends Controller
             'personal' => 'Personal',
             'seller' => 'Product & Service Seller',
             'creator' => 'Content Creator',
+            'employer' => 'Employer (Job Poster)',
+            'music' => 'Music Artist',
         ];
 
         return view('admin.subscription-plans.edit', compact('plan', 'profileTypes'));
@@ -116,7 +120,7 @@ class AdminSubscriptionPlanController extends Controller
         }
 
         $validated = $request->validate([
-            'profile_type' => 'required|string|in:personal,seller,creator',
+            'profile_type' => 'required|string|in:personal,seller,creator,employer,music',
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:subscription_plans,slug,' . $id,
             'description' => 'nullable|string|max:2000',
