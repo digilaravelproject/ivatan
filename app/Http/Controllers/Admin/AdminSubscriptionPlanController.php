@@ -149,7 +149,10 @@ class AdminSubscriptionPlanController extends Controller
                     $validated['gateway_plan_id'] = $result->transactionId;
                 }
             } catch (\Throwable $e) {
-                Log::warning('Failed to update gateway plan', ['error' => $e->getMessage()]);
+                Log::warning('Failed to update gateway plan', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
             }
         }
 
