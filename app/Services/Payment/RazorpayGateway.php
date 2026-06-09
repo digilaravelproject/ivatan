@@ -126,6 +126,18 @@ class RazorpayGateway implements PaymentGatewayInterface
                 'error' => $e->getMessage(),
             ]);
 
+            // Diagnostic call to get the exact raw API response from Razorpay
+            try {
+                $response = Http::withBasicAuth($this->key, $this->secret)
+                    ->post("{$this->baseUrl}/plans", $planData);
+                Log::error('Razorpay debug raw API response', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            } catch (\Throwable $logEx) {
+                Log::error('Razorpay diagnostic request failed', ['error' => $logEx->getMessage()]);
+            }
+
             $errorMessage = $e->getMessage();
             
             // Translate the Razorpay SDK's internal "Array to string conversion" bug into a clear message
