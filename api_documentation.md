@@ -1142,7 +1142,57 @@ Returns the authenticated user's complete profile configuration including all pr
 
 ---
 
-### 5.5 Purchase a Subscription
+### 5.5 Initiate a Subscription
+
+**POST** `/v1/profiles/{profileId}/subscriptions/initiate`
+
+**Headers:** `Accept: application/json`, `Authorization: Bearer {token}`
+**Rate Limit:** 10 requests per minute
+
+**Request Body:**
+```json
+{
+    "subscription_plan_id": 2
+}
+```
+
+**Success Response (200 - Paid Plan):**
+```json
+{
+    "status": true,
+    "message": "Subscription initiated successfully.",
+    "data": {
+        "requires_payment": true,
+        "gateway": "razorpay",
+        "gateway_subscription_id": "sub_E8XJrM7FkYm8Ht",
+        "razorpay_key": "rzp_test_S9yXFuXcf0S6Ll",
+        "plan": {
+            "id": 2,
+            "name": "Pro Seller",
+            "price": 499.00,
+            "currency": "INR"
+        }
+    }
+}
+```
+
+**Success Response (200 - Free Plan):**
+```json
+{
+    "status": true,
+    "message": "Free subscription plan initiated successfully.",
+    "data": {
+        "requires_payment": false,
+        "gateway": null,
+        "gateway_subscription_id": null,
+        "razorpay_key": null
+    }
+}
+```
+
+---
+
+### 5.6 Purchase a Subscription
 
 **POST** `/v1/profiles/{profileId}/subscriptions`
 
@@ -1203,7 +1253,7 @@ Returns the authenticated user's complete profile configuration including all pr
 
 ---
 
-### 5.6 Cancel a Subscription
+### 5.7 Cancel a Subscription
 
 **POST** `/v1/subscriptions/{id}/cancel`
 

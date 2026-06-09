@@ -489,6 +489,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/{id}/subscriptions/active', [SubscriptionController::class, 'active']);
             Route::get('/{id}/subscriptions/history', [SubscriptionController::class, 'history']);
             Route::post('/{id}/subscriptions', [SubscriptionController::class, 'purchase'])->middleware('throttle:10,1');
+            Route::post('/{id}/subscriptions/initiate', [SubscriptionController::class, 'initiate'])->middleware('throttle:10,1');
         });
 
         // ================================

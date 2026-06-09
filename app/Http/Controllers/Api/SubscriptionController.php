@@ -166,5 +166,83 @@ class SubscriptionController extends Controller
             return $this->exceptionResponse($e, 'Failed to cancel subscription.');
         }
     }
+
+    public function initiate(int $profileId, Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'subscription_plan_id' => 'required|integer|exists:subscription_plans,id',
+            ]);
+
+            $user = $request->user();
+            $profile = $user->profiles()->findOrFail($profileId);
+            
+            $plan = SubscriptionPlan::where('is_active', true)->findOrFail($request->subscription_plan_id);
+
+            if ($plan->profile_type !== $profile->type) {
+                return $this->error("The selected plan is not available for {$profile->type} profiles.", 422);
+            }
+
+            // Check if profile already has an active subscription
+            $activeSub = $profile->activeSubscription()->exists();
+            if ($activeSub) {
+                return $this->error('This profile already has an active subscription.', 422);
+            }
+
+            // If it is a free plan, no Razorpay initiation needed
+            if ($plan->isFree()) {
+                return $this->success([
+                    'requires_payment' => false,
+                    'gateway' => null,
+                    'gateway_subscription_id' => null,
+                    'razorpay_key' => null,
+                ], 'Free subscription plan initiated successfully.');
+            }
+
+            // If it is a paid plan, get the config dynamically from settings database table (not .env)
+            $gatewayName = app(\App\Services\Setting\SettingService::class)->get('payment.active_gateway', 'razorpay');
+            $gatewayConfig = app(\App\Services\Setting\SettingService::class)->getGatewayConfig($gatewayName);
+            $publicKey = $gatewayConfig['key'] ?? '';
+
+            if (empty($plan->gateway_plan_id)) {
+                return $this->error('The selected plan is not configured in the payment gateway. Please contact support.', 422);
+            }
+
+            // Call Gateway to create subscription on Razorpay
+            $gateway = app(\App\Services\Payment\GatewayManager::class)->driver($gatewayName);
+            
+            $result = $gateway->createSubscription(
+                $user->gateway_customer_id ?? '',
+                $plan->gateway_plan_id
+            );
+
+            if (!$result->success) {
+                return $this->error($result->message ?? 'Failed to initiate subscription with payment gateway.', 502);
+            }
+
+            return $this->success([
+                'requires_payment' => true,
+                'gateway' => $gatewayName,
+                'gateway_subscription_id' => $result->gatewaySubscriptionId,
+                'razorpay_key' => $publicKey, // Public Key dynamically fetched from SettingService
+                'plan' => [
+                    'id' => $plan->id,
+                    'name' => $plan->name,
+                    'price' => (float) $plan->price,
+                    'currency' => $plan->currency,
+                ]
+            ], 'Subscription initiated successfully.');
+        } catch (ModelNotFoundException $e) {
+            Log::warning('Subscription initiation failed: Profile not found', [
+                'user_id' => $request->user()->id ?? null,
+                'profile_id' => $profileId,
+                'error' => $e->getMessage()
+            ]);
+            return $this->error('The requested profile was not found.', 404);
+        } catch (Throwable $e) {
+            Log::error('Failed to initiate subscription', ['error' => $e->getMessage()]);
+            return $this->exceptionResponse($e, 'Failed to initiate subscription.');
+        }
+    }
 }
 
