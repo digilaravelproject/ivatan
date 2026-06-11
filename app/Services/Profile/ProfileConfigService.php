@@ -30,16 +30,20 @@ class ProfileConfigService
                 $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
                 $firstProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
 
+                // Get all profile switch requests for this user
+                $switchRequests = \App\Models\ProfileSwitchRequest::where('user_id', $user->id)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+
                 // 2. Calculate unlocked_profiles (Flattened list of profiles with active subscriptions)
                 $unlockedProfiles = [];
                 foreach ($user->profiles as $profile) {
-                    if ($profile->type === 'personal') {
-                        $unlockedProfiles[] = 'personal';
-                        continue;
-                    }
                     $sub = $profile->activeSubscription;
                     if ($sub && $sub->isActive()) {
-                        $unlockedProfiles[] = $profile->type;
+                        $isTargetOfSwitch = $switchRequests->contains(fn($r) => $r->to_profile_type === $profile->type);
+                        if ($profile->type === $firstProfileName || $profile->is_active || $isTargetOfSwitch) {
+                            $unlockedProfiles[] = $profile->type;
+                        }
                     }
                 }
                 $unlockedProfiles = array_values(array_unique($unlockedProfiles));
@@ -47,11 +51,6 @@ class ProfileConfigService
                 // 3. Calculate current_profile (Dynamic)
                 $activeProfile = $user->profiles->firstWhere('is_active', true);
                 $currentProfileName = $activeProfile ? $activeProfile->type : $firstProfileName;
-
-                // Check profile switch requests. If target of switch is unlocked, update current_profile
-                $switchRequests = \App\Models\ProfileSwitchRequest::where('user_id', $user->id)
-                    ->orderBy('created_at', 'desc')
-                    ->get();
 
                 foreach ($switchRequests as $request) {
                     if (in_array($request->to_profile_type, $unlockedProfiles)) {

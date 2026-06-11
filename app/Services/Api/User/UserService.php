@@ -147,6 +147,9 @@ class UserService
 
             $profileType = $data['profile_type'] ?? null;
             if ($profileType && $profileType !== 'personal') {
+                // Deactivate default personal profile since they selected a different one
+                $profile->update(['is_active' => false]);
+
                 $mappedType = $profileType === 'ecommerce' ? 'seller' : $profileType;
                 $details = [];
                 if ($mappedType === 'seller' && isset($data['profile_sub_type'])) {
