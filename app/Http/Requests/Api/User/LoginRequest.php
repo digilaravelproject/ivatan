@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Api\User;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Request;
 use Illuminate\Validation\Validator;
 
 class LoginRequest extends FormRequest
@@ -36,9 +35,9 @@ class LoginRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             if (
-                !$this->filled('email') &&
-                !$this->filled('phone') &&
-                !$this->filled('username')
+                ! $this->filled('email') &&
+                ! $this->filled('phone') &&
+                ! $this->filled('username')
             ) {
                 $validator->errors()->add(
                     'email_or_phone_or_username',
@@ -47,6 +46,7 @@ class LoginRequest extends FormRequest
             }
         });
     }
+
     public function identifier(): string
     {
         return $this->email ?? $this->phone ?? $this->username;
