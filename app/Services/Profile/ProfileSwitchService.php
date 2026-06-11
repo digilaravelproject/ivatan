@@ -30,7 +30,14 @@ class ProfileSwitchService
             }
 
             if ($activeProfile->type === $toProfileType) {
-                throw new \RuntimeException("You are already on the {$toProfileType} profile.");
+                if ($toProfileType === 'seller' && isset($details['seller_type'])) {
+                    $currentSellerType = $activeProfile->sellerDetails?->seller_type;
+                    if ($currentSellerType === $details['seller_type']) {
+                        throw new \RuntimeException("You are already on the {$toProfileType} profile with subtype {$currentSellerType}.");
+                    }
+                } else {
+                    throw new \RuntimeException("You are already on the {$toProfileType} profile.");
+                }
             }
 
             $existingActive = Profile::where('user_id', $userId)
@@ -40,7 +47,13 @@ class ProfileSwitchService
                 ->first();
 
             if ($existingActive) {
-                throw new \RuntimeException("You already have an active {$toProfileType} profile.");
+                $isChangingSubtype = ($toProfileType === 'seller' && 
+                                      isset($details['seller_type']) && 
+                                      $existingActive->sellerDetails?->seller_type !== $details['seller_type']);
+                
+                if (!$isChangingSubtype) {
+                    throw new \RuntimeException("You already have an active {$toProfileType} profile.");
+                }
             }
 
             $existingProfile = Profile::where('user_id', $userId)

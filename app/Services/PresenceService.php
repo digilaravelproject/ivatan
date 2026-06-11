@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Events\Chat\PresenceChanged;
 use App\Models\User;
-use App\Models\Chat\UserChat;
 use App\Models\Chat\UserChatParticipant;
 use Illuminate\Support\Facades\Log;
 
@@ -51,19 +50,6 @@ class PresenceService
         $this->broadcastPresenceToChats($user, true);
     }
 
-    public function handleMemberLeft(array $member): void
-    {
-        $userId = $member['id'] ?? null;
-        if (!$userId) return;
-
-        $user = User::find($userId);
-        if (!$user) return;
-
-        $this->setOffline($user);
-
-        $this->cancelInitiatedSessions($user);
-    }
-
     protected function broadcastPresenceToChats(User $user, bool $isOnline): void
     {
         try {
@@ -83,18 +69,4 @@ class PresenceService
         }
     }
 
-    protected function cancelInitiatedSessions(User $user): void
-    {
-        $sessions = \App\Models\UserCallSession::where(function ($q) use ($user) {
-            $q->where('caller_id', $user->id)
-              ->orWhere('receiver_id', $user->id);
-        })->whereIn('status', ['ringing'])->get();
-
-        foreach ($sessions as $session) {
-            $session->update([
-                'status' => 'missed',
-                'ended_at' => now(),
-            ]);
-        }
-    }
 }

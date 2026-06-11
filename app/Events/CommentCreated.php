@@ -26,7 +26,7 @@ class CommentCreated implements ShouldBroadcastNow
             return [];
         }
         return [
-            new PrivateChannel('user.' . $this->comment->post->user_id),
+            new PrivateChannel('private-user.' . $this->comment->post->user_id),
         ];
     }
 

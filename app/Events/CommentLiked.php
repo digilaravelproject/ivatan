@@ -26,7 +26,7 @@ class CommentLiked implements ShouldBroadcastNow
             return [];
         }
         return [
-            new PrivateChannel('user.' . $this->like->comment->user_id),
+            new PrivateChannel('private-user.' . $this->like->comment->user_id),
         ];
     }
 
