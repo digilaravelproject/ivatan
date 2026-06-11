@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('subscription_plans', function (Blueprint $table) {
-            $table->boolean('is_default')->default(false)->after('is_active');
-        });
+        if (!Schema::hasColumn('subscription_plans', 'is_default')) {
+            Schema::table('subscription_plans', function (Blueprint $table) {
+                $table->boolean('is_default')->default(false)->after('is_active');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('subscription_plans', function (Blueprint $table) {
-            $table->dropColumn('is_default');
-        });
+        if (Schema::hasColumn('subscription_plans', 'is_default')) {
+            Schema::table('subscription_plans', function (Blueprint $table) {
+                $table->dropColumn('is_default');
+            });
+        }
     }
 };
