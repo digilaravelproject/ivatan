@@ -64,4 +64,48 @@ class MarketplaceController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get approved products for a specific user/seller
+     */
+    public function getUserProducts(Request $request, $userId): JsonResponse
+    {
+        try {
+            $products = $this->marketplaceService->getUserProducts((int) $userId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User products fetched successfully.',
+                'data' => $products
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('User products fetch error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while fetching user products.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get approved services for a specific user/seller
+     */
+    public function getUserServices(Request $request, $userId): JsonResponse
+    {
+        try {
+            $services = $this->marketplaceService->getUserServices((int) $userId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User services fetched successfully.',
+                'data' => $services
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('User services fetch error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while fetching user services.',
+            ], 500);
+        }
+    }
 }

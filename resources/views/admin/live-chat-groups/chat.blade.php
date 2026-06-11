@@ -147,7 +147,17 @@ function liveChat() {
                 return;
             }
 
-            this.echo = window.Echo.private('chat.' + this.chatId)
+            this.echo = window.Echo.join('presence-chat.' + this.chatId)
+                .here((users) => {
+                    this.connected = true;
+                    console.log('[Chat] Online users:', users.length);
+                })
+                .joining((user) => {
+                    console.log('[Chat] User joined:', user.name);
+                })
+                .leaving((user) => {
+                    console.log('[Chat] User left:', user.name);
+                })
                 .listen('.message.sent', (e) => {
                     if (e.sender && e.sender.id === this.userId) return;
                     if (this.messages.some(m => m.id === e.id)) return;
@@ -168,9 +178,6 @@ function liveChat() {
                     this.$nextTick(() => {
                         if (this.autoScroll) this.scrollToBottom();
                     });
-                })
-                .subscribed(() => {
-                    this.connected = true;
                 })
                 .error((err) => {
                     console.error('[Chat] Subscription error:', err);

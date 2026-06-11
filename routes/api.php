@@ -20,7 +20,12 @@ use App\Http\Controllers\Api\Story\StoryHighlightController;
 use App\Http\Controllers\Api\UserPostController;
 use App\Http\Controllers\Api\Chat\ChatController;
 use App\Http\Controllers\Api\Chat\CallController;
+use App\Http\Controllers\Api\PresenceController;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
+
+// Register broadcasting auth endpoint
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\Contact\ContactSyncController;
@@ -282,6 +287,8 @@ Route::prefix('v1')->group(function () {
         Route::prefix('marketplace')->group(function () {
             Route::get('products', [MarketplaceController::class, 'getProducts']);
             Route::get('services', [MarketplaceController::class, 'getServices']);
+            Route::get('product/{user_id}', [MarketplaceController::class, 'getUserProducts']);
+            Route::get('service/{user_id}', [MarketplaceController::class, 'getUserServices']);
             Route::get('products/{productIdentifier}', [UserProductController::class, 'show']);
             Route::get('services/{serviceIdentifier}', [UserServiceController::class, 'show']);
         });
@@ -478,7 +485,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/{uuid}/ice-candidate', 'iceCandidate');
         });
 
-
+        // ================================
+        // Presence Routes
+        // ================================
+        Route::middleware('auth:sanctum')->prefix('presence')->controller(PresenceController::class)->group(function () {
+            Route::post('/pulse', 'pulse');
+            Route::post('/offline', 'offline');
+        });
 
 
 

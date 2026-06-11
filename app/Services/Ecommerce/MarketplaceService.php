@@ -44,4 +44,28 @@ class MarketplaceService
 
         return $query->latest()->paginate(12);
     }
+
+    /**
+     * Get approved products for a specific user/seller
+     */
+    public function getUserProducts(int $userId)
+    {
+        return UserProduct::with(['images', 'seller'])
+            ->where('seller_id', $userId)
+            ->whereIn('status', ['active', 'approved'])
+            ->latest()
+            ->paginate(12);
+    }
+
+    /**
+     * Get approved services for a specific user/seller
+     */
+    public function getUserServices(int $userId)
+    {
+        return UserService::with(['images', 'seller'])
+            ->where('seller_id', $userId)
+            ->whereIn('status', ['active', 'approved'])
+            ->latest()
+            ->paginate(12);
+    }
 }

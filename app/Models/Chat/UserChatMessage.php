@@ -2,6 +2,7 @@
 
 namespace App\Models\Chat;
 
+use App\Models\Chat\UserChatParticipant;
 use App\Models\User;
 use App\Traits\AutoGeneratesUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -36,7 +37,22 @@ class UserChatMessage extends Model
     // --- Accessor ---
     public function getStatusForUserAttribute()
     {
-        return 'sent'; // Extend this later for read receipts
+        $userId = request()->user()?->id;
+        if (!$userId) return 'sent';
+
+        $participant = UserChatParticipant::where('chat_id', $this->chat_id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if ($participant && $participant->last_read_message_id !== null && $participant->last_read_message_id >= $this->id) {
+            return 'read';
+        }
+
+        if ($this->delivered_at) {
+            return 'delivered';
+        }
+
+        return 'sent';
     }
 
     // --- Relations ---

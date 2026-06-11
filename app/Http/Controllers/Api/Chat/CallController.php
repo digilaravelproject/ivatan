@@ -14,11 +14,12 @@ use App\Events\Chat\CallCancelled;
 use App\Events\Chat\CallBusy;
 use App\Events\Chat\IceCandidateExchange;
 use App\Events\Chat\CallEnded;
+use App\Jobs\CleanupMissedCallJob;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class CallController extends Controller
 {
@@ -65,6 +66,16 @@ class CallController extends Controller
             } catch (\Exception $e) {
                 return $this->error($e->getMessage(), 403);
             }
+
+            // Check if receiver is busy
+            if ($otherParticipant->user->is_busy) {
+                return $this->error('User is currently busy.', 409);
+            }
+        }
+
+        // Check if caller is already busy
+        if ($user->is_busy) {
+            return $this->error('You are currently busy.', 409);
         }
 
         $session = UserCallSession::create([
@@ -75,6 +86,9 @@ class CallController extends Controller
             'type' => $request->type,
             'status' => 'ringing',
         ]);
+
+        // Set caller as busy
+        $user->update(['is_busy' => true, 'busy_status' => 'calling_' . $request->type]);
 
         // Send signaling event to the receiver
         if ($receiverId) {
@@ -92,6 +106,9 @@ class CallController extends Controller
                 $request->sdp_offer
             ))->toOthers();
         }
+
+        // Dispatch cleanup job for unanswered calls after 60 seconds
+        CleanupMissedCallJob::dispatch($session->uuid)->delay(now()->addSeconds(60));
 
         return $this->success([
             'session' => $session
@@ -130,6 +147,8 @@ class CallController extends Controller
             'started_at' => now(),
         ]);
 
+        Auth::user()->update(['is_busy' => true, 'busy_status' => 'calling_' . $session->type]);
+
         broadcast(new CallAccepted($session->caller_id, $session->uuid, $request->sdp_answer))->toOthers();
 
         return $this->success([
@@ -158,6 +177,8 @@ class CallController extends Controller
 
         broadcast(new CallDeclined($session->caller_id, $session->uuid, $reason))->toOthers();
 
+        User::where('id', $session->caller_id)->update(['is_busy' => false, 'busy_status' => null]);
+
         return $this->success([
             'session' => $session
         ], 'Call declined.');
@@ -182,6 +203,8 @@ class CallController extends Controller
         if ($session->receiver_id) {
             broadcast(new CallCancelled($session->receiver_id, $session->uuid))->toOthers();
         }
+
+        Auth::user()->update(['is_busy' => false, 'busy_status' => null]);
 
         return $this->success([
             'session' => $session
@@ -232,6 +255,14 @@ class CallController extends Controller
 
         if ($peerId) {
             broadcast(new CallEnded($peerId, $session->uuid))->toOthers();
+        }
+
+        Auth::user()->update(['is_busy' => false, 'busy_status' => null]);
+
+        if ($peerId) {
+            User::withoutEvents(function () use ($peerId) {
+                User::where('id', $peerId)->update(['is_busy' => false, 'busy_status' => null]);
+            });
         }
 
         return $this->success([

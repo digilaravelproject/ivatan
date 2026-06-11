@@ -49,6 +49,7 @@
     45 => 'App\\Providers\\EventServiceProvider',
     46 => 'App\\Providers\\TelescopeServiceProvider',
     47 => 'App\\Providers\\DynamicConfigServiceProvider',
+    48 => 'Laravel\\Reverb\\ReverbServiceProvider',
   ),
   'eager' => 
   array (
@@ -82,6 +83,7 @@
     27 => 'App\\Providers\\EventServiceProvider',
     28 => 'App\\Providers\\TelescopeServiceProvider',
     29 => 'App\\Providers\\DynamicConfigServiceProvider',
+    30 => 'Laravel\\Reverb\\ReverbServiceProvider',
   ),
   'deferred' => 
   array (
