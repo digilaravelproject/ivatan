@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Chat;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\UserCallSession;
 use App\Models\Chat\UserChat;
 use App\Services\ChatService;
