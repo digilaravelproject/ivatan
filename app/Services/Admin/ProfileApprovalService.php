@@ -10,6 +10,7 @@ use App\Services\Profile\ProfileService;
 use App\Services\Subscription\SubscriptionAssignmentService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class ProfileApprovalService
 {
@@ -58,6 +59,8 @@ class ProfileApprovalService
                 'admin_id' => $adminId,
             ]);
 
+            Cache::forget("profile_config:{$user->id}");
+
             return [
                 'switch_request' => $switchRequest->fresh()->load(['fromProfile', 'toProfile', 'approver']),
                 'new_active_profile' => $newProfile->fresh()->load(['activeSubscription.plan']),
@@ -79,6 +82,8 @@ class ProfileApprovalService
             if ($targetProfile && $targetProfile->status === 'pending_approval') {
                 $targetProfile->delete();
             }
+
+            Cache::forget("profile_config:{$switchRequest->user_id}");
 
             Log::info("Profile switch rejected", [
                 'request_id' => $switchRequest->id,

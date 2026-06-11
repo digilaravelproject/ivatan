@@ -125,6 +125,12 @@ class UserService
     {
         DB::beginTransaction();
         try {
+            $profileType = $data['profile_type'] ?? null;
+            $firstProfile = 'personal';
+            if ($profileType && $profileType !== 'personal') {
+                $firstProfile = $profileType === 'ecommerce' ? 'seller' : $profileType;
+            }
+
             $user = User::create([
                 'uuid' => Str::uuid(),
                 'name' => $data['name'],
@@ -134,6 +140,7 @@ class UserService
                 'password' => $data['password'], // Removed Hash::make due to 'hashed' cast
                 'date_of_birth' => $data['date_of_birth'],
                 'occupation' => $data['occupation'] ?? '',
+                'settings' => ['first_profile' => $firstProfile],
             ]);
 
             $user->assignRole('user');

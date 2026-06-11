@@ -27,8 +27,11 @@ class ProfileConfigService
                 ]);
 
                 // 1. Calculate first_profile (Immutable sign-up profile)
-                $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
-                $firstProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
+                $firstProfileName = $user->settings['first_profile'] ?? null;
+                if (!$firstProfileName) {
+                    $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
+                    $firstProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
+                }
 
                 // Get all profile switch requests for this user
                 $switchRequests = \App\Models\ProfileSwitchRequest::where('user_id', $user->id)
@@ -40,8 +43,12 @@ class ProfileConfigService
                 foreach ($user->profiles as $profile) {
                     $sub = $profile->activeSubscription;
                     if ($sub && $sub->isActive()) {
-                        $isTargetOfSwitch = $switchRequests->contains(fn($r) => $r->to_profile_type === $profile->type);
-                        if ($profile->type === $firstProfileName || $profile->is_active || $isTargetOfSwitch) {
+                        if ($profile->type === 'personal') {
+                            $isTargetOfSwitch = $switchRequests->contains(fn($r) => $r->to_profile_type === 'personal');
+                            if ($firstProfileName === 'personal' || $isTargetOfSwitch) {
+                                $unlockedProfiles[] = 'personal';
+                            }
+                        } else {
                             $unlockedProfiles[] = $profile->type;
                         }
                     }
@@ -50,13 +57,37 @@ class ProfileConfigService
 
                 // 3. Calculate current_profile (Dynamic)
                 $activeProfile = $user->profiles->firstWhere('is_active', true);
-                $currentProfileName = $activeProfile ? $activeProfile->type : $firstProfileName;
+                $activeProfileType = $activeProfile ? $activeProfile->type : null;
+                $currentProfileName = null;
 
-                foreach ($switchRequests as $request) {
-                    if (in_array($request->to_profile_type, $unlockedProfiles)) {
-                        $currentProfileName = $request->to_profile_type;
-                        break;
+                // A. Check if the currently active profile is unlocked (subscription is active)
+                if ($activeProfileType && in_array($activeProfileType, $unlockedProfiles)) {
+                    $currentProfileName = $activeProfileType;
+                }
+
+                // B. If not, traverse approved switch requests to find the most recent active profile that is unlocked
+                if (!$currentProfileName) {
+                    foreach ($switchRequests as $request) {
+                        if ($request->status === 'approved' && in_array($request->to_profile_type, $unlockedProfiles)) {
+                            $currentProfileName = $request->to_profile_type;
+                            break;
+                        }
                     }
+                }
+
+                // C. If still not found, check if the first profile is unlocked
+                if (!$currentProfileName && in_array($firstProfileName, $unlockedProfiles)) {
+                    $currentProfileName = $firstProfileName;
+                }
+
+                // D. If still not found, default to first unlocked profile
+                if (!$currentProfileName && !empty($unlockedProfiles)) {
+                    $currentProfileName = $unlockedProfiles[0];
+                }
+
+                // E. Absolute fallback
+                if (!$currentProfileName) {
+                    $currentProfileName = $firstProfileName;
                 }
 
                 $config = [
