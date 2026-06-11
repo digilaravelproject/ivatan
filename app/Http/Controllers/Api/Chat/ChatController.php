@@ -57,14 +57,14 @@ class ChatController extends Controller
             // (Hum check kar rahe hain ki participants mein koi aisa user hai jo seller hai aur main nahi hu)
             $query->whereHas('participants.user', function ($q) use ($user) {
                 $q->where('is_seller', true)
-                  ->where('users.id', '!=', $user->id);
+                  ->where('id', '!=', $user->id);
             });
         } 
         elseif ($filter === 'unread') {
             // Show chats having messages newer than what I have read
             $query->whereHas('lastMessage', function ($q) use ($user) {
                 $q->whereRaw('user_chat_messages.id > (
-                    SELECT last_read_message_id 
+                    SELECT COALESCE(last_read_message_id, 0)
                     FROM user_chat_participants 
                     WHERE user_chat_participants.chat_id = user_chat_messages.chat_id 
                     AND user_chat_participants.user_id = ?

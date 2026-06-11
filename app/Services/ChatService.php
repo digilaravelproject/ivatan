@@ -37,7 +37,7 @@ class ChatService
             ->where('user_id', $user->id)
             ->first();
 
-        if ($participant && $lastReadMessageId > $participant->last_read_message_id) {
+        if ($participant && ($participant->last_read_message_id === null || $lastReadMessageId > $participant->last_read_message_id)) {
             $participant->update(['last_read_message_id' => $lastReadMessageId]);
             try {
                 broadcast(new MessageRead($chatId, $user->id, $lastReadMessageId))->toOthers();
