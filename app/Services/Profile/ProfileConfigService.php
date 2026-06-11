@@ -27,6 +27,17 @@ class ProfileConfigService
                 ]);
 
                 $activeProfile = $user->profiles->firstWhere('is_active', true);
+                $currentProfileName = $activeProfile ? $activeProfile->type : null;
+
+                // If any profile has an active subscription, it overrides current_profile_name
+                foreach ($user->profiles as $profile) {
+                    if ($profile->type !== $currentProfileName) {
+                        $sub = $profile->activeSubscription;
+                        if ($sub && $sub->isActive()) {
+                            $currentProfileName = $profile->type;
+                        }
+                    }
+                }
 
                 $config = [
                     'user_profile' => [
@@ -46,7 +57,7 @@ class ProfileConfigService
                         'reputation_score' => (int) $user->reputation_score,
                         'created_at' => $user->created_at?->toIso8601String(),
                         'last_login_at' => $user->last_login_at?->toIso8601String(),
-                        'current_profile_name' => $activeProfile?->type,
+                        'current_profile_name' => $currentProfileName,
                     ],
                 ];
 
