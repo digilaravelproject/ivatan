@@ -98,8 +98,6 @@ class RazorpayGateway implements PaymentGatewayInterface
     public function createSubscriptionPlan(string $name, float $amount, string $currency, string $interval, int $intervalCount = 1): PaymentResult
     {
         try {
-            Log::info('Razorpay Key in createSubscriptionPlan: ' . $this->key);
-
             $planData = [
                 'period' => $interval,
                 'interval' => $intervalCount,
