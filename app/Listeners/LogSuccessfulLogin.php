@@ -35,13 +35,6 @@ class LogSuccessfulLogin
         try {
             // Log the successful login activity
             $this->activity->logLogin($user);
-
-            // Log additional information
-            Log::info('User logged in successfully.', [
-                'user_id'   => $user->id,
-                'email'     => $user->email,
-                'timestamp' => now(),
-            ]);
         } catch (Exception $e) {
             // Log the exception details
             Log::error('Failed to log successful login.', [
