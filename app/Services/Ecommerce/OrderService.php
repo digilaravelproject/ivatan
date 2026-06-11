@@ -11,6 +11,63 @@ use Illuminate\Auth\Access\AuthorizationException;
 class OrderService
 {
     /**
+     * List user orders (parent checkouts only)
+     */
+    public function listOrders($user)
+    {
+        return UserOrder::with([
+            'children.items.item', 
+            'payment', 
+            'shipping', 
+            'address'
+        ])
+            ->where('buyer_id', $user->id)
+            ->whereNull('parent_id')
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+    }
+
+    /**
+     * Show a single order
+     */
+    public function showOrder($orderId)
+    {
+        return UserOrder::with([
+            'children.items.item', 
+            'items.item',
+            'payment', 
+            'shipping', 
+            'buyer', 
+            'address'
+        ])->findOrFail($orderId);
+    }
+
+    /**
+     * Securely delete a pending order and restock items
+     */
+    public function deleteOrder($orderId, $user)
+    {
+        return DB::transaction(function () use ($orderId, $user) {
+            $order = UserOrder::lockForUpdate()->findOrFail($orderId);
+
+            // If order was not cancelled previously, restock the products
+            if ($order->status !== 'cancelled') {
+                if ($order->parent_id === null) {
+                    $childOrders = UserOrder::where('parent_id', $order->id)->lockForUpdate()->get();
+                    foreach ($childOrders as $child) {
+                        $this->restockOrderItems($child);
+                    }
+                } else {
+                    $this->restockOrderItems($order);
+                }
+            }
+
+            $order->delete();
+            return true;
+        });
+    }
+
+    /**
      * securely cancel/reject an order, reverting stock in a transaction
      */
     public function cancelOrder($orderId, $user)
@@ -71,7 +128,7 @@ class OrderService
                 if ($product) {
                     // Safe increment
                     $product->increment('stock', $item->quantity);
-                    \Log::info("Restocked Product {$product->id} by {$item->quantity} due to Order {$order->id} cancellation.");
+                    \Log::info("Restocked Product {$product->id} by {$item->quantity} due to Order {$order->id} deletion/cancellation.");
                 }
             }
         }

@@ -3,13 +3,20 @@
 namespace App\Http\Controllers\Api\Ecommerce;
 
 use App\Http\Controllers\Controller;
-use App\Models\Ecommerce\UserProduct;
-use App\Models\Ecommerce\UserService;
+use App\Services\Ecommerce\MarketplaceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class MarketplaceController extends Controller
 {
+    protected MarketplaceService $marketplaceService;
+
+    public function __construct(MarketplaceService $marketplaceService)
+    {
+        $this->marketplaceService = $marketplaceService;
+    }
+
     /**
      * Get all products for the marketplace
      */
@@ -17,20 +24,8 @@ class MarketplaceController extends Controller
     {
         try {
             $user = $request->user('sanctum');
-            $query = UserProduct::with(['images', 'seller'])
-                ->where('status', 'active');
-
-            // Exclude items belonging to the current user
-            if ($user) {
-                $query->where('seller_id', '!=', $user->id);
-            }
-
-            // Optional search by title
-            if ($request->has('search')) {
-                $query->where('title', 'like', '%' . $request->search . '%');
-            }
-
-            $products = $query->latest()->paginate(12);
+            $filters = $request->only(['search']);
+            $products = $this->marketplaceService->getProducts($filters, $user);
 
             return response()->json([
                 'success' => true,
@@ -38,7 +33,7 @@ class MarketplaceController extends Controller
                 'data' => $products
             ]);
         } catch (\Throwable $e) {
-            \Log::error('Marketplace product fetch error: ' . $e->getMessage());
+            Log::error('Marketplace product fetch error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred while fetching products.',
@@ -53,20 +48,8 @@ class MarketplaceController extends Controller
     {
         try {
             $user = $request->user('sanctum');
-            $query = UserService::with(['images', 'seller'])
-                ->where('status', 'active');
-
-            // Exclude items belonging to the current user
-            if ($user) {
-                $query->where('seller_id', '!=', $user->id);
-            }
-
-            // Optional search by title
-            if ($request->has('search')) {
-                $query->where('title', 'like', '%' . $request->search . '%');
-            }
-
-            $services = $query->latest()->paginate(12);
+            $filters = $request->only(['search']);
+            $services = $this->marketplaceService->getServices($filters, $user);
 
             return response()->json([
                 'success' => true,
@@ -74,7 +57,7 @@ class MarketplaceController extends Controller
                 'data' => $services
             ]);
         } catch (\Throwable $e) {
-            \Log::error('Marketplace service fetch error: ' . $e->getMessage());
+            Log::error('Marketplace service fetch error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred while fetching services.',

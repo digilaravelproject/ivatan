@@ -4,40 +4,44 @@ namespace App\Http\Controllers\Api\Ecommerce;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-
 use App\Http\Requests\Ecommerce\StoreEnquiryRequest;
 use App\Http\Requests\Ecommerce\UpdateEnquiryStatusRequest;
 use App\Http\Resources\Ecommerce\EnquiryResource;
-use App\Models\Ecommerce\UserEnquiry;
-use App\Services\NotificationService;
+use App\Services\Ecommerce\EnquiryService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class EnquiryController extends Controller
 {
+    protected EnquiryService $enquiryService;
+
+    public function __construct(EnquiryService $enquiryService)
+    {
+        $this->enquiryService = $enquiryService;
+    }
+
     /**
-     * Store a new enquiry (Rate-limited via Route Middleware)
+     * Store a new enquiry
      */
     public function store(StoreEnquiryRequest $request): JsonResponse
     {
         try {
-            $data = $request->validated();
-
-            // Link to authenticated user if logged in
-            if (auth('sanctum')->check()) {
-                $data['user_id'] = auth('sanctum')->id();
-            }
-
-            $enquiry = UserEnquiry::create($data);
-            $enquiry->load(['service', 'product', 'seller']);
+            $userId = auth('sanctum')->id();
+            $enquiry = $this->enquiryService->storeEnquiry($request->validated(), $userId);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Enquiry submitted successfully.',
                 'data' => new EnquiryResource($enquiry)
             ], 201);
-
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors()
+            ], 422);
         } catch (\Throwable $e) {
             Log::error('Enquiry Submission Error', ['error' => $e->getMessage()]);
             return response()->json(['success' => false, 'message' => 'Failed to submit enquiry'], 500);
@@ -47,32 +51,31 @@ class EnquiryController extends Controller
     /**
      * List enquiries made by the user
      */
-    public function myEnquiries(Request $request): AnonymousResourceCollection
+    public function myEnquiries(Request $request)
     {
-        $enquiries = UserEnquiry::with(['service', 'product', 'seller'])
-            ->where('user_id', $request->user()->id)
-            ->latest()
-            ->paginate(15);
-
-        return EnquiryResource::collection($enquiries)->additional(['success' => true]);
+        try {
+            $enquiries = $this->enquiryService->listMyEnquiries($request->user());
+            return EnquiryResource::collection($enquiries)->additional(['success' => true]);
+        } catch (\Throwable $e) {
+            Log::error('Enquiry myEnquiries Error', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve enquiries'], 500);
+        }
     }
 
     /**
      * List enquiries for the seller
      */
-    public function index(Request $request): AnonymousResourceCollection|JsonResponse
+    public function index(Request $request)
     {
-        $user = $request->user();
-        if (!$user->is_seller) {
-            return response()->json(['success' => false, 'message' => 'Only sellers can view enquiries'], 403);
+        try {
+            $enquiries = $this->enquiryService->listSellerEnquiries($request->user());
+            return EnquiryResource::collection($enquiries)->additional(['success' => true]);
+        } catch (AuthorizationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        } catch (\Throwable $e) {
+            Log::error('Enquiry list Error', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve enquiries'], 500);
         }
-
-        $enquiries = UserEnquiry::with(['service', 'product', 'seller', 'user'])
-            ->where('seller_id', $user->id)
-            ->latest()
-            ->paginate(15);
-
-        return EnquiryResource::collection($enquiries)->additional(['success' => true]);
     }
 
     /**
@@ -80,64 +83,40 @@ class EnquiryController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $user = $request->user();
-        if (!$user->is_seller) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        try {
+            $stats = $this->enquiryService->getStats($request->user());
+            return response()->json([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (AuthorizationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        } catch (\Throwable $e) {
+            Log::error('Enquiry stats Error', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve stats'], 500);
         }
-
-        $stats = [
-            'total' => UserEnquiry::where('seller_id', $user->id)->count(),
-            'pending' => UserEnquiry::where('seller_id', $user->id)->where('status', 'pending')->count(),
-            'replied' => UserEnquiry::where('seller_id', $user->id)->where('status', 'replied')->count(),
-            'closed' => UserEnquiry::where('seller_id', $user->id)->where('status', 'closed')->count(),
-        ];
-
-        return response()->json([
-            'success' => true,
-            'data' => $stats
-        ]);
     }
 
     /**
-     * Update enquiry status (and optionally message)
+     * Update enquiry status
      */
     public function updateStatus(UpdateEnquiryStatusRequest $request, string $identifier): JsonResponse
     {
-        $enquiry = UserEnquiry::with('user')
-            ->where(function($query) use ($identifier) {
-                $query->where('id', $identifier)
-                      ->orWhere('uuid', $identifier);
-            })->firstOrFail();
-
-        // Security check: Only the seller of THIS enquiry can update it
-        if ($enquiry->seller_id !== $request->user()->id) {
+        try {
+            $enquiry = $this->enquiryService->updateStatus($identifier, $request->validated(), $request->user());
+            return response()->json([
+                'success' => true,
+                'message' => 'Enquiry status updated to ' . $request->status,
+                'data' => new EnquiryResource($enquiry)
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Enquiry not found'], 404);
+        } catch (AuthorizationException $e) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        } catch (\Throwable $e) {
+            Log::error('Enquiry status update Error', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to update enquiry status'], 500);
         }
-
-        $enquiry->update([
-            'status' => $request->status,
-            'reply_message' => $request->reply_message ?? $enquiry->reply_message,
-        ]);
-
-        // Notify the user who made the enquiry
-        if ($enquiry->user) {
-            app(NotificationService::class)->sendToUser(
-                $enquiry->user,
-                'enquiry_update',
-                [
-                    'enquiry_id' => $enquiry->id,
-                    'status' => $request->status,
-                    'message' => "Your enquiry status has been updated to {$request->status}.",
-                    'reply' => $request->reply_message ?? null,
-                ]
-            );
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Enquiry status updated to ' . $request->status,
-            'data' => new EnquiryResource($enquiry)
-        ]);
     }
 
     /**
@@ -145,20 +124,19 @@ class EnquiryController extends Controller
      */
     public function destroy(Request $request, string $identifier): JsonResponse
     {
-        $enquiry = UserEnquiry::where(function($query) use ($identifier) {
-                $query->where('id', $identifier)
-                      ->orWhere('uuid', $identifier);
-            })->firstOrFail();
-
-        if ($enquiry->seller_id !== $request->user()->id) {
+        try {
+            $this->enquiryService->deleteEnquiry($identifier, $request->user());
+            return response()->json([
+                'success' => true,
+                'message' => 'Enquiry archived successfully'
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Enquiry not found'], 404);
+        } catch (AuthorizationException $e) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        } catch (\Throwable $e) {
+            Log::error('Enquiry destroy Error', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to archive enquiry'], 500);
         }
-
-        $enquiry->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Enquiry archived successfully'
-        ]);
     }
 }

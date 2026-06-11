@@ -8,20 +8,25 @@ use App\Models\Ecommerce\UserOrderItem;
 use App\Models\Ecommerce\UserPayment;
 use App\Models\Ecommerce\UserAddress;
 use App\Models\Ecommerce\UserProduct;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Support\Facades\Log;
 
 class CheckoutService
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function checkout(array $data, $user)
     {
-        // In your CheckoutService
         $cart = UserCart::with(['items.product', 'items.service'])->where('user_id', $user->id)->first();
-
-
 
         if (!$cart || $cart->items->isEmpty()) {
             throw ValidationException::withMessages(['error' => 'Cart is empty.']);
@@ -34,11 +39,9 @@ class CheckoutService
             foreach ($cart->items as $ci) {
                 $this->validateItem($ci, $priceChangedItems, $user);
 
-                // Calculate total
                 $lineTotal = bcmul((string) $ci->price, (string) $ci->quantity, 2);
                 $total = bcadd((string) $total, (string) $lineTotal, 2);
 
-                // Deduct stock if it's a product
                 if ($ci->item_type === 'user_products') {
                     $this->deductProductStock($ci);
                 }
@@ -51,11 +54,9 @@ class CheckoutService
                 ]);
             }
 
-            // Create parent order and save address
             $parentOrder = $this->createOrder($user, $total, $data);
             $this->saveShippingAddress($data['shipping_address'], $parentOrder);
 
-            // Group items by seller to create Child Orders
             $itemsBySeller = $cart->items->groupBy('seller_id');
 
             foreach ($itemsBySeller as $sellerId => $items) {
@@ -65,19 +66,39 @@ class CheckoutService
                     $sellerTotal = bcadd((string) $sellerTotal, (string) $itemTotal, 2);
                 }
 
-                // Create Child Order
                 $childOrder = $this->createOrder($user, $sellerTotal, $data, $parentOrder->id, $sellerId);
-
-                // Create order items linked to Child Order
                 $this->createOrderItems($items, $childOrder);
             }
 
-            // Create payment record linked to Parent Order
             $this->createPayment($parentOrder, $total, $data['payment_method']);
 
-            // Clear cart
             $cart->items()->delete();
             \Illuminate\Support\Facades\Cache::forget("cart_user_{$user->id}");
+
+            // Notify sellers of new order
+            try {
+                $childOrders = UserOrder::where('parent_id', $parentOrder->id)
+                    ->whereNotNull('seller_id')
+                    ->with('seller')
+                    ->get();
+
+                foreach ($childOrders as $childOrder) {
+                    if ($childOrder->seller && $childOrder->seller_id !== $user->id) {
+                        $this->notificationService->sendToUser($childOrder->seller, 'new_order', [
+                            'title'       => 'New Order',
+                            'message'     => 'You received a new order from ' . $user->name,
+                            'order_id'    => $childOrder->id,
+                            'order_uuid'  => $childOrder->uuid,
+                            'amount'      => $childOrder->total_amount,
+                            'buyer_name'  => $user->name,
+                            'buyer_id'    => $user->id,
+                            'action_url'  => null,
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('Order notification failed', ['error' => $e->getMessage()]);
+            }
 
             return [
                 'order' => $parentOrder,
@@ -88,7 +109,6 @@ class CheckoutService
 
     private function validateItem($ci, &$priceChangedItems, $user)
     {
-        // Prevent purchasing own items
         if ($ci->seller_id === $user->id) {
             throw ValidationException::withMessages([
                 'error' => "You cannot purchase your own item: " . ($ci->product?->title ?? $ci->service?->title)
@@ -96,7 +116,7 @@ class CheckoutService
         }
 
         if ($ci->item_type === 'user_products') {
-            $product = $ci->product; // Use the relationship here
+            $product = $ci->product;
 
             if (!$product) {
                 throw new HttpException(404, "Product not found (ID: {$ci->item_id})");
@@ -118,13 +138,8 @@ class CheckoutService
                 ];
                 $ci->update(['price' => $product->price]);
             }
-
-            if ($priceChangedItems) {
-                // Revert price silently to cart update is okay, but we shouldn't continue checkout
-                // Will throw after collecting all price changes.
-            }
         } elseif ($ci->item_type === 'user_services') {
-            $service = $ci->service; // Use the relationship here
+            $service = $ci->service;
 
             if (!$service) {
                 throw new HttpException(404, "Service not found (ID: {$ci->item_id})");
@@ -147,38 +162,29 @@ class CheckoutService
         }
     }
 
-
     private function deductProductStock($ci)
     {
         if ($ci->item_type === 'user_products') {
-            // Fetch the latest product data with a row-level lock to prevent race conditions
             $product = UserProduct::where('id', $ci->item_id)->lockForUpdate()->first();
 
             DB::transaction(function () use ($ci, $product) {
                 if ($product) {
-                    \Log::info("Before deduction - Product ID: {$product->id}, Available Stock: {$product->stock}, Requested Quantity: {$ci->quantity}");
+                    Log::info("Before deduction - Product ID: {$product->id}, Available Stock: {$product->stock}, Requested Quantity: {$ci->quantity}");
 
-                    // Check if the requested quantity is available
                     if ($product->stock < $ci->quantity) {
                         throw ValidationException::withMessages([
                             'error' => "Not enough stock available for product: {$product->title}. Only {$product->stock} units available."
                         ]);
                     }
 
-                    // Deduct the stock if enough is available
                     $product->decrement('stock', $ci->quantity);
-
-                    \Log::info("After deduction - Product ID: {$product->id}, New Stock: {$product->stock}");
+                    Log::info("After deduction - Product ID: {$product->id}, New Stock: {$product->stock}");
                 } else {
-                    // If product is not found, throw a 404 error
                     throw new HttpException(404, "Product not found (ID: {$ci->item_id})");
                 }
             });
         }
     }
-
-
-
 
     private function createOrder($user, $total, $data, $parentId = null, $sellerId = null)
     {

@@ -3,65 +3,29 @@
 namespace App\Http\Controllers\Api\Ecommerce;
 
 use App\Http\Controllers\Controller;
-use App\Models\Ecommerce\UserOrder;
-use App\Models\Ecommerce\UserShipping;
-use App\Models\User;
-use App\Services\NotificationService;
+use App\Services\Ecommerce\ShippingService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 use Illuminate\Http\JsonResponse;
-use App\Services\Ecommerce\OrderService;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Class ShippingController
- *
- * Handles shipping management for orders in the eCommerce module.
- *
- * Responsibilities:
- * - Admin & seller authorization for shipping updates
- * - Buyer access for viewing shipping status
- *
- * @package App\Http\Controllers\Api\Ecommerce
- */
 class ShippingController extends Controller
 {
-    protected $orderService;
-    protected NotificationService $notificationService;
+    protected ShippingService $shippingService;
 
-    public function __construct(OrderService $orderService, NotificationService $notificationService)
+    public function __construct(ShippingService $shippingService)
     {
-        $this->orderService = $orderService;
-        $this->notificationService = $notificationService;
+        $this->shippingService = $shippingService;
     }
 
     /**
-     * Update shipping info (tracking number, status) - Only seller or admin can update
-     */
-    /**
-     * Update the shipping information for an order.
-     *
-     * 🧠 Logic:
-     * - Admin can always update.
-     * - Seller can update only if they own at least one item in the order.
-     * - Buyers or other sellers are not authorized.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param int|string $orderId The ID of the order whose shipping info is being updated.
-     *
-     * @return \Illuminate\Http\JsonResponse
-     *
-     * @throws \Illuminate\Auth\Access\AuthorizationException
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     * @throws \Exception
+     * Update shipping info
      */
     public function updateShipping(Request $request, $orderId): JsonResponse
     {
         try {
-            // 🧾 Validate input data
             $validated = $request->validate([
                 'provider' => 'nullable|string|max:100',
                 'tracking_number' => 'required|string|max:255',
@@ -69,74 +33,8 @@ class ShippingController extends Controller
                 'meta' => 'nullable|array',
             ]);
 
-            // 🔎 Fetch order or throw 404
-            $order = UserOrder::findOrFail($orderId);
-            $user = $request->user();
+            $shipping = $this->shippingService->updateShipping((int) $orderId, $validated, $request->user());
 
-            /**
-             * 🛡️ Authorization
-             * - Admin always allowed
-             * - Seller allowed only if owns at least one item in the order
-             */
-            if (!$user->is_admin) {
-                if (!$user->is_seller) {
-                    throw new AuthorizationException('You are not authorized to update this shipping info.');
-                }
-
-                if ($order->seller_id !== $user->id) {
-                    // Fallback to checking items to support legacy orders (before sub-orders feature)
-                    $hasItem = \App\Models\Ecommerce\UserOrderItem::where('order_id', $order->id)
-                        ->where('seller_id', $user->id)
-                        ->exists();
-
-                    if (!$hasItem) {
-                        throw new AuthorizationException('You are not authorized to update this order’s shipping info.');
-                    }
-                }
-            }
-
-            // 📦 Create or find shipping record
-            $shipping = UserShipping::firstOrCreate(
-                ['order_id' => $order->id],
-                [
-                    'uuid' => (string) Str::uuid(),
-                    'status' => 'pending',
-                    'provider' => null,
-                    'tracking_number' => null,
-                    'meta' => null,
-                ]
-            );
-
-            // ✏️ Update shipping info
-            $shipping->fill([
-                'provider' => $validated['provider'] ?? $shipping->provider,
-                'tracking_number' => $validated['tracking_number'],
-                'status' => $validated['status'] ?? 'shipped',
-                'meta' => isset($validated['meta']) ? json_encode($validated['meta']) : $shipping->meta,
-            ])->save();
-
-            // 🛑 Catch Order Cancellation Flow
-            if ($shipping->status === 'cancelled') {
-                $this->orderService->cancelOrder($order->id, $user);
-
-                // Notify buyer about cancellation (non-blocking)
-                try {
-                    $buyer = User::find($order->buyer_id);
-                    if ($buyer) {
-                        $this->notificationService->sendToUser($buyer, 'order_cancelled', [
-                            'title'       => 'Order Cancelled',
-                            'message'     => 'Your order #' . $order->id . ' has been cancelled.',
-                            'order_id'    => $order->id,
-                            'order_uuid'  => $order->uuid,
-                            'action_url'  => null,
-                        ]);
-                    }
-                } catch (\Throwable $e) {
-                    Log::error('Cancellation notification failed', ['error' => $e->getMessage()]);
-                }
-            }
-
-            // ✅ Successful response
             return response()->json([
                 'success' => true,
                 'message' => 'Shipping info updated successfully.',
@@ -153,8 +51,7 @@ class ShippingController extends Controller
                 'message' => $e->getMessage(),
             ], 403);
         } catch (Exception $e) {
-            // 🪵 Log unexpected errors for debugging
-            \Log::error('Shipping update failed', [
+            Log::error('Shipping update failed', [
                 'order_id' => $orderId,
                 'user_id' => $request->user()->id ?? null,
                 'error' => $e->getMessage(),
@@ -168,32 +65,13 @@ class ShippingController extends Controller
         }
     }
 
-
-
-
     /**
-     * Get shipping info by order for buyer only
-     * @param Request $request
-     * @param int $orderId
-     * @return JsonResponse
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     * @throws \Exception
+     * Get shipping info
      */
     public function getShipping(Request $request, $orderId): JsonResponse
     {
         try {
-            $order = UserOrder::where('id', $orderId)
-                ->where('buyer_id', $request->user()->id)
-                ->firstOrFail();
-
-            $shipping = UserShipping::where('order_id', $order->id)->first();
-
-            if (!$shipping) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Shipping information not available yet.',
-                ], 404);
-            }
+            $shipping = $this->shippingService->getShipping((int) $orderId, $request->user());
 
             return response()->json([
                 'success' => true,
@@ -202,7 +80,7 @@ class ShippingController extends Controller
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Order not found or you are not authorized to view this shipping info.'
+                'message' => $e->getMessage()
             ], 404);
         } catch (Exception $e) {
             return response()->json([

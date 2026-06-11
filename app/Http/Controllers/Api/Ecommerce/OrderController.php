@@ -4,31 +4,31 @@ namespace App\Http\Controllers\Api\Ecommerce;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Ecommerce\UserOrder;
+use App\Services\Ecommerce\OrderService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Exception;
+use Illuminate\Http\JsonResponse;
 
 class OrderController extends Controller
 {
     use AuthorizesRequests;
-    // List logged-in user's orders
-    public function index(Request $request)
+
+    protected OrderService $orderService;
+
+    public function __construct(OrderService $orderService)
+    {
+        $this->orderService = $orderService;
+    }
+
+    /**
+     * List logged-in user's orders
+     */
+    public function index(Request $request): JsonResponse
     {
         try {
-            // Show only parent orders (main checkouts) in the history list
-            $orders = UserOrder::with([
-                'children.items.item', 
-                'payment', 
-                'shipping', 
-                'address'
-            ])
-                ->where('buyer_id', $request->user()->id)
-                ->whereNull('parent_id') // Filter for Parent Orders only
-                ->orderBy('created_at', 'desc')
-                ->paginate(20);
-
+            $orders = $this->orderService->listOrders($request->user());
             return response()->json([
                 'success' => true,
                 'data' => $orders
@@ -42,19 +42,13 @@ class OrderController extends Controller
         }
     }
 
-    // Show single order (only if authorized by policy)
-    public function show(Request $request, $id)
+    /**
+     * Show single order
+     */
+    public function show(Request $request, $id): JsonResponse
     {
         try {
-            $order = UserOrder::with([
-                'children.items.item', 
-                'items.item', // In case a child order is viewed directly
-                'payment', 
-                'shipping', 
-                'buyer', 
-                'address'
-            ])
-                ->findOrFail($id);
+            $order = $this->orderService->showOrder($id);
 
             $this->authorize('view', $order);
 
@@ -81,15 +75,18 @@ class OrderController extends Controller
         }
     }
 
-    // Delete order (only pending & owned)
-    public function destroy(Request $request, $id)
+    /**
+     * Delete order (only pending & owned)
+     */
+    public function destroy(Request $request, $id): JsonResponse
     {
         try {
-            $order = UserOrder::findOrFail($id);
+            // Fetch order to check authorization policy first
+            $order = $this->orderService->showOrder($id);
 
             $this->authorize('delete', $order);
 
-            $order->delete();
+            $this->orderService->deleteOrder($id, $request->user());
 
             return response()->json([
                 'success' => true,

@@ -15,7 +15,6 @@
             <label class="block text-sm font-medium mb-1">Active Gateway</label>
             <select name="payment_active_gateway" class="w-full border rounded px-3 py-2">
                 <option value="razorpay" @selected($settings['payment_active_gateway'] ?? '' === 'razorpay')>Razorpay</option>
-                <option value="stripe" @selected($settings['payment_active_gateway'] ?? '' === 'stripe') disabled class="text-gray-400">Stripe (Coming Soon)</option>
             </select>
         </div>
 
