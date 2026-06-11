@@ -1,0 +1,266 @@
+<?php
+
+namespace App\Http\Controllers\Api\Chat;
+
+use App\Http\Controllers\Controller;
+use App\Models\UserCallSession;
+use App\Models\Chat\UserChat;
+use App\Services\ChatService;
+use App\Events\Chat\CallInitiated;
+use App\Events\Chat\CallRinging;
+use App\Events\Chat\CallAccepted;
+use App\Events\Chat\CallDeclined;
+use App\Events\Chat\CallCancelled;
+use App\Events\Chat\CallBusy;
+use App\Events\Chat\IceCandidateExchange;
+use App\Events\Chat\CallEnded;
+use App\Traits\ApiResponse;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+
+class CallController extends Controller
+{
+    use ApiResponse;
+
+    protected ChatService $chatService;
+
+    public function __construct(ChatService $chatService)
+    {
+        $this->chatService = $chatService;
+    }
+
+    /**
+     * Initiate a Call Session (caller side)
+     */
+    public function initiate(Request $request): JsonResponse
+    {
+        $request->validate([
+            'chat_id' => 'required|exists:user_chats,id',
+            'type' => 'required|in:audio,video',
+            'sdp_offer' => 'required|array',
+        ]);
+
+        $user = Auth::user();
+        $chat = UserChat::findOrFail($request->chat_id);
+
+        // Verify participant
+        $isParticipant = $chat->participants()->where('user_id', $user->id)->exists();
+        if (!$isParticipant) {
+            return $this->error('Unauthorized to call in this chat.', 403);
+        }
+
+        // For private call, perform privacy check on the receiver
+        $receiverId = null;
+        if ($chat->type === 'private') {
+            $otherParticipant = $chat->participants()->where('user_id', '!=', $user->id)->first();
+            if (!$otherParticipant) {
+                return $this->error('No receiver found in this chat.', 404);
+            }
+            $receiverId = $otherParticipant->user_id;
+            
+            try {
+                $this->chatService->validateMessagingPrivacy($user, $otherParticipant->user);
+            } catch (\Exception $e) {
+                return $this->error($e->getMessage(), 403);
+            }
+        }
+
+        $session = UserCallSession::create([
+            'uuid' => (string) Str::uuid(),
+            'chat_id' => $chat->id,
+            'caller_id' => $user->id,
+            'receiver_id' => $receiverId,
+            'type' => $request->type,
+            'status' => 'ringing',
+        ]);
+
+        // Send signaling event to the receiver
+        if ($receiverId) {
+            $callerInfo = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'username' => $user->username,
+                'avatar' => $user->profile_photo_url,
+            ];
+            broadcast(new CallInitiated(
+                $receiverId,
+                $session->uuid,
+                $callerInfo,
+                $session->type,
+                $request->sdp_offer
+            ))->toOthers();
+        }
+
+        return $this->success([
+            'session' => $session
+        ], 'Call initiated.', 201);
+    }
+
+    /**
+     * Send Ringing state back to caller
+     */
+    public function ringing(string $uuid): JsonResponse
+    {
+        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        
+        broadcast(new CallRinging($session->caller_id, $session->uuid))->toOthers();
+
+        return $this->success(null, 'Ringing broadcast sent.');
+    }
+
+    /**
+     * Accept call (receiver side)
+     */
+    public function accept(Request $request, string $uuid): JsonResponse
+    {
+        $request->validate([
+            'sdp_answer' => 'required|array',
+        ]);
+
+        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        
+        if (Auth::id() !== $session->receiver_id) {
+            return $this->error('Unauthorized to accept this call.', 403);
+        }
+
+        $session->update([
+            'status' => 'accepted',
+            'started_at' => now(),
+        ]);
+
+        broadcast(new CallAccepted($session->caller_id, $session->uuid, $request->sdp_answer))->toOthers();
+
+        return $this->success([
+            'session' => $session
+        ], 'Call accepted.');
+    }
+
+    /**
+     * Decline call (receiver side)
+     */
+    public function decline(Request $request, string $uuid): JsonResponse
+    {
+        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        
+        if (Auth::id() !== $session->receiver_id) {
+            return $this->error('Unauthorized to decline this call.', 403);
+        }
+
+        $reason = $request->input('reason', 'declined'); // declined, busy
+        $status = $reason === 'busy' ? 'busy' : 'rejected';
+
+        $session->update([
+            'status' => $status,
+            'ended_at' => now(),
+        ]);
+
+        broadcast(new CallDeclined($session->caller_id, $session->uuid, $reason))->toOthers();
+
+        return $this->success([
+            'session' => $session
+        ], 'Call declined.');
+    }
+
+    /**
+     * Cancel call (caller side)
+     */
+    public function cancel(string $uuid): JsonResponse
+    {
+        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        
+        if (Auth::id() !== $session->caller_id) {
+            return $this->error('Unauthorized to cancel this call.', 403);
+        }
+
+        $session->update([
+            'status' => 'cancelled',
+            'ended_at' => now(),
+        ]);
+
+        if ($session->receiver_id) {
+            broadcast(new CallCancelled($session->receiver_id, $session->uuid))->toOthers();
+        }
+
+        return $this->success([
+            'session' => $session
+        ], 'Call cancelled.');
+    }
+
+    /**
+     * Busy call state
+     */
+    public function busy(string $uuid): JsonResponse
+    {
+        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        
+        if (Auth::id() !== $session->receiver_id) {
+            return $this->error('Unauthorized.', 403);
+        }
+
+        $session->update([
+            'status' => 'busy',
+            'ended_at' => now(),
+        ]);
+
+        broadcast(new CallBusy($session->caller_id, $session->uuid))->toOthers();
+
+        return $this->success([
+            'session' => $session
+        ], 'Call busy state set.');
+    }
+
+    /**
+     * End call session (either side)
+     */
+    public function end(string $uuid): JsonResponse
+    {
+        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        
+        $userId = Auth::id();
+        if ($userId !== $session->caller_id && $userId !== $session->receiver_id) {
+            return $this->error('Unauthorized to end this call.', 403);
+        }
+
+        $session->update([
+            'status' => 'ended',
+            'ended_at' => now(),
+        ]);
+
+        $peerId = $userId === $session->caller_id ? $session->receiver_id : $session->caller_id;
+
+        if ($peerId) {
+            broadcast(new CallEnded($peerId, $session->uuid))->toOthers();
+        }
+
+        return $this->success([
+            'session' => $session
+        ], 'Call ended.');
+    }
+
+    /**
+     * Route WebRTC ICE Candidate
+     */
+    public function iceCandidate(Request $request, string $uuid): JsonResponse
+    {
+        $request->validate([
+            'candidate' => 'required|array',
+        ]);
+
+        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        
+        $userId = Auth::id();
+        if ($userId !== $session->caller_id && $userId !== $session->receiver_id) {
+            return $this->error('Unauthorized to exchange candidate.', 403);
+        }
+
+        $peerId = $userId === $session->caller_id ? $session->receiver_id : $session->caller_id;
+
+        if ($peerId) {
+            broadcast(new IceCandidateExchange($peerId, $session->uuid, $request->candidate))->toOthers();
+        }
+
+        return $this->success(null, 'ICE Candidate broadcasted.');
+    }
+}

@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\Story\StoryController;
 use App\Http\Controllers\Api\Story\StoryHighlightController;
 use App\Http\Controllers\Api\UserPostController;
 use App\Http\Controllers\Api\Chat\ChatController;
+use App\Http\Controllers\Api\Chat\CallController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\CommentController;
@@ -451,6 +452,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('/messages', 'messages');
                 Route::post('/messages', 'sendMessage');
                 Route::post('/read', 'markRead');
+                Route::post('/delivered', 'markDelivered');
 
                 // Group Actions (Can separate controller later)
                 Route::post('/participants', 'addParticipants');
@@ -459,6 +461,21 @@ Route::prefix('v1')->group(function () {
 
             // Message Actions
             Route::delete('/messages/{message}', 'deleteMessage'); // Payload: { delete_for_everyone: true/false }
+            Route::post('/messages/{message}/edit', 'editMessage');
+        });
+
+        // ================================
+        // WebRTC Calling Routes
+        // ================================
+        Route::middleware('auth:sanctum')->prefix('chats/calls')->controller(CallController::class)->group(function () {
+            Route::post('/initiate', 'initiate');
+            Route::post('/{uuid}/ringing', 'ringing');
+            Route::post('/{uuid}/accept', 'accept');
+            Route::post('/{uuid}/decline', 'decline');
+            Route::post('/{uuid}/cancel', 'cancel');
+            Route::post('/{uuid}/busy', 'busy');
+            Route::post('/{uuid}/end', 'end');
+            Route::post('/{uuid}/ice-candidate', 'iceCandidate');
         });
 
 

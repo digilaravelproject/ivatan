@@ -7,6 +7,7 @@ use App\Http\Requests\Chat\AddParticipantsRequest;
 use App\Http\Requests\Chat\CreateGroupChatRequest;
 use App\Http\Requests\Chat\CreatePrivateChatRequest;
 use App\Http\Requests\Chat\MarkReadRequest;
+use App\Http\Requests\Chat\MarkDeliveredRequest;
 use App\Http\Requests\Chat\SendMessageRequest;
 use App\Http\Resources\Chat\ChatResource;
 use App\Http\Resources\Chat\MessageResource;
@@ -240,6 +241,37 @@ class ChatController extends Controller
         );
 
         return $this->success(null, 'Messages marked as read.');
+    }
+
+    /**
+     * 9b. Mark as Delivered
+     */
+    public function markDelivered(MarkDeliveredRequest $request, UserChat $chat): JsonResponse
+    {
+        $this->chatService->markAsDelivered(
+            Auth::user(),
+            $chat->id,
+            $request->validated()['last_delivered_message_id']
+        );
+
+        return $this->success(null, 'Messages marked as delivered.');
+    }
+
+    /**
+     * 9c. Edit Message
+     */
+    public function editMessage(Request $request, UserChatMessage $message): JsonResponse
+    {
+        $request->validate([
+            'content' => 'required|string',
+        ]);
+
+        try {
+            $editedMessage = $this->chatService->editMessage(Auth::user(), $message, $request->content);
+            return $this->success(new MessageResource($editedMessage), 'Message edited.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
+        }
     }
 
     /**

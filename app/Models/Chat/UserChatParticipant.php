@@ -27,6 +27,7 @@ class UserChatParticipant extends Model
         'user_id',
         'is_admin',
         'last_read_message_id',
+        'last_delivered_message_id',
         'joined_at',
         'is_banned',
         'banned_at',

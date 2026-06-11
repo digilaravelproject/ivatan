@@ -4,12 +4,12 @@ namespace App\Events\Chat;
 
 use App\Models\Chat\UserChatMessage;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Broadcasting\PresenceChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class MessageSent implements ShouldBroadcast
+class MessageSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -23,7 +23,7 @@ class MessageSent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('chat.' . $this->message->chat_id),
+            new PresenceChannel('presence-chat.' . $this->message->chat_id),
         ];
     }
 
@@ -40,14 +40,14 @@ class MessageSent implements ShouldBroadcast
             'content' => $this->message->content,
             'message_type' => $this->message->message_type,
             'attachment_url' => $this->message->attachment_path ? url('/storage/' . $this->message->attachment_path) : null,
-            'is_mine' => false, // Dusre ke liye always false hoga
+            'is_mine' => false,
             'status' => 'sent',
             'created_at' => $this->message->created_at->toISOString(),
-            'sender' => [
+            'sender' => $this->message->sender ? [
                 'id' => $this->message->sender->id,
                 'name' => $this->message->sender->name,
-                'avatar' => $this->message->sender->profile_photo_path,
-            ],
+                'avatar' => $this->message->sender->profile_photo_url,
+            ] : null,
             'reply_to_id' => $this->message->reply_to_message_id,
         ];
     }

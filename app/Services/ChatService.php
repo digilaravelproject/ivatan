@@ -4,6 +4,14 @@ namespace App\Services;
 
 use App\Events\Chat\MessageRead;
 use App\Events\Chat\MessageSent;
+use App\Events\Chat\MessageDelivered;
+use App\Events\Chat\MessageDeleted;
+use App\Events\Chat\MessageEdited;
+use App\Events\Chat\GroupCreated;
+use App\Events\Chat\GroupUpdated;
+use App\Events\Chat\ParticipantAdded;
+use App\Events\Chat\ParticipantRemoved;
+use App\Events\Chat\ParticipantLeft;
 use App\Models\Chat\UserChat;
 use App\Models\Chat\UserChatMessage;
 use App\Models\Chat\UserChatParticipant;
@@ -29,6 +37,41 @@ class ChatService
     }
 
     /**
+     * ✅ Validate Messaging Privacy Settings, Blocks, and Private Accounts
+     */
+    public function validateMessagingPrivacy(User $sender, User $receiver): void
+    {
+        // 1. Check Bidirectional Block List
+        $hasBlock = UserBlock::where(function ($q) use ($sender, $receiver) {
+            $q->where('user_id', $sender->id)->where('blocked_user_id', $receiver->id);
+        })->orWhere(function ($q) use ($sender, $receiver) {
+            $q->where('user_id', $receiver->id)->where('blocked_user_id', $sender->id);
+        })->exists();
+
+        if ($hasBlock) {
+            throw new \Exception('Messaging blocked.');
+        }
+
+        // 2. Check Messaging Privacy Rules
+        $messagingPrivacy = $receiver->messaging_privacy ?? 'everyone';
+
+        if ($messagingPrivacy === 'none') {
+            throw new \Exception('This user does not accept direct messages.');
+        }
+
+        // 3. Private Account / Followers check
+        $isFollowing = $sender->isFollowing($receiver);
+        
+        if ($messagingPrivacy === 'followers' && !$isFollowing) {
+            throw new \Exception('Only followers can message this user.');
+        }
+
+        if ($receiver->account_privacy === 'private' && !$isFollowing) {
+            throw new \Exception('This account is private. You must follow them to send a message.');
+        }
+    }
+
+    /**
      * ✅ Mark Messages as Read
      */
     public function markAsRead(User $user, int $chatId, int $lastReadMessageId)
@@ -40,7 +83,41 @@ class ChatService
         if ($participant && ($participant->last_read_message_id === null || $lastReadMessageId > $participant->last_read_message_id)) {
             $participant->update(['last_read_message_id' => $lastReadMessageId]);
             try {
-                broadcast(new MessageRead($chatId, $user->id, $lastReadMessageId))->toOthers();
+                $chat = $participant->chat;
+                $targetUserId = null;
+                if ($chat && $chat->type === 'private') {
+                    $otherParticipant = $chat->participants()->where('user_id', '!=', $user->id)->first();
+                    if ($otherParticipant) {
+                        $targetUserId = $otherParticipant->user_id;
+                    }
+                }
+                broadcast(new MessageRead($chatId, $user->id, $lastReadMessageId, $targetUserId))->toOthers();
+            } catch (\Exception $e) {
+                \Log::error("Broadcast Error: " . $e->getMessage());
+            }
+        }
+        return true;
+    }
+
+    /**
+     * ✅ Mark Messages as Delivered
+     */
+    public function markAsDelivered(User $user, int $chatId, int $lastDeliveredMessageId)
+    {
+        $participant = UserChatParticipant::where('chat_id', $chatId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($participant && ($participant->last_delivered_message_id === null || $lastDeliveredMessageId > $participant->last_delivered_message_id)) {
+            $participant->update(['last_delivered_message_id' => $lastDeliveredMessageId]);
+            try {
+                $chat = $participant->chat;
+                if ($chat && $chat->type === 'private') {
+                    $otherParticipant = $chat->participants()->where('user_id', '!=', $user->id)->first();
+                    if ($otherParticipant) {
+                        broadcast(new MessageDelivered($chatId, $lastDeliveredMessageId, $user->id, $otherParticipant->user_id))->toOthers();
+                    }
+                }
             } catch (\Exception $e) {
                 \Log::error("Broadcast Error: " . $e->getMessage());
             }
@@ -54,16 +131,10 @@ class ChatService
      */
     public function getPrivateChat(int $myId, int $otherId)
     {
-        // === BLOCK CHECK ===
-        $isBlocked = UserBlock::where(function ($q) use ($myId, $otherId) {
-            $q->where('user_id', $myId)->where('blocked_user_id', $otherId);
-        })->orWhere(function ($q) use ($myId, $otherId) {
-            $q->where('user_id', $otherId)->where('blocked_user_id', $myId);
-        })->exists();
+        $me = User::findOrFail($myId);
+        $other = User::findOrFail($otherId);
 
-        if ($isBlocked) {
-            throw new \Exception('You cannot chat with this user.');
-        }
+        $this->validateMessagingPrivacy($me, $other);
 
         $chat = UserChat::where('type', 'private')
             ->whereHas('participants', fn($q) => $q->where('user_id', $myId))
@@ -110,6 +181,23 @@ class ChatService
             }
 
             $this->sendSystemMessage($chat->id, "Group created by " . Auth::user()->name);
+
+            // Broadcast GroupCreated to all participants
+            $participants = $chat->participants;
+            foreach ($participants as $p) {
+                try {
+                    broadcast(new GroupCreated(
+                        $chat->id,
+                        $chat->name,
+                        $chat->avatar_url,
+                        $ownerId,
+                        $p->user_id
+                    ))->toOthers();
+                } catch (\Exception $e) {
+                    \Log::error("Broadcast Error: " . $e->getMessage());
+                }
+            }
+
             return $chat;
         });
     }
@@ -135,7 +223,20 @@ class ChatService
                 if (!$chat->participants()->where('user_id', $id)->exists()) {
                     UserChatParticipant::create(['chat_id' => $chat->id, 'user_id' => $id]);
                     $newUser = User::find($id);
-                    if($newUser) $addedNames[] = $newUser->name;
+                    if ($newUser) {
+                        $addedNames[] = $newUser->name;
+
+                        // Broadcast ParticipantAdded event to the channel and specifically to the new member
+                        try {
+                            broadcast(new ParticipantAdded(
+                                $chat->id,
+                                ['id' => $newUser->id, 'name' => $newUser->name],
+                                $user->id
+                            ))->toOthers();
+                        } catch (\Exception $e) {
+                            \Log::error("Broadcast Error: " . $e->getMessage());
+                        }
+                    }
                 }
             }
 
@@ -168,6 +269,13 @@ class ChatService
             $participant->delete();
             $this->sendSystemMessage($chat->id, $requester->name . " left the group.");
 
+            // Broadcast ParticipantLeft
+            try {
+                broadcast(new ParticipantLeft($chat->id, $requester->id))->toOthers();
+            } catch (\Exception $e) {
+                \Log::error("Broadcast Error: " . $e->getMessage());
+            }
+
             // ADMIN TRANSFER LOGIC
             // If the person leaving was an admin, assign a new admin randomly
             if ($wasAdmin) {
@@ -177,6 +285,13 @@ class ChatService
                 if ($newAdmin) {
                     $newAdmin->update(['is_admin' => true]);
                     $this->sendSystemMessage($chat->id, $newAdmin->user->name . " is now an Admin.");
+
+                    // Broadcast AdminStatusChanged
+                    try {
+                        broadcast(new AdminStatusChanged($chat->id, $newAdmin->user_id, true, $requester->id))->toOthers();
+                    } catch (\Exception $e) {
+                        \Log::error("Broadcast Error: " . $e->getMessage());
+                    }
                 }
             }
 
@@ -199,6 +314,13 @@ class ChatService
             
             $name = $targetUser ? $targetUser->name : 'a member';
             $this->sendSystemMessage($chat->id, $requester->name . " removed " . $name);
+
+            // Broadcast ParticipantRemoved
+            try {
+                broadcast(new ParticipantRemoved($chat->id, $targetUserId, $requester->id))->toOthers();
+            } catch (\Exception $e) {
+                \Log::error("Broadcast Error: " . $e->getMessage());
+            }
         }
 
         return true;
@@ -215,24 +337,14 @@ class ChatService
             $this->liveChatGroupService->checkCanSend($sender, $chat);
         }
 
-        // === BLOCK CHECK for private chats ===
+        // === PRIVACY & BLOCK CHECK for private chats ===
         if ($chat->type === 'private') {
             $otherParticipant = $chat->participants()
                 ->where('user_id', '!=', $sender->id)
                 ->first();
 
             if ($otherParticipant) {
-                $isBlocked = UserBlock::where(function ($q) use ($sender, $otherParticipant) {
-                    $q->where('user_id', $sender->id)
-                        ->where('blocked_user_id', $otherParticipant->user_id);
-                })->orWhere(function ($q) use ($sender, $otherParticipant) {
-                    $q->where('user_id', $otherParticipant->user_id)
-                        ->where('blocked_user_id', $sender->id);
-                })->exists();
-
-                if ($isBlocked) {
-                    throw new \Exception('You cannot send messages to this user.');
-                }
+                $this->validateMessagingPrivacy($sender, $otherParticipant->user);
             }
         }
 
@@ -271,15 +383,39 @@ class ChatService
     }
 
     /**
+     * ✅ Edit Message
+     */
+    public function editMessage(User $user, UserChatMessage $message, string $newContent)
+    {
+        if ($message->sender_id !== $user->id) {
+            throw new \Exception("Unauthorized to edit this message.");
+        }
+
+        $message->update([
+            'content' => $newContent,
+        ]);
+
+        broadcast(new MessageEdited($message->chat_id, $message->id, $newContent, now()->toISOString()))->toOthers();
+
+        return $message;
+    }
+
+    /**
      * ✅ Delete Message
      */
     public function deleteMessage(User $user, UserChatMessage $message, bool $deleteForEveryone = false)
     {
+        $chatId = $message->chat_id;
+        $messageId = $message->id;
+
         if ($deleteForEveryone) {
             if ($message->sender_id !== $user->id) {
                 throw new \Exception("Unauthorized to delete for everyone.");
             }
             $message->delete();
+            
+            // Broadcast deletion to everyone
+            broadcast(new MessageDeleted($chatId, $messageId, 'everyone', $user->id))->toOthers();
         } else {
             $hiddenUsers = $message->hidden_for_users ?? [];
             if (!in_array($user->id, $hiddenUsers)) {
@@ -287,6 +423,9 @@ class ChatService
                 $message->hidden_for_users = $hiddenUsers;
                 $message->save();
             }
+            
+            // Broadcast deletion to self
+            broadcast(new MessageDeleted($chatId, $messageId, 'me', $user->id))->toOthers();
         }
         return true;
     }
