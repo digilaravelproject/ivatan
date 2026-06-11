@@ -46,7 +46,7 @@ class UpdatePostTrendingScore implements ShouldQueue
                 WHERE status = "active"
             ');
 
-            Log::info("Trending scores updated successfully.");
+            // Log::info("Trending scores updated successfully.");
         } catch (\Exception $e) {
             Log::error("Failed to update trending scores: " . $e->getMessage());
         }

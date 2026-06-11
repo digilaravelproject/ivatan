@@ -73,7 +73,7 @@ class UserService
     {
         DB::beginTransaction();
         try {
-            Log::info("Starting profile update for User ID: {$user->id}");
+            // Log::info("Starting profile update for User ID: {$user->id}");
 
             // 1. Update Allowed Fields
             $user->fill($data);
@@ -90,7 +90,7 @@ class UserService
 
                 // Detect Disk automatically
                 $disk = $this->getStorageDisk();
-                Log::info("Uploading profile photo to disk: {$disk}");
+                // Log::info("Uploading profile photo to disk: {$disk}");
 
                 // Step A: Clear Old Media
                 $user->clearMediaCollection('profile_photo');

@@ -80,12 +80,12 @@ class ProfileSwitchService
                 'user_notes' => $notes,
             ]);
 
-            Log::info("Profile switch requested", [
-                'user_id' => $userId,
-                'from' => $activeProfile->type,
-                'to' => $toProfileType,
-                'request_id' => $switchRequest->id,
-            ]);
+            // Log::info("Profile switch requested", [
+            //     'user_id' => $userId,
+            //     'from' => $activeProfile->type,
+            //     'to' => $toProfileType,
+            //     'request_id' => $switchRequest->id,
+            // ]);
 
             return $switchRequest->load(['fromProfile', 'toProfile']);
         });

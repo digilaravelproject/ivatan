@@ -33,7 +33,7 @@ class ProfileService
 
             $this->subscriptionAssignmentService->assignDefaultPlan($profile);
 
-            Log::info("Personal profile created for user: {$userId}", ['profile_id' => $profile->id]);
+            // Log::info("Personal profile created for user: {$userId}", ['profile_id' => $profile->id]);
 
             return $profile;
         });
@@ -60,10 +60,10 @@ class ProfileService
 
             Cache::forget("profile_config:{$userId}");
 
-            Log::info("Profile created for user: {$userId}", [
-                'profile_id' => $profile->id,
-                'type' => $type,
-            ]);
+            // Log::info("Profile created for user: {$userId}", [
+            //     'profile_id' => $profile->id,
+            //     'type' => $type,
+            // ]);
 
             return $profile->load($this->getDetailRelation($type));
         });
@@ -86,7 +86,7 @@ class ProfileService
 
             Cache::forget("profile_config:{$profile->user_id}");
 
-            Log::info("Profile activated: {$profile->id}", ['user_id' => $profile->user_id]);
+            // Log::info("Profile activated: {$profile->id}", ['user_id' => $profile->user_id]);
         });
     }
 
