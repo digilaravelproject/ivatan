@@ -26,34 +26,37 @@ class ProfileConfigService
                     ]),
                 ]);
 
+                // 1. Calculate first_profile (Immutable sign-up profile)
+                $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
+                $firstProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
+
+                // 2. Calculate unlocked_profiles (Flattened list of profiles with active subscriptions)
+                $unlockedProfiles = [];
+                foreach ($user->profiles as $profile) {
+                    if ($profile->type === 'personal') {
+                        $unlockedProfiles[] = 'personal';
+                        continue;
+                    }
+                    $sub = $profile->activeSubscription;
+                    if ($sub && $sub->isActive()) {
+                        $unlockedProfiles[] = $profile->type;
+                    }
+                }
+                $unlockedProfiles = array_values(array_unique($unlockedProfiles));
+
+                // 3. Calculate current_profile (Dynamic)
                 $activeProfile = $user->profiles->firstWhere('is_active', true);
-                
-                // Get all profile switch requests for this user
+                $currentProfileName = $activeProfile ? $activeProfile->type : $firstProfileName;
+
+                // Check profile switch requests. If target of switch is unlocked, update current_profile
                 $switchRequests = \App\Models\ProfileSwitchRequest::where('user_id', $user->id)
                     ->orderBy('created_at', 'desc')
                     ->get();
 
-                if ($switchRequests->isEmpty()) {
-                    // First Time Registration:
-                    // If they selected a profile other than 'personal' during registration, it exists in their profiles list.
-                    $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
-                    $currentProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
-                } else {
-                    // Second Time (Profile Switch):
-                    // Start with the initial registration profile or previous active profile name
-                    $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
-                    $currentProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
-
-                    // Check if any switched profile has an active subscription
-                    foreach ($switchRequests as $request) {
-                        $targetProfile = $user->profiles->firstWhere('type', $request->to_profile_type);
-                        if ($targetProfile) {
-                            $sub = $targetProfile->activeSubscription;
-                            if ($sub && $sub->isActive()) {
-                                $currentProfileName = $targetProfile->type;
-                                break; // Found the active subscribed profile
-                            }
-                        }
+                foreach ($switchRequests as $request) {
+                    if (in_array($request->to_profile_type, $unlockedProfiles)) {
+                        $currentProfileName = $request->to_profile_type;
+                        break;
                     }
                 }
 
@@ -75,7 +78,9 @@ class ProfileConfigService
                         'reputation_score' => (int) $user->reputation_score,
                         'created_at' => $user->created_at?->toIso8601String(),
                         'last_login_at' => $user->last_login_at?->toIso8601String(),
-                        'current_profile_name' => $currentProfileName,
+                        'first_profile' => $firstProfileName,
+                        'current_profile' => $currentProfileName,
+                        'unlocked_profiles' => $unlockedProfiles,
                     ],
                 ];
 
