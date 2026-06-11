@@ -264,6 +264,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('/', [StoryHighlightController::class, 'store']);
                 Route::post('/{highlightId}/{storyId}', [StoryHighlightController::class, 'addStory']); // Add
                 Route::delete('/{highlightId}/{storyId}', [StoryHighlightController::class, 'removeStory']); // Remove
+                Route::delete('/{id}', [StoryHighlightController::class, 'destroy']);
             });
         });
 

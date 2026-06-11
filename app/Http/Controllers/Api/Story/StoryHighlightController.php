@@ -5,36 +5,29 @@ namespace App\Http\Controllers\Api\Story;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Story\CreateHighlightRequest;
 use App\Http\Resources\StoryHighlightResource;
-use App\Models\User;
-use App\Models\UserStory;
-use App\Models\UserStoryHighlight;
+use App\Services\StoryHighlightService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Laravel\Telescope\AuthorizesRequests;
 
 class StoryHighlightController extends Controller
 {
-    use AuthorizesRequests;
+    protected StoryHighlightService $highlightService;
+
+    public function __construct(StoryHighlightService $highlightService)
+    {
+        $this->highlightService = $highlightService;
+    }
+
     /**
      * Get Highlights for a specific User (or logged in user).
      */
     public function index(Request $request, string $username = null): JsonResponse
     {
         try {
-            // Determine target user
-            if ($username) {
-                $user = User::where('username', $username)->firstOrFail();
-            } else {
-                $user = Auth::user();
-            }
-
-            $highlights = UserStoryHighlight::with(['stories.media'])
-                ->where('user_id', $user->id)
-                ->latest()
-                ->get(); // Highlights are usually limited, so paginate might not be needed strictly, but good to have if many
+            $user = Auth::user();
+            $highlights = $this->highlightService->getUserHighlights($username, $user);
 
             return response()->json([
                 'success' => true,
@@ -51,7 +44,7 @@ class StoryHighlightController extends Controller
     public function show(int $id): JsonResponse
     {
         try {
-            $highlight = UserStoryHighlight::with(['stories.media', 'user'])->findOrFail($id);
+            $highlight = $this->highlightService->getHighlightById($id);
             return response()->json(['success' => true, 'data' => new StoryHighlightResource($highlight)]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => 'Highlight not found.'], 404);
@@ -63,34 +56,14 @@ class StoryHighlightController extends Controller
      */
     public function store(CreateHighlightRequest $request): JsonResponse
     {
-        DB::beginTransaction();
         try {
             $user = Auth::user();
-
-            $highlight = UserStoryHighlight::create([
-                'user_id' => $user->id,
-                'title' => $request->title,
-            ]);
-
-            // Handle Cover Image
-            if ($request->hasFile('cover_media')) {
-                $media = $highlight->addMedia($request->file('cover_media'))
-                    ->toMediaCollection('cover_media');
-
-                $highlight->update(['cover_media_id' => $media->id]);
-            }
-
-            // Optionally add stories immediately during creation
-            if ($request->filled('story_ids')) {
-                // Ensure stories belong to user
-                $storyIds = UserStory::whereIn('id', $request->story_ids)
-                    ->where('user_id', $user->id)
-                    ->pluck('id');
-
-                $highlight->stories()->sync($storyIds);
-            }
-
-            DB::commit();
+            $highlight = $this->highlightService->createHighlight(
+                $user,
+                $request->title,
+                $request->file('cover_media'),
+                $request->story_ids
+            );
 
             return response()->json([
                 'success' => true,
@@ -98,7 +71,6 @@ class StoryHighlightController extends Controller
                 'data' => new StoryHighlightResource($highlight->load('stories'))
             ], 201);
         } catch (\Throwable $e) {
-            DB::rollBack();
             Log::error("Highlight Create Error: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to create highlight.'], 500);
         }
@@ -111,20 +83,12 @@ class StoryHighlightController extends Controller
     {
         try {
             $user = Auth::user();
-
-            // Fetch Highlight
-            $highlight = UserStoryHighlight::where('id', $highlightId)->where('user_id', $user->id)->firstOrFail();
-
-            // Fetch Story (Ensure ownership)
-            $story = UserStory::where('id', $storyId)->where('user_id', $user->id)->firstOrFail();
-
-            // Sync without detaching (adds if not exists)
-            $highlight->stories()->syncWithoutDetaching([$story->id]);
+            $highlight = $this->highlightService->addStoryToHighlight($user, $highlightId, $storyId);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Story added to highlight.',
-                'data' => new StoryHighlightResource($highlight->fresh('stories.media'))
+                'data' => new StoryHighlightResource($highlight)
             ]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => 'Could not add story.'], 400);
@@ -138,17 +102,42 @@ class StoryHighlightController extends Controller
     {
         try {
             $user = Auth::user();
-            $highlight = UserStoryHighlight::where('id', $highlightId)->where('user_id', $user->id)->firstOrFail();
-
-            $highlight->stories()->detach($storyId);
+            $highlight = $this->highlightService->removeStoryFromHighlight($user, $highlightId, $storyId);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Story removed from highlight.',
-                'data' => new StoryHighlightResource($highlight->fresh('stories.media'))
+                'data' => new StoryHighlightResource($highlight)
             ]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => 'Could not remove story.'], 400);
+        }
+    }
+
+    /**
+     * Delete a Highlight and clean up all dependencies.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $this->highlightService->deleteHighlight($user, $id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Highlight deleted successfully.'
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Highlight not found or unauthorized.'
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error("Highlight Delete Error: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete highlight due to a server error.'
+            ], 500);
         }
     }
 }
