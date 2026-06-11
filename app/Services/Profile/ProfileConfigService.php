@@ -297,6 +297,7 @@ class ProfileConfigService
                 'expiry_date' => null,
                 'next_billing_date' => null,
                 'auto_renew' => false,
+                'has_paid_subscription' => false,
             ];
         }
 
@@ -315,6 +316,7 @@ class ProfileConfigService
             'expiry_date' => $subscription->ends_at?->toIso8601String(),
             'next_billing_date' => $subscription->next_billing_at?->toIso8601String(),
             'auto_renew' => (bool) $subscription->auto_renew,
+            'has_paid_subscription' => (bool) ($subscription->isActive() && !$plan->is_default),
         ];
     }
 

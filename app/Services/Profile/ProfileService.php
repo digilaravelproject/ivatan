@@ -54,9 +54,7 @@ class ProfileService
 
             $this->createTypeDetails($profile, $details);
 
-            if ($profile->status === 'active') {
-                $this->subscriptionAssignmentService->assignDefaultPlan($profile);
-            }
+            $this->subscriptionAssignmentService->assignDefaultPlan($profile);
 
             Cache::forget("profile_config:{$userId}");
 
