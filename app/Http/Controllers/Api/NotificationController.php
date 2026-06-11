@@ -165,13 +165,28 @@ class NotificationController extends Controller
 
         $user = $request->user();
 
-        DeviceToken::updateOrCreate(
-            ['user_id' => $user->id, 'token' => $request->token],
-            [
+        DB::transaction(function () use ($user, $request) {
+            // Delete token if it exists under another user to avoid duplicates
+            DeviceToken::where('token', $request->token)->delete();
+
+            // Create fresh token
+            DeviceToken::create([
+                'user_id'      => $user->id,
+                'token'        => $request->token,
                 'device'       => $request->device,
                 'last_used_at' => now(),
-            ]
-        );
+            ]);
+
+            // Keep only the 5 most recently used tokens/devices for the user
+            $excessTokens = DeviceToken::where('user_id', $user->id)
+                ->orderBy('last_used_at', 'desc')
+                ->skip(5)
+                ->get();
+
+            foreach ($excessTokens as $staleToken) {
+                $staleToken->delete();
+            }
+        });
 
         return response()->json(['success' => true, 'message' => 'Device token registered.']);
     }
