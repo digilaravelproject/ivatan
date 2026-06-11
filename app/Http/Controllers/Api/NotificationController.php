@@ -181,6 +181,7 @@ class NotificationController extends Controller
             $excessTokens = DeviceToken::where('user_id', $user->id)
                 ->orderBy('last_used_at', 'desc')
                 ->skip(5)
+                ->take(100)
                 ->get();
 
             foreach ($excessTokens as $staleToken) {
