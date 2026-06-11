@@ -34,10 +34,29 @@ class UserChatMessage extends Model
         'delivered_at' => 'datetime',
     ];
 
-    // --- Accessor ---
-    public function getStatusForUserAttribute()
+    public function getStatusForUserAttribute(): string
     {
-        $userId = request()->user()?->id;
+        $userId = request()?->user()?->id;
+        if (!$userId) return 'sent';
+
+        $participant = UserChatParticipant::where('chat_id', $this->chat_id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if ($participant && $participant->last_read_message_id !== null && $participant->last_read_message_id >= $this->id) {
+            return 'read';
+        }
+
+        if ($this->delivered_at) {
+            return 'delivered';
+        }
+
+        return 'sent';
+    }
+
+    public function statusForUser(?int $userId = null): string
+    {
+        $userId ??= request()?->user()?->id;
         if (!$userId) return 'sent';
 
         $participant = UserChatParticipant::where('chat_id', $this->chat_id)

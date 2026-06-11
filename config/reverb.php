@@ -101,7 +101,7 @@ return [
                 'allowed_origins' => ['*'],
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
                 'activity_timeout' => env('REVERB_APP_ACTIVITY_TIMEOUT', 120),
-                'max_message_size' => env('REVERB_APP_MAX_MESSAGE_SIZE', 10_000),
+                'max_message_size' => env('REVERB_APP_MAX_MESSAGE_SIZE', 262_144),
                 'accept_client_events_from' => ['members'],
             ],
         ],

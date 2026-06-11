@@ -44,7 +44,7 @@ class LikeHistoryResource extends JsonResource
             $media = $likeable->media->first();
             return [
                 'caption'   => Str::limit($likeable->caption, 50),
-                'thumbnail' => $media ? $media->getUrl() : null,
+                'thumbnail' => $media ? ($media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl()) : null,
             ];
         }
 

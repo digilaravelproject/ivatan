@@ -27,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Relation::morphMap([
             'UserPost' => UserPost::class,
+            'App\\Models\\UserPost' => UserPost::class,
             'user_products' => \App\Models\Ecommerce\UserProduct::class,
             'user_services' => \App\Models\Ecommerce\UserService::class,
         ]);

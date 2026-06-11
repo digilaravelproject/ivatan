@@ -20,7 +20,7 @@ class VideoViewHistoryResource extends JsonResource
 
         if (!$isDeleted && $viewable instanceof \App\Models\UserPost) {
             $media = $viewable->media->first();
-            $preview['thumbnail'] = $media ? $media->getUrl() : null;
+            $preview['thumbnail'] = $media ? ($media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl()) : null;
             $preview['caption'] = Str::limit($viewable->caption, 50);
         }
 

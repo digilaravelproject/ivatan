@@ -37,11 +37,6 @@ class PresenceController extends Controller
             }
         }
 
-        $user->update([
-            'is_online' => true,
-            'last_seen_at' => now(),
-        ]);
-
         $this->presenceService->setOnline($user);
 
         return $this->success([

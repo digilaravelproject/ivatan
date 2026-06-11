@@ -19,7 +19,7 @@ class HistoryService
         return Like::select('id', 'user_id', 'likeable_type', 'likeable_id', 'created_at')
             ->where('user_id', $userId)
             ->with(['likeable' => function ($morph) {
-                $morph->morphWith([
+                $morph->withTrashed()->morphWith([
                     UserPost::class => ['media'],
                 ]);
             }])
@@ -35,7 +35,7 @@ class HistoryService
         return Comment::select('id', 'user_id', 'body', 'commentable_type', 'commentable_id', 'parent_id', 'created_at')
             ->where('user_id', $userId)
             ->with(['commentable' => function ($morph) {
-                $morph->morphWith([
+                $morph->withTrashed()->morphWith([
                     UserPost::class => ['media'],
                 ]);
             }])
@@ -64,7 +64,9 @@ class HistoryService
             ->selectRaw('user_posts.type as post_type')
             ->selectRaw('user_posts.caption as post_caption')
             ->with(['viewable' => function ($m) {
-                $m->with(['media']);
+                $m->withTrashed()->morphWith([
+                    UserPost::class => ['media'],
+                ]);
             }])
             ->orderByDesc('views.created_at')
             ->orderByDesc('views.id')

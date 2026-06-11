@@ -122,7 +122,11 @@ class CallController extends Controller
     public function ringing(string $uuid): JsonResponse
     {
         $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
-        
+
+        if (Auth::id() !== $session->receiver_id) {
+            return $this->error('Unauthorized to send ringing.', 403);
+        }
+
         broadcast(new CallRinging($session->caller_id, $session->uuid))->toOthers();
 
         return $this->success(null, 'Ringing broadcast sent.');
@@ -141,6 +145,10 @@ class CallController extends Controller
         
         if (Auth::id() !== $session->receiver_id) {
             return $this->error('Unauthorized to accept this call.', 403);
+        }
+
+        if ($session->status !== 'ringing') {
+            return $this->error('Call session is no longer active.', 400);
         }
 
         $session->update([
@@ -166,6 +174,10 @@ class CallController extends Controller
         
         if (Auth::id() !== $session->receiver_id) {
             return $this->error('Unauthorized to decline this call.', 403);
+        }
+
+        if ($session->status !== 'ringing') {
+            return $this->error('Call session is no longer active.', 400);
         }
 
         $reason = $request->input('reason', 'declined'); // declined, busy
@@ -229,6 +241,8 @@ class CallController extends Controller
         ]);
 
         broadcast(new CallBusy($session->caller_id, $session->uuid))->toOthers();
+
+        User::where('id', $session->caller_id)->update(['is_busy' => false, 'busy_status' => null]);
 
         return $this->success([
             'session' => $session
