@@ -432,4 +432,20 @@ class User extends Authenticatable implements HasMedia
         $this->cachedUnreadCount = $row ? (int) $row->unread_count : 0;
         return $this->cachedUnreadCount;
     }
+
+    public function getIsEmployerAttribute($value): bool
+    {
+        if ($value) {
+            return true;
+        }
+        return $this->activeProfile()->where('type', 'employer')->exists();
+    }
+
+    public function getIsSellerAttribute($value): bool
+    {
+        if ($value) {
+            return true;
+        }
+        return $this->activeProfile()->where('type', 'seller')->exists();
+    }
 }
