@@ -21,7 +21,12 @@ class ProfileSwitchService
                 ->first();
 
             if (!$activeProfile) {
-                throw new \RuntimeException('No active profile found.');
+                $activeProfile = Profile::where('user_id', $userId)->first();
+                if ($activeProfile) {
+                    $activeProfile->update(['is_active' => true]);
+                } else {
+                    $activeProfile = $this->profileService->createPersonalProfile($userId);
+                }
             }
 
             if ($activeProfile->type === $toProfileType) {
