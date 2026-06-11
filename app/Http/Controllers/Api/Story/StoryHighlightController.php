@@ -41,10 +41,10 @@ class StoryHighlightController extends Controller
     /**
      * Show a single highlight with its stories.
      */
-    public function show(int $id): JsonResponse
+    public function show($id): JsonResponse
     {
         try {
-            $highlight = $this->highlightService->getHighlightById($id);
+            $highlight = $this->highlightService->getHighlightById((int)$id);
             return response()->json(['success' => true, 'data' => new StoryHighlightResource($highlight)]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => 'Highlight not found.'], 404);
@@ -79,11 +79,11 @@ class StoryHighlightController extends Controller
     /**
      * Add Story to Highlight.
      */
-    public function addStory(int $highlightId, int $storyId): JsonResponse
+    public function addStory($highlightId, $storyId): JsonResponse
     {
         try {
             $user = Auth::user();
-            $highlight = $this->highlightService->addStoryToHighlight($user, $highlightId, $storyId);
+            $highlight = $this->highlightService->addStoryToHighlight($user, (int)$highlightId, (int)$storyId);
 
             return response()->json([
                 'success' => true,
@@ -98,11 +98,11 @@ class StoryHighlightController extends Controller
     /**
      * Remove Story from Highlight.
      */
-    public function removeStory(int $highlightId, int $storyId): JsonResponse
+    public function removeStory($highlightId, $storyId): JsonResponse
     {
         try {
             $user = Auth::user();
-            $highlight = $this->highlightService->removeStoryFromHighlight($user, $highlightId, $storyId);
+            $highlight = $this->highlightService->removeStoryFromHighlight($user, (int)$highlightId, (int)$storyId);
 
             return response()->json([
                 'success' => true,
@@ -117,11 +117,11 @@ class StoryHighlightController extends Controller
     /**
      * Delete a Highlight and clean up all dependencies.
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy($id): JsonResponse
     {
         try {
             $user = Auth::user();
-            $this->highlightService->deleteHighlight($user, $id);
+            $this->highlightService->deleteHighlight($user, (int)$id);
 
             return response()->json([
                 'success' => true,
