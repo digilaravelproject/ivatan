@@ -27,14 +27,32 @@ class ProfileConfigService
                 ]);
 
                 $activeProfile = $user->profiles->firstWhere('is_active', true);
-                $currentProfileName = $activeProfile ? $activeProfile->type : null;
+                
+                // Get all profile switch requests for this user
+                $switchRequests = \App\Models\ProfileSwitchRequest::where('user_id', $user->id)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
 
-                // If any profile has an active subscription, it overrides current_profile_name
-                foreach ($user->profiles as $profile) {
-                    if ($profile->type !== $currentProfileName) {
-                        $sub = $profile->activeSubscription;
-                        if ($sub && $sub->isActive()) {
-                            $currentProfileName = $profile->type;
+                if ($switchRequests->isEmpty()) {
+                    // First Time Registration:
+                    // If they selected a profile other than 'personal' during registration, it exists in their profiles list.
+                    $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
+                    $currentProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
+                } else {
+                    // Second Time (Profile Switch):
+                    // Start with the initial registration profile or previous active profile name
+                    $registrationProfile = $user->profiles->first(fn($p) => $p->type !== 'personal');
+                    $currentProfileName = $registrationProfile ? $registrationProfile->type : 'personal';
+
+                    // Check if any switched profile has an active subscription
+                    foreach ($switchRequests as $request) {
+                        $targetProfile = $user->profiles->firstWhere('type', $request->to_profile_type);
+                        if ($targetProfile) {
+                            $sub = $targetProfile->activeSubscription;
+                            if ($sub && $sub->isActive()) {
+                                $currentProfileName = $targetProfile->type;
+                                break; // Found the active subscribed profile
+                            }
                         }
                     }
                 }
