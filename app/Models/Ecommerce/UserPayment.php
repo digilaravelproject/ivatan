@@ -42,6 +42,7 @@ class UserPayment extends Model
     const STATUS_FAILED = 'failed';
     const GATEWAY_COD = 'cod';
     const GATEWAY_RAZORPAY = 'razorpay';
+    const GATEWAY_PHONEPE = 'phonepe';
     const GATEWAY_STRIPE = 'stripe';
 
     protected $fillable = ['uuid', 'order_id', 'gateway', 'amount', 'status', 'transaction_id', 'meta'];

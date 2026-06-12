@@ -15,50 +15,63 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\DB;
 
-class ProcessOrderPayment implements ShouldQueue
+class ProcessOrderPayment implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $orderId;
     public string $paymentId;
-    public string $razorpayOrderId;
-    public string $razorpaySignature;
+    public string $gatewayOrderId;
+    public string $gatewayChecksum;
+    public string $gateway;
 
-    /** ✅ Job control properties */
-    public $timeout = 120; // Job fails if it runs more than 2 minutes
-    public $tries = 3;     // Retry up to 3 times before failing permanently
+    public $timeout = 120;
+    public $tries = 3;
+    public $backoff = [2, 10, 30];
+    public $uniqueFor = 3600;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(int $orderId, string $paymentId, string $razorpayOrderId, string $razorpaySignature)
+    public function uniqueId(): string
     {
-        $this->orderId = $orderId;
-        $this->paymentId = $paymentId;
-        $this->razorpayOrderId = $razorpayOrderId;
-        $this->razorpaySignature = $razorpaySignature;
+        return (string) $this->orderId;
     }
 
-    /**
-     * Get the middleware the job should pass through.
-     *
-     * @return array
-     */
+    public function __construct(
+        int $orderId,
+        string $paymentId,
+        string $gatewayOrderId = '',
+        string $gatewayChecksum = '',
+        string $gateway = 'razorpay',
+    ) {
+        $this->orderId = $orderId;
+        $this->paymentId = $paymentId;
+        $this->gatewayOrderId = $gatewayOrderId;
+        $this->gatewayChecksum = $gatewayChecksum;
+        $this->gateway = $gateway;
+    }
+
+    public function __set(string $name, mixed $value): void
+    {
+        if ($name === 'razorpayOrderId') {
+            $this->gatewayOrderId = $value;
+        } elseif ($name === 'razorpaySignature') {
+            $this->gatewayChecksum = $value;
+        }
+    }
+
     public function middleware()
     {
         return [new WithoutOverlapping((string) $this->orderId)];
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle()
     {
         Log::info('ProcessOrderPayment job started', [
             'order_id' => $this->orderId,
+            'gateway' => $this->gateway,
         ]);
 
         try {
@@ -75,40 +88,36 @@ class ProcessOrderPayment implements ShouldQueue
                     return;
                 }
 
-                // Update payment record
                 $payment = UserPayment::where('order_id', $order->id)
-                    ->where('gateway', 'razorpay')
                     ->where('status', 'initiated')
+                    ->latest()
                     ->first();
 
                 if (!$payment) {
                     Log::error('Payment record not found or already processed', ['order_id' => $order->id]);
                 } else {
-                    // UserPayment 'meta' is cast to array in the model
                     $currentMeta = is_array($payment->meta) ? $payment->meta : (is_string($payment->meta) ? json_decode($payment->meta, true) : []);
 
-                    // Add the new keys to the existing meta array
-                    $currentMeta['razorpay_order_id'] = $this->razorpayOrderId;
-                    $currentMeta['razorpay_signature'] = $this->razorpaySignature;
+                    $currentMeta['gateway_order_id'] = $this->gatewayOrderId;
+                    $currentMeta['gateway_checksum'] = $this->gatewayChecksum;
 
-                    // Update the payment record
                     $payment->update([
                         'status' => UserPayment::STATUS_PAID,
                         'transaction_id' => $this->paymentId,
                         'meta' => $currentMeta,
                     ]);
 
-
-                    Log::info('Payment record updated successfully', ['payment_id' => $payment->id]);
+                    Log::info('Payment record updated successfully', [
+                        'payment_id' => $payment->id,
+                        'gateway' => $this->gateway,
+                    ]);
                 }
 
-                // Update order status (Parent)
                 $order->update([
                     'payment_status' => UserOrder::PAYMENT_PAID ?? 'paid',
                     'status' => UserOrder::STATUS_PROCESSING ?? 'processing',
                 ]);
 
-                // Update order status (Children)
                 UserOrder::where('parent_id', $order->id)->update([
                     'payment_status' => UserOrder::PAYMENT_PAID ?? 'paid',
                     'status' => UserOrder::STATUS_PROCESSING ?? 'processing',
@@ -116,17 +125,13 @@ class ProcessOrderPayment implements ShouldQueue
 
                 Log::info('Order payment status updated', ['order_id' => $order->id]);
 
-                // Stock is already deducted during checkout (CheckoutService)
-                // Redundant stock deduction removed here to prevent double/triple deduction bug.
-
-                // Create shipping per child order
                 $childOrders = UserOrder::where('parent_id', $order->id)->get();
                 $address = $order->address;
 
                 if ($address) {
                     foreach ($childOrders as $childOrder) {
                         if (!$childOrder->shipping) {
-                            $shipping = UserShipping::create([
+                            UserShipping::create([
                                 'uuid' => (string) Str::uuid(),
                                 'order_id' => $childOrder->id,
                                 'address_id' => $address->id,
@@ -134,7 +139,6 @@ class ProcessOrderPayment implements ShouldQueue
                             ]);
 
                             Log::info('Shipping record created for Child Order', [
-                                'shipping_id' => $shipping->id,
                                 'child_order_id' => $childOrder->id,
                             ]);
                         }
@@ -143,10 +147,8 @@ class ProcessOrderPayment implements ShouldQueue
                     Log::warning('No address found to create shipping', ['order_id' => $order->id]);
                 }
 
-                // You can also log the final success if all goes well
                 Log::info('ProcessOrderPayment job completed', ['order_id' => $order->id]);
 
-                // Send payment success notification (non-blocking)
                 try {
                     $buyer = User::find($order->buyer_id);
                     if ($buyer) {
@@ -171,7 +173,16 @@ class ProcessOrderPayment implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            throw $e; // rethrow to let Laravel handle failed_jobs table
+            throw $e;
         }
+    }
+
+    public function failed(?\Throwable $exception = null): void
+    {
+        Log::error('ProcessOrderPayment permanently failed', [
+            'order_id' => $this->orderId,
+            'gateway' => $this->gateway,
+            'error' => $exception?->getMessage(),
+        ]);
     }
 }

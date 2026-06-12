@@ -6,6 +6,7 @@ use App\Helpers\ImageHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ecommerce\StoreUserProductRequest;
 use App\Http\Requests\Ecommerce\UpdateUserProductRequest;
+use App\Http\Resources\Ecommerce\ProductResource;
 use App\Models\Ecommerce\UserProduct;
 use App\Models\Ecommerce\UserProductImage;
 use App\Models\User;
@@ -43,7 +44,7 @@ class UserProductController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Products fetched successfully.',
-                'data' => $products->items(),
+                'data' => ProductResource::collection($products->items()),
                 'pagination' => [
                     'total' => $products->total(),
                     'per_page' => $products->perPage(),
@@ -89,7 +90,7 @@ class UserProductController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Seller products fetched successfully.',
-                'data' => $products->items(),
+                'data' => ProductResource::collection($products->items()),
                 'pagination' => [
                     'total' => $products->total(),
                     'per_page' => $products->perPage(),
@@ -130,7 +131,7 @@ class UserProductController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $product,
+                'data' => new ProductResource($product->load('images', 'seller')),
             ]);
         } catch (ModelNotFoundException $e) {
             // Handle the case where the product wasn't found in both ID and slug queries
@@ -217,7 +218,7 @@ class UserProductController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Product created successfully.',
-                'data' => $product->load('images'),
+                'data' => new ProductResource($product->load('images')),
             ], 201);
         } catch (\Throwable $e) {
             DB::rollBack(); // Rollback in case of error
@@ -327,7 +328,7 @@ class UserProductController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Product updated successfully.',
-                'data' => $product,
+                'data' => new ProductResource($product),
             ]);
         } catch (\Throwable $e) {
             DB::rollBack(); // Rollback in case of error

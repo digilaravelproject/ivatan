@@ -14,6 +14,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $user_id
  * @property numeric $amount
  * @property string $currency
+ * @property string|null $gateway
+ * @property string|null $gateway_order_id
+ * @property string|null $gateway_payment_id
  * @property string $status
  * @property string|null $razorpay_order_id
  * @property string|null $razorpay_payment_id
@@ -30,6 +33,9 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereAmount($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereCurrency($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereGateway($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereGatewayOrderId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereGatewayPaymentId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereMeta($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AdPayment whereRazorpayOrderId($value)
@@ -44,12 +50,14 @@ class AdPayment extends Model
 {
     use HasFactory;
 
-
     protected $fillable = [
         'ad_id',
         'user_id',
         'amount',
         'currency',
+        'gateway',
+        'gateway_order_id',
+        'gateway_payment_id',
         'status',
         'razorpay_order_id',
         'razorpay_payment_id',
@@ -57,12 +65,10 @@ class AdPayment extends Model
         'meta',
     ];
 
-
     protected $casts = [
         'amount' => 'decimal:2',
         'meta' => 'array',
     ];
-
 
     public function ad()
     {

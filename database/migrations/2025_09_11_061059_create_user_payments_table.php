@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique();
             $table->foreignId('order_id')->constrained('user_orders')->onDelete('cascade');
-            $table->enum('gateway', ['cod', 'razorpay', 'stripe']);
+            $table->enum('gateway', ['cod', 'razorpay', 'stripe', 'phonepe']);
             $table->decimal('amount', 12, 2);
             $table->enum('status', ['pending', 'paid', 'failed', 'initiated'])->default('pending');
             $table->string('transaction_id')->nullable();

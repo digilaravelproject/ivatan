@@ -17,10 +17,7 @@ class PaymentController extends Controller
         $this->paymentService = $paymentService;
     }
 
-    /**
-     * Create Razorpay order/intent for existing order
-     */
-    public function createRazorpayOrder(Request $request)
+    public function createPayment(Request $request)
     {
         $request->validate([
             'order_id' => 'required|exists:user_orders,id',
@@ -35,7 +32,7 @@ class PaymentController extends Controller
 
             return response()->json($result);
         } catch (Exception $e) {
-            Log::error('Razorpay order creation failed', [
+            Log::error('Payment creation failed', [
                 'order_id' => $request->order_id,
                 'error' => $e->getMessage(),
             ]);
@@ -48,15 +45,9 @@ class PaymentController extends Controller
         }
     }
 
-    /**
-     * Verify payment and process order
-     */
-    public function verifyRazorpayPayment(Request $request)
+    public function verifyPayment(Request $request)
     {
         $request->validate([
-            'razorpay_payment_id' => 'required|string',
-            'razorpay_order_id' => 'required|string',
-            'razorpay_signature' => 'required|string',
             'order_id' => 'required|exists:user_orders,id',
         ]);
 
@@ -82,5 +73,22 @@ class PaymentController extends Controller
                 'error' => $e->getMessage(),
             ], $status);
         }
+    }
+
+    public function createRazorpayOrder(Request $request)
+    {
+        return $this->createPayment($request);
+    }
+
+    public function verifyRazorpayPayment(Request $request)
+    {
+        $request->validate([
+            'razorpay_payment_id' => 'required|string',
+            'razorpay_order_id' => 'required|string',
+            'razorpay_signature' => 'required|string',
+            'order_id' => 'required|exists:user_orders,id',
+        ]);
+
+        return $this->verifyPayment($request);
     }
 }

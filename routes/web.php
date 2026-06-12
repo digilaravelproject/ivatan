@@ -42,6 +42,13 @@ Route::get('/child-safety', fn() => view('web.child_safety'))->name('web.child.s
 Route::get('/payment-and-refund-policy', fn() => view('web.financial-policy'))->name('web.financial-policy');
 Route::get('/pricing-plan', fn() => view('web.pricing'))->name('web.pricing-plan');
 
+// =====================
+// Payment Callback (PhonePe redirects users here)
+// =====================
+Route::match(['get', 'post'], 'payment/callback/{gateway}', [\App\Http\Controllers\Api\PaymentCallbackController::class, 'handle'])
+    ->name('payment.callback')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 // Route::get('/', fn() => redirect('/admin'));
 Route::get('/admin', fn() => view('auth.login'));
 

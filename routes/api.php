@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\RazorpayWebhookController;
+use App\Http\Controllers\Api\PhonePeWebhookController;
 use App\Http\Controllers\Admin\ProfileApprovalController;
 
 
@@ -367,7 +368,15 @@ Route::prefix('v1')->group(function () {
 
         /*
         |--------------------------------------------------------------------------
-        | Razorpay Payment
+        | Payment (Generic gateway-agnostic)
+        |--------------------------------------------------------------------------
+        */
+        Route::post('/payment/create', [PaymentController::class, 'createPayment']);
+        Route::post('/payment/verify', [PaymentController::class, 'verifyPayment']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Razorpay Payment (Legacy direct endpoints)
         |--------------------------------------------------------------------------
         */
         Route::post('/payment/razorpay/order', [PaymentController::class, 'createRazorpayOrder']);
@@ -604,9 +613,25 @@ Route::prefix('v1')->group(function () {
 });
 
 // ================================
-// Razorpay Webhook (No auth, signature verified)
+// Payment Webhook — Unified (No auth, signature verified per gateway)
+// ================================
+Route::post('webhooks/payment/{gateway}', [PaymentWebhookController::class, 'handle'])
+    ->name('webhook.payment')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->middleware('throttle:30,1');
+
+// ================================
+// Razorpay Webhook (Backward compat)
 // ================================
 Route::post('webhooks/razorpay', [RazorpayWebhookController::class, 'handle'])
     ->name('webhook.razorpay')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->middleware('throttle:30,1');
+
+// ================================
+// PhonePe Webhook (Backward compat)
+// ================================
+Route::post('webhooks/phonepe', [PhonePeWebhookController::class, 'handle'])
+    ->name('webhook.phonepe')
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->middleware('throttle:30,1');

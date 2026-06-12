@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\Payment\GatewayManager;
 use App\Services\Payment\RazorpayGateway;
+use App\Services\Payment\PhonePeGateway;
 use App\Services\Setting\SettingService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -21,6 +22,7 @@ class DynamicConfigServiceProvider extends ServiceProvider
             $manager = new GatewayManager($app->make(SettingService::class));
 
             $manager->register('razorpay', RazorpayGateway::class);
+            $manager->register('phonepe', PhonePeGateway::class);
 
             return $manager;
         });
@@ -47,6 +49,10 @@ class DynamicConfigServiceProvider extends ServiceProvider
                 'services.razorpay.key' => $settings->get('payment.razorpay.key'),
                 'services.razorpay.secret' => $settings->get('payment.razorpay.secret'),
                 'services.razorpay.webhook_secret' => $settings->get('payment.razorpay.webhook_secret'),
+                'services.phonepe.key' => $settings->get('payment.phonepe.key'),
+                'services.phonepe.secret' => $settings->get('payment.phonepe.secret'),
+                'services.phonepe.webhook_secret' => $settings->get('payment.phonepe.webhook_secret'),
+                'services.phonepe.env' => $settings->get('payment.phonepe.env', 'sandbox'),
             ]);
         } catch (\Throwable $e) {
             Log::critical('DynamicConfigServiceProvider: Failed to load payment config from DB', [

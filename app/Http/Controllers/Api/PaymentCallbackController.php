@@ -1,0 +1,126 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\AdPayment;
+use App\Models\Ecommerce\UserOrder;
+use App\Services\Payment\GatewayManager;
+use App\Services\Payment\PaymentOrchestrator;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
+
+class PaymentCallbackController extends Controller
+{
+    public function __construct(
+        protected GatewayManager $gatewayManager,
+        protected PaymentOrchestrator $orchestrator,
+    ) {}
+
+    public function handle(string $gateway, Request $request): Response
+    {
+        try {
+            Log::info("Payment callback received for {$gateway}", $request->all());
+
+            if ($gateway === 'phonepe') {
+                return $this->handlePhonePeCallback($request);
+            }
+
+            Log::warning('Payment callback: unsupported gateway', ['gateway' => $gateway]);
+            return $this->redirectFailed();
+        } catch (\Throwable $e) {
+            Log::error('Payment callback failed', [
+                'gateway' => $gateway,
+                'error' => $e->getMessage(),
+            ]);
+            return $this->redirectFailed();
+        }
+    }
+
+    protected function handlePhonePeCallback(Request $request): Response
+    {
+        $code = $request->input('code');
+        $merchantTransactionId = $request->input('merchantTransactionId')
+            ?? $request->input('transactionId');
+
+        if ($code !== 'PAYMENT_SUCCESS') {
+            Log::warning('PhonePe callback: payment not successful', [
+                'code' => $code,
+                'merchantTransactionId' => $merchantTransactionId,
+            ]);
+            return $this->redirectFailed();
+        }
+
+        if (!$merchantTransactionId) {
+            Log::warning('PhonePe callback: missing transaction ID');
+            return $this->redirectFailed();
+        }
+
+        $order = UserOrder::where('uuid', $merchantTransactionId)->first();
+        $adPayment = AdPayment::where('gateway_order_id', $merchantTransactionId)->first();
+
+        if ($order) {
+            try {
+                $this->orchestrator->resetDriver();
+                $payload = ['merchantTransactionId' => $merchantTransactionId];
+
+                $result = $this->orchestrator->verifyEcommercePayment($order, $payload);
+
+                if ($result->success) {
+                    $this->orchestrator->processEcommercePayment($order, $result, $payload);
+                    Log::info('PhonePe callback: payment verified & job dispatched', [
+                        'order_id' => $order->id,
+                    ]);
+                    return $this->redirectSuccess(['order_id' => $order->id]);
+                }
+
+                Log::warning('PhonePe callback: verify failed for order', [
+                    'order_id' => $order->id,
+                    'message' => $result->message,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('PhonePe callback: exception for order', [
+                    'order_id' => $order->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } elseif ($adPayment) {
+            try {
+                $this->orchestrator->resetDriver();
+                $payload = ['merchantTransactionId' => $merchantTransactionId];
+
+                $result = $this->orchestrator->verifyAdPayment($adPayment, $payload);
+
+                if ($result->success) {
+                    $this->orchestrator->processAdPayment($adPayment, $adPayment->ad, $result);
+                    Log::info('PhonePe callback: ad payment verified', [
+                        'ad_payment_id' => $adPayment->id,
+                    ]);
+                    return $this->redirectSuccess(['ad_id' => $adPayment->ad_id]);
+                }
+            } catch (\Throwable $e) {
+                Log::error('PhonePe callback: exception for ad', [
+                    'ad_payment_id' => $adPayment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } else {
+            Log::warning('PhonePe callback: no matching order or ad found', [
+                'merchantTransactionId' => $merchantTransactionId,
+            ]);
+        }
+
+        return $this->redirectFailed();
+    }
+
+    protected function redirectSuccess(array $params = []): Response
+    {
+        return response('Payment Successful', 200);
+    }
+
+    protected function redirectFailed(): Response
+    {
+        return response('Payment Failed', 200);
+    }
+}

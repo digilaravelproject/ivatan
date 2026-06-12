@@ -224,7 +224,7 @@ class SubscriptionController extends Controller
                 'requires_payment' => true,
                 'gateway' => $gatewayName,
                 'gateway_subscription_id' => $result->gatewaySubscriptionId,
-                'razorpay_key' => $publicKey, // Public Key dynamically fetched from SettingService
+                'razorpay_key' => $publicKey,
                 'plan' => [
                     'id' => $plan->id,
                     'name' => $plan->name,

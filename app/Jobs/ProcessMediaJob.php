@@ -20,6 +20,7 @@ class ProcessMediaJob implements ShouldQueue
      * 🔴 CRITICAL: Stop infinite loops if FFmpeg fails.
      */
     public $tries = 3;
+    public $backoff = [2, 10, 30];
     // Increase timeout to 10 minutes for large video processing
     public $timeout = 600;
 
@@ -119,5 +120,13 @@ class ProcessMediaJob implements ShouldQueue
         } catch (\Exception $e) {
             Log::error("Video processing exception: " . $e->getMessage());
         }
+    }
+
+    public function failed(?\Throwable $exception = null): void
+    {
+        Log::error('ProcessMediaJob permanently failed', [
+            'media_id' => $this->media->id ?? null,
+            'error' => $exception?->getMessage(),
+        ]);
     }
 }

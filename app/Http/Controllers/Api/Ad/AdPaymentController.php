@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\Ad;
 use App\Http\Controllers\Controller;
 use App\Models\Ad;
 use App\Models\AdPayment;
-use App\Services\AdPaymentService;
+use App\Services\Payment\PaymentOrchestrator;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,15 +15,16 @@ use Illuminate\Support\Facades\Log;
 
 class AdPaymentController extends Controller
 {
-    /**
-     * Get existing pending payment OR create a new Razorpay order if missing.
-     */
-    public function getPendingOrder(Ad $ad, AdPaymentService $paymentService): JsonResponse
+    public function __construct(
+        protected PaymentOrchestrator $orchestrator,
+    ) {}
+
+    public function getPendingOrder(Ad $ad): JsonResponse
     {
         try {
             $user = Auth::user();
 
-            if (! $user) {
+            if (!$user) {
                 return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
             }
 
@@ -37,12 +38,12 @@ class AdPaymentController extends Controller
 
             $payment = $ad->payments()->where('status', 'pending')->latest()->first();
 
-            if (! $payment) {
-                if (! $ad->package) {
+            if (!$payment) {
+                if (!$ad->package) {
                     return response()->json(['success' => false, 'message' => 'Ad package not found'], 422);
                 }
 
-                $amount = (float) $ad->package->price; // exact float
+                $amount = (float) $ad->package->price;
 
                 $payment = AdPayment::create([
                     'ad_id' => $ad->id,
@@ -52,22 +53,26 @@ class AdPaymentController extends Controller
                     'status' => 'pending',
                 ]);
 
-                // create Razorpay order using exact float converted to paise
-                $amountInPaise = (int) round($amount * 100, 2); // Razorpay needs integer paise
-                $order = $paymentService->createOrder($payment, $amountInPaise);
+                $result = $this->orchestrator->createAdPayment($payment, $ad, $user);
 
-                $payment->update(['razorpay_order_id' => $order['id']]);
-            } else {
-                $order = [
-                    'id' => $payment->razorpay_order_id,
-                    'amount' => (int) round($payment->amount * 100, 2),
-                    'currency' => $payment->currency,
-                ];
+                return response()->json($result);
+            }
+
+            $activeGateway = $this->orchestrator->activeGateway();
+            $order = [
+                'id' => $payment->gateway_order_id ?? $payment->razorpay_order_id,
+                'amount' => (int) round($payment->amount * 100),
+                'currency' => $payment->currency,
+            ];
+
+            if ($activeGateway === 'razorpay') {
+                $order['razorpay_order_id'] = $payment->razorpay_order_id;
             }
 
             return response()->json([
                 'success' => true,
                 'payment' => $payment,
+                'gateway_order' => $order,
                 'razorpay_order' => $order,
             ]);
         } catch (\Exception $e) {
@@ -85,21 +90,26 @@ class AdPaymentController extends Controller
         }
     }
 
-    /**
-     * Verify Razorpay payment safely with transactions and double-check
-     */
-    public function verify(Request $request, AdPaymentService $paymentService): JsonResponse
+    public function verify(Request $request): JsonResponse
     {
         $request->validate([
-            'razorpay_order_id' => 'required|string',
-            'razorpay_payment_id' => 'required|string',
-            'razorpay_signature' => 'required|string',
+            'razorpay_order_id' => 'required_without:merchantTransactionId|string',
+            'razorpay_payment_id' => 'required_without:merchantTransactionId|string',
+            'razorpay_signature' => 'required_without:merchantTransactionId|string',
+            'merchantTransactionId' => 'required_without:razorpay_order_id|string',
+            'transactionId' => 'nullable|string',
         ]);
 
-        $payment = null;
-
         try {
-            $payment = AdPayment::where('razorpay_order_id', $request->razorpay_order_id)->first();
+            $activeGateway = $this->orchestrator->activeGateway();
+
+            $gatewayOrderId = $request->input('merchantTransactionId')
+                ?? $request->input('razorpay_order_id');
+
+            $payment = AdPayment::where(function ($q) use ($gatewayOrderId) {
+                $q->where('gateway_order_id', $gatewayOrderId)
+                  ->orWhere('razorpay_order_id', $gatewayOrderId);
+            })->first();
 
             if (!$payment) {
                 return response()->json(['success' => false, 'message' => 'Payment record not found'], 404);
@@ -109,46 +119,31 @@ class AdPaymentController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Payment already verified',
-                    'ad' => $payment->ad
+                    'ad' => $payment->ad,
                 ]);
             }
 
-            DB::transaction(function () use ($paymentService, $payment, $request) {
+            $payload = $request->all();
+            if ($activeGateway === 'phonepe') {
+                $payload = ['merchantTransactionId' => $gatewayOrderId];
+            }
 
-                // Verify Razorpay signature
-                $paymentService->verifyPaymentSignature(
-                    $request->razorpay_order_id,
-                    $request->razorpay_payment_id,
-                    $request->razorpay_signature
-                );
+            $result = $this->orchestrator->verifyAdPayment($payment, $payload);
 
-                // Mark payment success
+            if (!$result->success) {
                 $payment->update([
-                    'status' => 'success',
-                    'razorpay_payment_id' => $request->razorpay_payment_id,
-                    'razorpay_signature' => $request->razorpay_signature,
+                    'status' => 'failed',
+                    'meta' => ['error' => $result->message],
                 ]);
 
-                // Activate ad based on schedule
-                $ad = $payment->ad;
-                $startAt = $ad->start_at ?? Carbon::now(); // If no start date, use now
-                $duration = max(1, $ad->package?->duration_days ?? 7);
-                $endAt = (clone $startAt)->addDays($duration);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment verification failed',
+                    'error' => $result->message,
+                ], 422);
+            }
 
-                if ($startAt->isFuture()) {
-                    // Start date is in future → approved
-                    $ad->status = 'approved';
-                } else {
-                    // Start date is now or past → live
-                    $ad->status = 'live';
-                    $startAt = Carbon::now();
-                    $endAt = (clone $startAt)->addDays($duration);
-                }
-
-                $ad->start_at = $startAt;
-                $ad->end_at = $endAt;
-                $ad->save();
-            });
+            $this->orchestrator->processAdPayment($payment, $payment->ad, $result);
 
             return response()->json([
                 'success' => true,
@@ -156,89 +151,6 @@ class AdPaymentController extends Controller
                 'ad' => $payment->ad,
             ]);
         } catch (\Exception $e) {
-            if ($payment && $payment->status !== 'success') {
-                $payment->update([
-                    'status' => 'failed',
-                    'meta' => ['error' => $e->getMessage()]
-                ]);
-            }
-
-            Log::error('Payment verification failed: ' . $e->getMessage(), [
-                'request' => $request->all(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Payment verification failed',
-                'error' => $e->getMessage(),
-            ], 422);
-        }
-    }
-
-    public function verify_old(Request $request, AdPaymentService $paymentService): JsonResponse
-    {
-        $request->validate([
-            'razorpay_order_id' => 'required|string',
-            'razorpay_payment_id' => 'required|string',
-            'razorpay_signature' => 'required|string',
-        ]);
-
-        $payment = null;
-
-        try {
-            $payment = AdPayment::where('razorpay_order_id', $request->razorpay_order_id)->first();
-
-            if (! $payment) {
-                return response()->json(['success' => false, 'message' => 'Payment record not found'], 404);
-            }
-
-            if ($payment->status === 'success') {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Payment already verified',
-                    'ad' => $payment->ad
-                ]);
-            }
-
-            DB::transaction(function () use ($paymentService, $payment, $request) {
-
-                // Verify Razorpay signature
-                $paymentService->verifyPaymentSignature(
-                    $request->razorpay_order_id,
-                    $request->razorpay_payment_id,
-                    $request->razorpay_signature
-                );
-
-                // mark payment success
-                $payment->update([
-                    'status' => 'success',
-                    'razorpay_payment_id' => $request->razorpay_payment_id,
-                    'razorpay_signature' => $request->razorpay_signature,
-                ]);
-
-                // activate ad
-                $ad = $payment->ad;
-                $ad->status = 'live';
-                $ad->start_at = Carbon::now(); // server timezone
-                $duration = max(1, $ad->package?->duration_days ?? 7);
-                $ad->end_at = Carbon::now()->addDays($duration);
-                $ad->save();
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Payment verified and ad is live',
-                'ad' => $payment->ad,
-            ]);
-        } catch (\Exception $e) {
-            if ($payment && $payment->status !== 'success') {
-                $payment->update([
-                    'status' => 'failed',
-                    'meta' => ['error' => $e->getMessage()]
-                ]);
-            }
-
             Log::error('Payment verification failed: ' . $e->getMessage(), [
                 'request' => $request->all(),
                 'trace' => $e->getTraceAsString(),

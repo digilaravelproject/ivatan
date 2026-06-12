@@ -55,9 +55,6 @@ class AdminReportedPostController extends Controller
             ])
             ->findOrFail($id);
 
-        // 🔴 DEBUG CHECK (TEMPORARY)
-        // dd($post);
-
         return view('admin.reported-post.details', [
             'post' => $post
         ]);

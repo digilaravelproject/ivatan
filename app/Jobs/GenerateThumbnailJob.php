@@ -17,6 +17,9 @@ class GenerateThumbnailJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 3;
+    public $backoff = [2, 10, 30];
+
     public function __construct(public UserStory $story) {}
 
     public function handle()
@@ -65,5 +68,13 @@ class GenerateThumbnailJob implements ShouldQueue
             if (isset($tempVideoPath) && file_exists($tempVideoPath)) @unlink($tempVideoPath);
             if (isset($tempThumbPath) && file_exists($tempThumbPath)) @unlink($tempThumbPath);
         }
+    }
+
+    public function failed(?\Throwable $exception = null): void
+    {
+        Log::error('GenerateThumbnailJob permanently failed', [
+            'story_id' => $this->story->id ?? null,
+            'error' => $exception?->getMessage(),
+        ]);
     }
 }

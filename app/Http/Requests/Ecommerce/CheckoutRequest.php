@@ -24,7 +24,7 @@ class CheckoutRequest extends FormRequest
     {
         return [
             // Payment method validation
-            'payment_method' => 'required|string|in:cod,razorpay,stripe',
+            'payment_method' => 'required|string|in:cod,razorpay,stripe,phonepe',
 
             // Shipping address validation
             'shipping_address' => 'required|array',

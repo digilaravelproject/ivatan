@@ -38,82 +38,83 @@ class CallController extends Controller
      */
     public function initiate(Request $request): JsonResponse
     {
-        $request->validate([
-            'chat_id' => 'required|exists:user_chats,id',
-            'type' => 'required|in:audio,video',
-            'sdp_offer' => 'required|array',
-        ]);
+        try {
+            $request->validate([
+                'chat_id' => 'required|exists:user_chats,id',
+                'type' => 'required|in:audio,video',
+                'sdp_offer' => 'required|array',
+            ]);
 
-        $user = Auth::user();
-        $chat = UserChat::findOrFail($request->chat_id);
+            $user = Auth::user();
+            $chat = UserChat::findOrFail($request->chat_id);
 
-        // Verify participant
-        $isParticipant = $chat->participants()->where('user_id', $user->id)->exists();
-        if (!$isParticipant) {
-            return $this->error('Unauthorized to call in this chat.', 403);
-        }
-
-        // For private call, perform privacy check on the receiver
-        $receiverId = null;
-        if ($chat->type === 'private') {
-            $otherParticipant = $chat->participants()->where('user_id', '!=', $user->id)->first();
-            if (!$otherParticipant) {
-                return $this->error('No receiver found in this chat.', 404);
-            }
-            $receiverId = $otherParticipant->user_id;
-            
-            try {
-                $this->chatService->validateMessagingPrivacy($user, $otherParticipant->user);
-            } catch (\Exception $e) {
-                return $this->error($e->getMessage(), 403);
+            $isParticipant = $chat->participants()->where('user_id', $user->id)->exists();
+            if (!$isParticipant) {
+                return $this->error('Unauthorized to call in this chat.', 403);
             }
 
-            // Check if receiver is busy
-            if ($otherParticipant->user->is_busy) {
-                return $this->error('User is currently busy.', 409);
+            $receiverId = null;
+            if ($chat->type === 'private') {
+                $otherParticipant = $chat->participants()->where('user_id', '!=', $user->id)->first();
+                if (!$otherParticipant) {
+                    return $this->error('No receiver found in this chat.', 404);
+                }
+                $receiverId = $otherParticipant->user_id;
+
+                try {
+                    $this->chatService->validateMessagingPrivacy($user, $otherParticipant->user);
+                } catch (\Exception $e) {
+                    return $this->error($e->getMessage(), 403);
+                }
+
+                if ($otherParticipant->user->is_busy) {
+                    return $this->error('User is currently busy.', 409);
+                }
             }
+
+            if ($user->is_busy) {
+                return $this->error('You are currently busy.', 409);
+            }
+
+            $session = UserCallSession::create([
+                'uuid' => (string) Str::uuid(),
+                'chat_id' => $chat->id,
+                'caller_id' => $user->id,
+                'receiver_id' => $receiverId,
+                'type' => $request->type,
+                'status' => 'ringing',
+            ]);
+
+            $user->update(['is_busy' => true, 'busy_status' => 'calling_' . $request->type]);
+
+            if ($receiverId) {
+                $callerInfo = [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'avatar' => $user->profile_photo_url,
+                ];
+                broadcast(new CallInitiated(
+                    $receiverId,
+                    $session->uuid,
+                    $callerInfo,
+                    $session->type,
+                    $request->sdp_offer
+                ))->toOthers();
+            }
+
+            CleanupMissedCallJob::dispatch($session->uuid)->delay(now()->addSeconds(60));
+
+            return $this->success([
+                'session' => $session
+            ], 'Call initiated.', 201);
+        } catch (\Throwable $e) {
+            \Log::error('CallController initiate error', [
+                'error' => $e->getMessage(),
+                'chat_id' => $request->chat_id ?? null,
+            ]);
+            return $this->error('Failed to initiate call.', 500);
         }
-
-        // Check if caller is already busy
-        if ($user->is_busy) {
-            return $this->error('You are currently busy.', 409);
-        }
-
-        $session = UserCallSession::create([
-            'uuid' => (string) Str::uuid(),
-            'chat_id' => $chat->id,
-            'caller_id' => $user->id,
-            'receiver_id' => $receiverId,
-            'type' => $request->type,
-            'status' => 'ringing',
-        ]);
-
-        // Set caller as busy
-        $user->update(['is_busy' => true, 'busy_status' => 'calling_' . $request->type]);
-
-        // Send signaling event to the receiver
-        if ($receiverId) {
-            $callerInfo = [
-                'id' => $user->id,
-                'name' => $user->name,
-                'username' => $user->username,
-                'avatar' => $user->profile_photo_url,
-            ];
-            broadcast(new CallInitiated(
-                $receiverId,
-                $session->uuid,
-                $callerInfo,
-                $session->type,
-                $request->sdp_offer
-            ))->toOthers();
-        }
-
-        // Dispatch cleanup job for unanswered calls after 60 seconds
-        CleanupMissedCallJob::dispatch($session->uuid)->delay(now()->addSeconds(60));
-
-        return $this->success([
-            'session' => $session
-        ], 'Call initiated.', 201);
     }
 
     /**

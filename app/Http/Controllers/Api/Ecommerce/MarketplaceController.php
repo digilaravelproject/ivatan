@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Ecommerce;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Ecommerce\ProductResource;
+use App\Http\Resources\Ecommerce\ServiceResource;
 use App\Services\Ecommerce\MarketplaceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +33,7 @@ class MarketplaceController extends Controller
                 $products = $this->marketplaceService->getProducts($filters, $user);
             } else {
                 $page = (int) $request->get('page', 1);
-                $cacheKey = 'marketplace_products_' . md5(serialize($filters)) . "_page_{$page}";
+                $cacheKey = 'marketplace_products_' . md5(json_encode($filters)) . "_page_{$page}";
                 $products = Cache::remember($cacheKey, 600, function () use ($filters, $user) {
                     return $this->marketplaceService->getProducts($filters, $user);
                 });
@@ -40,7 +42,13 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Marketplace products fetched successfully.',
-                'data' => $products
+                'data' => ProductResource::collection($products->items()),
+                'pagination' => [
+                    'total' => $products->total(),
+                    'per_page' => $products->perPage(),
+                    'current_page' => $products->currentPage(),
+                    'last_page' => $products->lastPage(),
+                ],
             ]);
         } catch (\Throwable $e) {
             Log::error('Marketplace product fetch error: ' . $e->getMessage());
@@ -64,7 +72,7 @@ class MarketplaceController extends Controller
                 $services = $this->marketplaceService->getServices($filters, $user);
             } else {
                 $page = (int) $request->get('page', 1);
-                $cacheKey = 'marketplace_services_' . md5(serialize($filters)) . "_page_{$page}";
+                $cacheKey = 'marketplace_services_' . md5(json_encode($filters)) . "_page_{$page}";
                 $services = Cache::remember($cacheKey, 600, function () use ($filters, $user) {
                     return $this->marketplaceService->getServices($filters, $user);
                 });
@@ -73,7 +81,13 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Marketplace services fetched successfully.',
-                'data' => $services
+                'data' => ServiceResource::collection($services->items()),
+                'pagination' => [
+                    'total' => $services->total(),
+                    'per_page' => $services->perPage(),
+                    'current_page' => $services->currentPage(),
+                    'last_page' => $services->lastPage(),
+                ],
             ]);
         } catch (\Throwable $e) {
             Log::error('Marketplace service fetch error: ' . $e->getMessage());
@@ -95,7 +109,7 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'User products fetched successfully.',
-                'data' => $products
+                'data' => ProductResource::collection($products)
             ]);
         } catch (\Throwable $e) {
             Log::error('User products fetch error: ' . $e->getMessage());
@@ -117,7 +131,7 @@ class MarketplaceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'User services fetched successfully.',
-                'data' => $services
+                'data' => ServiceResource::collection($services)
             ]);
         } catch (\Throwable $e) {
             Log::error('User services fetch error: ' . $e->getMessage());

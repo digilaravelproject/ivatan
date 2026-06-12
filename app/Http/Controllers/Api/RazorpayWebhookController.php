@@ -10,14 +10,13 @@ use App\Services\Payment\GatewayManager;
 use App\Services\Payment\Exceptions\PaymentGatewayException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class RazorpayWebhookController extends Controller
 {
     protected ?PaymentGatewayInterface $gateway = null;
-
-    protected array $processedEvents = [];
 
     public function __construct(
         protected GatewayManager $gatewayManager
@@ -55,10 +54,11 @@ class RazorpayWebhookController extends Controller
             $payloadData = $request->input('payload', []);
             $eventId = $payloadData['payment']['entity']['id']
                 ?? $payloadData['subscription']['entity']['id']
-                ?? $request->input('event_id')
-                || null;
+                ?? $request->input('event_id');
 
-            if ($eventId && isset($this->processedEvents[$eventId])) {
+            $dedupKey = $eventId ? "webhook_dedup_razorpay_{$eventId}" : null;
+
+            if ($dedupKey && Cache::get($dedupKey)) {
                 Log::info('Razorpay webhook: duplicate event skipped', ['event_id' => $eventId]);
                 return response()->json(['status' => 'duplicate']);
             }
@@ -89,8 +89,8 @@ class RazorpayWebhookController extends Controller
                 default => Log::info('Razorpay webhook: unhandled event', ['event' => $event]),
             };
 
-            if ($eventId) {
-                $this->processedEvents[$eventId] = true;
+            if ($dedupKey) {
+                Cache::put($dedupKey, true, 3600);
             }
 
             return response()->json(['status' => 'success']);

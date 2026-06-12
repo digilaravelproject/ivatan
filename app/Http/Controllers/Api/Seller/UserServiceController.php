@@ -223,7 +223,7 @@ class UserServiceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $service,
+                'data' => new ServiceResource($service->load('images', 'seller')),
             ]);
         } catch (ModelNotFoundException $e) {
             // Handle the case where the service wasn't found in both ID and slug queries

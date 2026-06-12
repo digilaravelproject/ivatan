@@ -18,10 +18,13 @@ class ProfileSwitchService
         return DB::transaction(function () use ($userId, $toProfileType, $notes, $details) {
             $activeProfile = Profile::where('user_id', $userId)
                 ->where('is_active', true)
+                ->orderBy('id', 'desc')
                 ->first();
 
             if (!$activeProfile) {
-                $activeProfile = Profile::where('user_id', $userId)->first();
+                $activeProfile = Profile::where('user_id', $userId)
+                    ->orderBy('id', 'desc')
+                    ->first();
                 if ($activeProfile) {
                     $activeProfile->update(['is_active' => true]);
                 } else {

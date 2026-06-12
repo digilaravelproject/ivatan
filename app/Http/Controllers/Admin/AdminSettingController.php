@@ -25,6 +25,10 @@ class AdminSettingController extends Controller
             'services_razorpay_key' => $this->settings->get('payment.razorpay.key', ''),
             'services_razorpay_secret' => $this->settings->get('payment.razorpay.secret', ''),
             'services_razorpay_webhook_secret' => $this->settings->get('payment.razorpay.webhook_secret', ''),
+            'services_phonepe_merchant_id' => $this->settings->get('payment.phonepe.key', ''),
+            'services_phonepe_salt_key' => $this->settings->get('payment.phonepe.secret', ''),
+            'services_phonepe_salt_index' => $this->settings->get('payment.phonepe.webhook_secret', '1'),
+            'services_phonepe_env' => $this->settings->get('payment.phonepe.env', 'sandbox'),
             'subscription_default_duration' => $this->settings->get('subscription.default_duration', 30),
             'subscription_trial_days' => $this->settings->get('subscription.trial_days', 0),
             'subscription_cancellation_mode' => $this->settings->get('subscription.cancel_mode', 'end_of_period'),
@@ -45,18 +49,44 @@ class AdminSettingController extends Controller
     public function updatePayment(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'payment_active_gateway' => 'required|string|in:razorpay',
-            'services_razorpay_key' => 'required|string|max:255',
-            'services_razorpay_secret' => 'required|string|max:255',
+            'payment_active_gateway' => 'required|string|in:razorpay,phonepe',
+            'services_razorpay_key' => 'required_if:payment_active_gateway,razorpay|nullable|string|max:255',
+            'services_razorpay_secret' => 'required_if:payment_active_gateway,razorpay|nullable|string|max:255',
             'services_razorpay_webhook_secret' => 'nullable|string|max:255',
+            'services_phonepe_merchant_id' => 'required_if:payment_active_gateway,phonepe|nullable|string|max:255',
+            'services_phonepe_salt_key' => 'required_if:payment_active_gateway,phonepe|nullable|string|max:255',
+            'services_phonepe_salt_index' => 'required_if:payment_active_gateway,phonepe|nullable|string|max:255',
+            'services_phonepe_env' => 'required_if:payment_active_gateway,phonepe|nullable|string|in:sandbox,production',
         ]);
 
-        $this->settings->setMultiple([
+        $settings = [
             'payment.active_gateway' => ['value' => $validated['payment_active_gateway'], 'group' => 'payment', 'description' => 'Active payment gateway provider'],
-            'payment.razorpay.key' => ['value' => $validated['services_razorpay_key'], 'group' => 'payment', 'encrypted' => true, 'description' => 'Razorpay API Key ID'],
-            'payment.razorpay.secret' => ['value' => $validated['services_razorpay_secret'], 'group' => 'payment', 'encrypted' => true, 'description' => 'Razorpay API Secret'],
-            'payment.razorpay.webhook_secret' => ['value' => $validated['services_razorpay_webhook_secret'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'Razorpay Webhook Secret'],
-        ]);
+        ];
+
+        if ($request->has('services_razorpay_key')) {
+            $settings['payment.razorpay.key'] = ['value' => $validated['services_razorpay_key'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'Razorpay API Key ID'];
+        }
+        if ($request->has('services_razorpay_secret')) {
+            $settings['payment.razorpay.secret'] = ['value' => $validated['services_razorpay_secret'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'Razorpay API Secret'];
+        }
+        if ($request->has('services_razorpay_webhook_secret')) {
+            $settings['payment.razorpay.webhook_secret'] = ['value' => $validated['services_razorpay_webhook_secret'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'Razorpay Webhook Secret'];
+        }
+
+        if ($request->has('services_phonepe_merchant_id')) {
+            $settings['payment.phonepe.key'] = ['value' => $validated['services_phonepe_merchant_id'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'PhonePe Merchant ID'];
+        }
+        if ($request->has('services_phonepe_salt_key')) {
+            $settings['payment.phonepe.secret'] = ['value' => $validated['services_phonepe_salt_key'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'PhonePe Salt Key'];
+        }
+        if ($request->has('services_phonepe_salt_index')) {
+            $settings['payment.phonepe.webhook_secret'] = ['value' => $validated['services_phonepe_salt_index'] ?? '1', 'group' => 'payment', 'encrypted' => true, 'description' => 'PhonePe Salt Index'];
+        }
+        if ($request->has('services_phonepe_env')) {
+            $settings['payment.phonepe.env'] = ['value' => $validated['services_phonepe_env'] ?? 'sandbox', 'group' => 'payment', 'description' => 'PhonePe Environment'];
+        }
+
+        $this->settings->setMultiple($settings);
 
         Artisan::call('config:clear');
         Artisan::call('cache:clear');
@@ -76,6 +106,7 @@ class AdminSettingController extends Controller
                 'key' => $request->input('key', $this->settings->get("payment.{$gatewayName}.key")),
                 'secret' => $request->input('secret', $this->settings->get("payment.{$gatewayName}.secret")),
                 'webhook_secret' => $request->input('webhook_secret', $this->settings->get("payment.{$gatewayName}.webhook_secret")),
+                'env' => $request->input('env', $this->settings->get("payment.{$gatewayName}.env", 'sandbox')),
             ];
 
             $gateway = app(\App\Services\Payment\GatewayManager::class)->driver($gatewayName);

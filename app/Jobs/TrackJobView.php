@@ -9,10 +9,14 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class TrackJobView implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $tries = 3;
+    public $backoff = [1, 5, 10];
 
     public $jobPostId;
     public $userId;
@@ -51,5 +55,13 @@ class TrackJobView implements ShouldQueue
 
             $job->increment('views_count');
         }
+    }
+
+    public function failed(?\Throwable $exception = null): void
+    {
+        Log::error('TrackJobView permanently failed', [
+            'job_post_id' => $this->jobPostId,
+            'error' => $exception?->getMessage(),
+        ]);
     }
 }

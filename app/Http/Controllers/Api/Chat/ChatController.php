@@ -31,10 +31,7 @@ class ChatController extends Controller
     }
 
     /**
-     * 1. Inbox & Listing
-     */
-     /**
-     * 1. Inbox & Listing with Filters
+     * Inbox & Listing
      * Filters: 'groups', 'unread', 'read', 'business'
      */
     public function index(Request $request): JsonResponse
@@ -96,31 +93,16 @@ class ChatController extends Controller
             'chats' => ChatResource::collection($chats)->response()->getData(true)
         ]);
     }
-    public function index_old(Request $request): JsonResponse
-    {
-        $user = Auth::user();
-        $filter = $request->query('filter');
-
-        $query = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
-            ->with(['participants.user', 'lastMessage.sender'])
-            ->withCount(['participants']);
-
-        if ($filter === 'groups') {
-            $query->where('type', 'group');
-        }
-
-        $chats = $query->orderByDesc('last_message_at')->simplePaginate(20);
-
-        return $this->success([
-            'chats' => ChatResource::collection($chats)->response()->getData(true)
-        ]);
-    }
-
     /**
      * 2. Chat Details
      */
     public function show(UserChat $chat): JsonResponse
     {
+        $user = Auth::user();
+        $isParticipant = $chat->participants()->where('user_id', $user->id)->exists();
+        if (!$isParticipant) {
+            return $this->error('Unauthorized.', 403);
+        }
         return $this->success(new ChatResource($chat->load('participants.user')));
     }
 
@@ -146,17 +128,6 @@ class ChatController extends Controller
 
         return $this->success(MessageResource::collection($messages));
     }
-    public function messages_old(UserChat $chat, Request $request): JsonResponse
-    {
-        $messages = $chat->messages()
-            ->visibleToUser(Auth::id())
-            ->with(['sender', 'replyTo.sender'])
-            ->latest()
-            ->cursorPaginate(30);
-
-        return $this->success(MessageResource::collection($messages));
-    }
-
     /**
      * 4. Open/Start Private Chat
      */
