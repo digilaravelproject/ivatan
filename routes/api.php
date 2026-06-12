@@ -150,6 +150,18 @@ Route::prefix('v1')->group(function () {
     // ================================
     Route::post('/auth/restore-account', [UserController::class, 'requestRestore']);
 
+    // ================================
+    // Marketplace Routes (Public — no auth required)
+    // ================================
+    Route::prefix('marketplace')->group(function () {
+        Route::get('products', [MarketplaceController::class, 'getProducts']);
+        Route::get('services', [MarketplaceController::class, 'getServices']);
+        Route::get('product/{user_id}', [MarketplaceController::class, 'getUserProducts']);
+        Route::get('service/{user_id}', [MarketplaceController::class, 'getUserServices']);
+        Route::get('products/{productIdentifier}', [UserProductController::class, 'show']);
+        Route::get('services/{serviceIdentifier}', [UserServiceController::class, 'show']);
+    });
+
     Route::middleware('auth:sanctum')->group(function () {
 
         // Fetch User by Username
@@ -281,17 +293,6 @@ Route::prefix('v1')->group(function () {
         // User Enquiries (Buyer side)
         Route::get('user/my-enquiries', [EnquiryController::class, 'myEnquiries']);
 
-        // ================================
-        // Marketplace Routes (Public)
-        // ================================
-        Route::prefix('marketplace')->group(function () {
-            Route::get('products', [MarketplaceController::class, 'getProducts']);
-            Route::get('services', [MarketplaceController::class, 'getServices']);
-            Route::get('product/{user_id}', [MarketplaceController::class, 'getUserProducts']);
-            Route::get('service/{user_id}', [MarketplaceController::class, 'getUserServices']);
-            Route::get('products/{productIdentifier}', [UserProductController::class, 'show']);
-            Route::get('services/{serviceIdentifier}', [UserServiceController::class, 'show']);
-        });
         // Public Enquiry (Rate limited: 5 requests per minute)
         Route::post('enquiries', [EnquiryController::class, 'store'])->middleware('throttle:5,1');
         // ================================

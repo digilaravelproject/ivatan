@@ -28,7 +28,14 @@ class DynamicConfigServiceProvider extends ServiceProvider
 
     public function boot(SettingService $settings): void
     {
-        if (!Schema::hasTable('settings')) {
+        try {
+            if (!Schema::hasTable('settings')) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('DynamicConfigServiceProvider: DB unavailable during boot, skipping dynamic config', [
+                'error' => $e->getMessage(),
+            ]);
             return;
         }
 

@@ -85,6 +85,10 @@ class UserServiceController extends Controller
         try {
             /** @var \Illuminate\Http\Request $request */
             $user = $request->user();
+            if (!$user) {
+                DB::rollBack();
+                return $this->errorResponse('Unauthenticated.', 401);
+            }
             $slug = $this->generateUniqueSlug($request->title);
 
             // Create the service
@@ -120,7 +124,8 @@ class UserServiceController extends Controller
             \Log::error('Failed to store service', [
                 'user_id' => $request->user()?->id,
                 'error' => $e->getMessage(),
-                'stack' => $e->getTraceAsString(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->except(['cover_image', 'images']),
             ]);
 
             return $this->errorResponse('Failed to create service. Please try again later.', 500);

@@ -153,7 +153,7 @@ class UserProductController extends Controller
 
     // Store a new product
     /**
-     * @param \App\Http\Requests\StoreUserProductRequest $request
+     * @param \App\Http\Requests\Ecommerce\StoreUserProductRequest $request
      */
     public function store(StoreUserProductRequest $request): JsonResponse
     {
@@ -161,6 +161,13 @@ class UserProductController extends Controller
         try {
             /** @var \Illuminate\Http\Request $request */
             $user = $request->user();
+            if (!$user) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
             // Generate the base slug
             $slugBase = Str::slug($request->title) . '-' . Str::random(8);
             $slug = $slugBase;
@@ -217,6 +224,8 @@ class UserProductController extends Controller
             \Log::error('Failed to store product', [
                 'user_id' => $request->user()?->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->except(['cover_image', 'images']),
             ]);
 
             return response()->json([

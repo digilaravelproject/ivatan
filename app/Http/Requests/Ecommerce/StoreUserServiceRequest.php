@@ -12,8 +12,15 @@ class StoreUserServiceRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // Ensure the user is authenticated and a seller
-        return Auth::check() && Auth::user()?->is_seller;
+        $user = Auth::user();
+        return $user && $user->is_seller;
+    }
+
+    protected function failedAuthorization()
+    {
+        throw new \Illuminate\Auth\Access\AuthorizationException(
+            'You must be a registered seller to create services.'
+        );
     }
 
     /**
