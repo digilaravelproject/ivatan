@@ -9,22 +9,22 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('user_chat_participants', function (Blueprint $table) {
-            $table->index(['chat_id', 'user_id', 'last_read_message_id']);
+            $table->index(['chat_id', 'user_id', 'last_read_message_id'], 'ucp_chat_user_read_idx');
         });
 
         Schema::table('user_chat_messages', function (Blueprint $table) {
-            $table->index(['chat_id', 'id']);
+            $table->index(['chat_id', 'id'], 'ucm_chat_id_idx');
         });
     }
 
     public function down(): void
     {
         Schema::table('user_chat_participants', function (Blueprint $table) {
-            $table->dropIndex(['chat_id', 'user_id', 'last_read_message_id']);
+            $table->dropIndex('ucp_chat_user_read_idx');
         });
 
         Schema::table('user_chat_messages', function (Blueprint $table) {
-            $table->dropIndex(['chat_id', 'id']);
+            $table->dropIndex('ucm_chat_id_idx');
         });
     }
 };
