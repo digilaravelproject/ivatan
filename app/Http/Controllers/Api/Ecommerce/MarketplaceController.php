@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Ecommerce\MarketplaceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class MarketplaceController extends Controller
@@ -25,7 +26,16 @@ class MarketplaceController extends Controller
         try {
             $user = $request->user('sanctum');
             $filters = $request->only(['search']);
-            $products = $this->marketplaceService->getProducts($filters, $user);
+
+            if ($user) {
+                $products = $this->marketplaceService->getProducts($filters, $user);
+            } else {
+                $page = (int) $request->get('page', 1);
+                $cacheKey = 'marketplace_products_' . md5(serialize($filters)) . "_page_{$page}";
+                $products = Cache::remember($cacheKey, 600, function () use ($filters, $user) {
+                    return $this->marketplaceService->getProducts($filters, $user);
+                });
+            }
 
             return response()->json([
                 'success' => true,
@@ -49,7 +59,16 @@ class MarketplaceController extends Controller
         try {
             $user = $request->user('sanctum');
             $filters = $request->only(['search']);
-            $services = $this->marketplaceService->getServices($filters, $user);
+
+            if ($user) {
+                $services = $this->marketplaceService->getServices($filters, $user);
+            } else {
+                $page = (int) $request->get('page', 1);
+                $cacheKey = 'marketplace_services_' . md5(serialize($filters)) . "_page_{$page}";
+                $services = Cache::remember($cacheKey, 600, function () use ($filters, $user) {
+                    return $this->marketplaceService->getServices($filters, $user);
+                });
+            }
 
             return response()->json([
                 'success' => true,
