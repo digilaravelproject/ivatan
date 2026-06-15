@@ -45,7 +45,7 @@ class UserResource extends JsonResource
                 'interests' => [],
                 'profiles' => [],
                 'active_profile' => null,
-                'user_profile_type' => 'personal',
+                'profile_type' => 'personal',
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'is_deleted_user' => true,
@@ -58,13 +58,13 @@ class UserResource extends JsonResource
         // Login/Register response me currentUser null hota h, isliye hum resource check krte hain.
         $isMine = ($currentUser && $currentUser->id === $user->id) || ($user->is_own_profile ?? false);
 
-        $activeProfile = $this->relationLoaded('profiles')
-            ? $this->getRelation('profiles')->firstWhere('is_active', true)
-            : $this->activeProfile;
+        $activeProfile = $this->relationLoaded('activeProfile')
+            ? $this->getRelation('activeProfile')
+            : ($this->relationLoaded('profiles') ? $this->getRelation('profiles')->firstWhere('is_active', true) : $this->activeProfile);
 
-        $userProfileType = 'personal';
+        $profileType = 'personal';
         if ($activeProfile) {
-            $userProfileType = $activeProfile->type === 'seller' ? 'ecommerce' : $activeProfile->type;
+            $profileType = $activeProfile->type === 'seller' ? 'ecommerce' : $activeProfile->type;
         }
 
         $data = [
@@ -102,7 +102,7 @@ class UserResource extends JsonResource
                 $active = $this->getRelation('profiles')->firstWhere('is_active', true);
                 return $active ? new \App\Http\Resources\Profile\ProfileResource($active) : null;
             }),
-            'user_profile_type' => $userProfileType,
+            'profile_type' => $profileType,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

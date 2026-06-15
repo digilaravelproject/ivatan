@@ -339,10 +339,7 @@ class UserService
     {
         return User::with([
             'interests.category', 
-            'profiles.sellerDetails', 
-            'profiles.employerDetails', 
-            'profiles.musicDetails', 
-            'profiles.creatorDetails'
+            'activeProfile'
         ])
         ->where('username', $username)
         ->withCount(['followers', 'following'])
