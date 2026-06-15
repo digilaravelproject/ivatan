@@ -337,8 +337,18 @@ class UserService
      */
     public function findByUsername(string $username): ?User
     {
-        return User::with('interests.category')->where('username', $username)->withCount(['followers', 'following'])->withCount(['posts' => function ($query) {
+        return User::with([
+            'interests.category', 
+            'profiles.sellerDetails', 
+            'profiles.employerDetails', 
+            'profiles.musicDetails', 
+            'profiles.creatorDetails'
+        ])
+        ->where('username', $username)
+        ->withCount(['followers', 'following'])
+        ->withCount(['posts' => function ($query) {
             $query->where('status', 'active');
-        }])->first();
+        }])
+        ->first();
     }
 }
