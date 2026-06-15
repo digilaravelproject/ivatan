@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Class UserService
@@ -109,6 +110,9 @@ class UserService
 
             $user->refresh();
             $user->load('interests.category');
+
+            // Clear findByUsername cache
+            Cache::forget("user_profile_find:" . Str::slug($user->username));
 
             return $user;
         } catch (\Throwable $e) {
@@ -337,15 +341,19 @@ class UserService
      */
     public function findByUsername(string $username): ?User
     {
-        return User::with([
-            'interests.category', 
-            'activeProfile'
-        ])
-        ->where('username', $username)
-        ->withCount(['followers', 'following'])
-        ->withCount(['posts' => function ($query) {
-            $query->where('status', 'active');
-        }])
-        ->first();
+        $cacheKey = "user_profile_find:" . Str::slug($username);
+
+        return Cache::remember($cacheKey, now()->addSeconds(15), function () use ($username) {
+            return User::with([
+                'interests.category', 
+                'activeProfile'
+            ])
+            ->where('username', $username)
+            ->withCount(['followers', 'following'])
+            ->withCount(['posts' => function ($query) {
+                $query->where('status', 'active');
+            }])
+            ->first();
+        });
     }
 }
