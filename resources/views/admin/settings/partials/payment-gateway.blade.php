@@ -34,8 +34,6 @@
                 </select>
             </div>
         </div>
-
-        <!-- Razorpay Configuration Panel -->
         <div id="razorpay-section" class="gateway-section bg-gray-50/50 border border-gray-100 p-4 rounded-xl mb-4">
             <div class="flex items-center gap-2 mb-3">
                 <span class="text-sm">💳</span>
@@ -50,7 +48,12 @@
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-gray-500 mb-1">Key Secret</label>
-                    <input type="password" name="services_razorpay_secret" id="services_razorpay_secret" value="{{ $settings['services_razorpay_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <div class="relative">
+                        <input type="password" name="services_razorpay_secret" id="services_razorpay_secret" value="{{ $settings['services_razorpay_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg pl-3 pr-10 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                        <button type="button" onclick="togglePassword('services_razorpay_secret', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none text-xs">
+                            👁️
+                        </button>
+                    </div>
                     <p class="text-[10px] text-gray-400 mt-1">Keep this key secret and stored securely.</p>
                 </div>
             </div>
@@ -58,7 +61,12 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-[11px] font-bold text-gray-500 mb-1">Webhook Secret</label>
-                    <input type="password" name="services_razorpay_webhook_secret" id="services_razorpay_webhook_secret" value="{{ $settings['services_razorpay_webhook_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <div class="relative">
+                        <input type="password" name="services_razorpay_webhook_secret" id="services_razorpay_webhook_secret" value="{{ $settings['services_razorpay_webhook_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg pl-3 pr-10 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                        <button type="button" onclick="togglePassword('services_razorpay_webhook_secret', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none text-xs">
+                            👁️
+                        </button>
+                    </div>
                     <p class="text-[10px] text-gray-400 mt-1">Secret token to authenticate Razorpay events.</p>
                 </div>
                 <div>
@@ -84,7 +92,12 @@
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-gray-500 mb-1">Salt Key / Client Secret</label>
-                    <input type="password" name="services_phonepe_salt_key" id="services_phonepe_salt_key" value="{{ $settings['services_phonepe_salt_key'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <div class="relative">
+                        <input type="password" name="services_phonepe_salt_key" id="services_phonepe_salt_key" value="{{ $settings['services_phonepe_salt_key'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg pl-3 pr-10 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                        <button type="button" onclick="togglePassword('services_phonepe_salt_key', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none text-xs">
+                            👁️
+                        </button>
+                    </div>
                     <p class="text-[10px] text-gray-400 mt-1">Used to compute SHA256 signatures (or Client Secret for test credentials).</p>
                 </div>
             </div>
@@ -127,6 +140,17 @@
 
 @push('scripts')
 <script>
+function togglePassword(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const select = document.getElementById('payment_active_gateway');
     const razorpaySec = document.getElementById('razorpay-section');
@@ -138,12 +162,12 @@ document.addEventListener('DOMContentLoaded', function() {
             razorpaySec.classList.remove('hidden');
             phonepeSec.classList.add('hidden');
             badge.textContent = "Razorpay Mode";
-            badge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100";
+            badge.className = "px-2.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100";
         } else {
             razorpaySec.classList.add('hidden');
             phonepeSec.classList.remove('hidden');
             badge.textContent = "PhonePe Mode";
-            badge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-100";
+            badge.className = "px-2.5 py-0.5 text-xs font-semibold rounded-full bg-purple-50 text-purple-700 border border-purple-100";
         }
     }
 
