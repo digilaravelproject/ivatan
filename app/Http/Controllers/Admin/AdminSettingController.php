@@ -91,8 +91,6 @@ class AdminSettingController extends Controller
         Artisan::call('config:clear');
         Artisan::call('cache:clear');
 
-        Log::info('Payment settings updated, cache cleared', ['admin_id' => auth()->id()]);
-
         return redirect()->route('admin.settings.index', ['tab' => 'payment'])
             ->with('success', 'Payment gateway credentials saved. Configuration cache cleared automatically.');
     }

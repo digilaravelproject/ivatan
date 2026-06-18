@@ -32,8 +32,6 @@ class SettingService
 
         $this->clearCache();
 
-        Log::info("Setting updated: {$key}", ['group' => $group]);
-
         return $record;
     }
 
