@@ -219,11 +219,16 @@ class PhonePeGateway implements PaymentGatewayInterface
                 'X-MERCHANT-ID' => $this->merchantId,
             ])->get("{$this->baseUrl}{$endpoint}");
 
-            if ($response->successful() && ($response->json('code') ?? '') === 'PAYMENT_ERROR') {
+            $code = $response->json('code');
+
+            // If the request succeeds, OR returns a PhonePe-specific API error like PAYMENT_NOT_FOUND,
+            // it means signature authorization has succeeded and the credentials are valid.
+            if ($response->successful() || in_array($code, ['PAYMENT_NOT_FOUND', 'PAYMENT_ERROR', 'PAYMENT_SUCCESS'])) {
                 return true;
             }
 
-            if ($response->successful()) {
+            // Also check if we received standard validation response but not authorization failure
+            if ($response->status() === 400 && $code && $code !== 'AUTHORIZATION_FAILED') {
                 return true;
             }
 

@@ -22,16 +22,13 @@ class SettingService
 
     public function set(string $key, mixed $value, ?string $type = null, ?string $group = null, bool $encrypted = false, ?string $description = null): Setting
     {
-        $record = Setting::updateOrCreate(
-            ['key' => $key],
-            [
-                'value' => $value,
-                'type' => $type ?? $this->inferType($value),
-                'group' => $group,
-                'is_encrypted' => $encrypted,
-                'description' => $description,
-            ]
-        );
+        $record = Setting::firstOrNew(['key' => $key]);
+        $record->is_encrypted = $encrypted;
+        $record->value = $value;
+        $record->type = $type ?? $this->inferType($value);
+        $record->group = $group;
+        $record->description = $description;
+        $record->save();
 
         $this->clearCache();
 
@@ -45,15 +42,18 @@ class SettingService
         foreach ($settings as $key => $value) {
             $type = null;
             $encrypted = false;
+            $description = null;
+            $groupName = $group;
 
             if (is_array($value)) {
                 $type = $value['type'] ?? null;
                 $encrypted = $value['encrypted'] ?? false;
                 $description = $value['description'] ?? null;
+                $groupName = $value['group'] ?? $group;
                 $value = $value['value'] ?? null;
             }
 
-            $this->set($key, $value, $type, $group, $encrypted, $description ?? null);
+            $this->set($key, $value, $type, $groupName, $encrypted, $description);
         }
 
         $this->clearCache();
