@@ -91,25 +91,28 @@ class PaymentWebhookController extends Controller
 
         $gatewaySubId = $subscriptionEntity['id'] ?? $paymentEntity['subscription_id'] ?? null;
 
-        if (!$gatewaySubId) {
-            Log::warning('Razorpay webhook: no subscription ID', ['event' => $event]);
-            return response()->json(['status' => 'error', 'message' => 'No subscription ID'], 400);
+        if ($gatewaySubId) {
+            $subscription = UserSubscription::where('gateway_subscription_id', $gatewaySubId)->first();
+
+            if (!$subscription) {
+                Log::warning('Razorpay webhook: subscription not found', ['gateway_id' => $gatewaySubId]);
+                return response()->json(['status' => 'error', 'message' => 'Subscription not found'], 404);
+            }
+
+            match ($event) {
+                'subscription.charged' => $this->handleCharged($subscription, $paymentEntity),
+                'subscription.cancelled' => $this->handleCancelled($subscription),
+                'subscription.completed' => $this->handleCompleted($subscription),
+                'payment.failed' => $this->handlePaymentFailed($subscription),
+                default => Log::info('Razorpay webhook: unhandled subscription event', ['event' => $event]),
+            };
+        } else {
+            if (str_starts_with($event, 'subscription.')) {
+                Log::warning('Razorpay webhook: subscription event missing subscription ID', ['event' => $event]);
+                return response()->json(['status' => 'error', 'message' => 'No subscription ID'], 400);
+            }
+            Log::info('Razorpay webhook: direct payment event received', ['event' => $event]);
         }
-
-        $subscription = UserSubscription::where('gateway_subscription_id', $gatewaySubId)->first();
-
-        if (!$subscription) {
-            Log::warning('Razorpay webhook: subscription not found', ['gateway_id' => $gatewaySubId]);
-            return response()->json(['status' => 'error', 'message' => 'Subscription not found'], 404);
-        }
-
-        match ($event) {
-            'subscription.charged' => $this->handleCharged($subscription, $paymentEntity),
-            'subscription.cancelled' => $this->handleCancelled($subscription),
-            'subscription.completed' => $this->handleCompleted($subscription),
-            'payment.failed' => $this->handlePaymentFailed($subscription),
-            default => Log::info('Razorpay webhook: unhandled event', ['event' => $event]),
-        };
 
         if ($dedupKey) {
             Cache::put($dedupKey, true, 3600);

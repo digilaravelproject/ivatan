@@ -70,8 +70,12 @@ class RazorpayWebhookController extends Controller
             $gatewaySubId = $subscriptionEntity['id'] ?? $paymentEntity['subscription_id'] ?? null;
 
             if (!$gatewaySubId) {
-                Log::warning('Razorpay webhook: no subscription ID', ['event' => $event]);
-                return response()->json(['status' => 'error', 'message' => 'No subscription ID'], 400);
+                if (str_starts_with($event, 'subscription.')) {
+                    Log::warning('Razorpay webhook: no subscription ID', ['event' => $event]);
+                    return response()->json(['status' => 'error', 'message' => 'No subscription ID'], 400);
+                }
+                Log::info('Razorpay webhook: direct payment event ignored on subscription webhook', ['event' => $event]);
+                return response()->json(['status' => 'success', 'message' => 'Ignored non-subscription event']);
             }
 
             $subscription = UserSubscription::where('gateway_subscription_id', $gatewaySubId)->first();

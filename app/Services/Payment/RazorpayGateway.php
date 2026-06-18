@@ -252,6 +252,11 @@ class RazorpayGateway implements PaymentGatewayInterface
                 return true;
             }
 
+            if ($response->status() === 429) {
+                Log::warning('Razorpay: Test connection received 429 Too Many Requests, but connection is likely functional.');
+                return true;
+            }
+
             Log::error('Razorpay: Test connection failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),

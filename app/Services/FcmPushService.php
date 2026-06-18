@@ -78,7 +78,12 @@ class FcmPushService
             } catch (InvalidMessage $e) {
                 Log::error('FCM invalid message for token: ' . $e->getMessage());
             } catch (\Throwable $e) {
-                Log::error('FCM send failed: ' . $e->getMessage());
+                if (str_contains($e->getMessage(), 'SenderId mismatch')) {
+                    Log::warning('FCM token invalid (removed): ' . substr($token, 0, 20) . '...');
+                    DeviceToken::where('token', $token)->delete();
+                } else {
+                    Log::error('FCM send failed: ' . $e->getMessage());
+                }
             }
         }
     }
