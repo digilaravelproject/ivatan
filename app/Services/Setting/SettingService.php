@@ -77,6 +77,7 @@ class SettingService
             'secret' => $this->get("{$prefix}.secret", ''),
             'webhook_secret' => $this->get("{$prefix}.webhook_secret", ''),
             'webhook_url' => $this->get("{$prefix}.webhook_url", ''),
+            'env' => $this->get("{$prefix}.env", 'sandbox'),
         ];
     }
 
