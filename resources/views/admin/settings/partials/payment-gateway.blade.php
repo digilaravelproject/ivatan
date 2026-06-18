@@ -1,129 +1,128 @@
-<div class="bg-white rounded-xl shadow-lg border border-gray-100 p-8 max-w-3xl">
-    <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+<div class="bg-white rounded-xl shadow border border-gray-150 p-5 w-full max-w-5xl">
+    <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
         <div>
-            <h2 class="text-xl font-bold text-gray-800">💳 Payment Gateway Settings</h2>
-            <p class="text-xs text-gray-500 mt-1">Configure active gateways, API keys, and connection details.</p>
+            <h2 class="text-lg font-bold text-gray-800">💳 Payment Gateway Settings</h2>
+            <p class="text-xs text-gray-400">Configure active gateways, API keys, and connection details.</p>
         </div>
-        <div id="status-badge" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+        <div id="status-badge" class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-100">
             Active Integration
         </div>
     </div>
 
     @if(session('success'))
-        <div class="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-lg mb-6">
+        <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-lg mb-4 text-xs font-medium">
             <span class="text-emerald-500 font-bold">✓</span>
-            <span class="text-sm font-medium">{{ session('success') }}</span>
+            <span>{{ session('success') }}</span>
         </div>
     @endif
     @if($errors->any())
-        <div class="flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-lg mb-6">
+        <div class="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-800 px-3 py-2 rounded-lg mb-4 text-xs font-medium">
             <span class="text-rose-500 font-bold">✕</span>
-            <span class="text-sm font-medium">{{ $errors->first() }}</span>
+            <span>{{ $errors->first() }}</span>
         </div>
     @endif
 
     <form method="POST" action="{{ route('admin.settings.update-payment') }}" id="payment-form">
         @csrf
 
-        <div class="mb-6">
-            <label class="block text-sm font-bold text-gray-700 mb-2">Active Provider Gateway</label>
+        <div class="mb-4">
+            <label class="block text-xs font-bold text-gray-700 mb-1.5">Active Provider Gateway</label>
             <div class="relative">
-                <select name="payment_active_gateway" id="payment_active_gateway" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold text-gray-700">
+                <select name="payment_active_gateway" id="payment_active_gateway" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-semibold text-gray-700">
                     <option value="razorpay" @selected(($settings['payment_active_gateway'] ?? '') === 'razorpay')>Razorpay</option>
                     <option value="phonepe" @selected(($settings['payment_active_gateway'] ?? '') === 'phonepe')>PhonePe</option>
                 </select>
             </div>
-            <p class="text-xs text-gray-400 mt-1.5">This gateway will be used to process all user payments and order checkouts.</p>
         </div>
 
         <!-- Razorpay Configuration Panel -->
-        <div id="razorpay-section" class="gateway-section bg-gray-50/50 border border-gray-100 p-6 rounded-xl mb-6">
-            <div class="flex items-center gap-2 mb-4">
-                <span class="text-lg">💳</span>
-                <h3 class="font-bold text-gray-800 text-sm tracking-wide uppercase">Razorpay Credentials</h3>
+        <div id="razorpay-section" class="gateway-section bg-gray-50/50 border border-gray-100 p-4 rounded-xl mb-4">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-sm">💳</span>
+                <h3 class="font-bold text-gray-700 text-xs tracking-wide uppercase">Razorpay Credentials</h3>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Key ID</label>
-                    <input type="text" name="services_razorpay_key" id="services_razorpay_key" value="{{ $settings['services_razorpay_key'] ?? '' }}" placeholder="rzp_test_..." class="w-full bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 font-mono text-sm focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[11px] text-gray-400 mt-1">Found under Razorpay API Keys dashboard.</p>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Key ID</label>
+                    <input type="text" name="services_razorpay_key" id="services_razorpay_key" value="{{ $settings['services_razorpay_key'] ?? '' }}" placeholder="rzp_test_..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <p class="text-[10px] text-gray-400 mt-1">Found under Razorpay API Keys dashboard.</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Key Secret</label>
-                    <input type="password" name="services_razorpay_secret" id="services_razorpay_secret" value="{{ $settings['services_razorpay_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 font-mono text-sm focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[11px] text-gray-400 mt-1">Keep this key secret and stored securely.</p>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Key Secret</label>
+                    <input type="password" name="services_razorpay_secret" id="services_razorpay_secret" value="{{ $settings['services_razorpay_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <p class="text-[10px] text-gray-400 mt-1">Keep this key secret and stored securely.</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Webhook Secret</label>
-                    <input type="password" name="services_razorpay_webhook_secret" id="services_razorpay_webhook_secret" value="{{ $settings['services_razorpay_webhook_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 font-mono text-sm focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[11px] text-gray-400 mt-1">Secret token to authenticate Razorpay events.</p>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Webhook Secret</label>
+                    <input type="password" name="services_razorpay_webhook_secret" id="services_razorpay_webhook_secret" value="{{ $settings['services_razorpay_webhook_secret'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <p class="text-[10px] text-gray-400 mt-1">Secret token to authenticate Razorpay events.</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Webhook URL</label>
-                    <input type="text" readonly value="{{ route('webhook.razorpay') }}" class="w-full bg-gray-100 border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs text-gray-500 cursor-text select-all font-mono">
-                    <p class="text-[11px] text-gray-400 mt-1">Copy & configure this endpoint in your Razorpay dashboard.</p>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Webhook URL</label>
+                    <input type="text" readonly value="{{ route('webhook.razorpay') }}" class="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-text select-all font-mono">
+                    <p class="text-[10px] text-gray-400 mt-1">Copy & configure this endpoint in your Razorpay dashboard.</p>
                 </div>
             </div>
         </div>
 
         <!-- PhonePe Configuration Panel -->
-        <div id="phonepe-section" class="gateway-section hidden bg-gray-50/50 border border-gray-100 p-6 rounded-xl mb-6">
-            <div class="flex items-center gap-2 mb-4">
-                <span class="text-lg">📲</span>
-                <h3 class="font-bold text-gray-800 text-sm tracking-wide uppercase">PhonePe Credentials</h3>
+        <div id="phonepe-section" class="gateway-section hidden bg-gray-50/50 border border-gray-100 p-4 rounded-xl mb-4">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-sm">📲</span>
+                <h3 class="font-bold text-gray-700 text-xs tracking-wide uppercase">PhonePe Credentials</h3>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Merchant ID</label>
-                    <input type="text" name="services_phonepe_merchant_id" id="services_phonepe_merchant_id" value="{{ $settings['services_phonepe_merchant_id'] ?? '' }}" placeholder="e.g. M23NCDAG7VSKU" class="w-full bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 font-mono text-sm focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[11px] text-gray-400 mt-1">PhonePe provided unique Merchant ID.</p>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Merchant ID / Client ID</label>
+                    <input type="text" name="services_phonepe_merchant_id" id="services_phonepe_merchant_id" value="{{ $settings['services_phonepe_merchant_id'] ?? '' }}" placeholder="e.g. M23NCDAG7VSKU_2604301424" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <p class="text-[10px] text-gray-400 mt-1">PhonePe provided Merchant ID (or Client ID for test credentials).</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Salt Key (API Key)</label>
-                    <input type="password" name="services_phonepe_salt_key" id="services_phonepe_salt_key" value="{{ $settings['services_phonepe_salt_key'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 font-mono text-sm focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[11px] text-gray-400 mt-1">Used to compute SHA256 signatures for requests.</p>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Salt Key / Client Secret</label>
+                    <input type="password" name="services_phonepe_salt_key" id="services_phonepe_salt_key" value="{{ $settings['services_phonepe_salt_key'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <p class="text-[10px] text-gray-400 mt-1">Used to compute SHA256 signatures (or Client Secret for test credentials).</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Salt Index (Key Version)</label>
-                    <input type="text" name="services_phonepe_salt_index" id="services_phonepe_salt_index" value="{{ $settings['services_phonepe_salt_index'] ?? '1' }}" class="w-full bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 font-mono text-sm focus:ring-2 focus:ring-blue-500">
-                    <p class="text-[11px] text-gray-400 mt-1">Default is 1 (corresponds to the salt index suffix e.g. ###1).</p>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Salt Index / Client Version</label>
+                    <input type="text" name="services_phonepe_salt_index" id="services_phonepe_salt_index" value="{{ $settings['services_phonepe_salt_index'] ?? '1' }}" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <p class="text-[10px] text-gray-400 mt-1">Default is 1 (matches Client Version in dashboard).</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Environment Mode</label>
-                    <select name="services_phonepe_env" id="services_phonepe_env" class="w-full bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Environment Mode</label>
+                    <select name="services_phonepe_env" id="services_phonepe_env" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500">
                         <option value="sandbox" @selected(($settings['services_phonepe_env'] ?? '') === 'sandbox')>Sandbox (Test Mode)</option>
                         <option value="production" @selected(($settings['services_phonepe_env'] ?? '') === 'production')>Production (Live Mode)</option>
                     </select>
-                    <p class="text-[11px] text-gray-400 mt-1">Set to Sandbox for mock payments during development.</p>
+                    <p class="text-[10px] text-gray-400 mt-1">Set to Sandbox for mock payments during development.</p>
                 </div>
             </div>
 
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-gray-600 mb-1">Webhook URL</label>
-                <input type="text" readonly value="{{ route('webhook.phonepe') }}" class="w-full bg-gray-100 border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs text-gray-500 cursor-text select-all font-mono">
-                <p class="text-[11px] text-gray-400 mt-1">Configure this endpoint URL in your PhonePe console to capture real-time payment states.</p>
+            <div class="mb-3">
+                <label class="block text-[11px] font-bold text-gray-500 mb-1">Webhook URL</label>
+                <input type="text" readonly value="{{ route('webhook.phonepe') }}" class="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-text select-all font-mono">
+                <p class="text-[10px] text-gray-400 mt-1">Configure this endpoint URL in your PhonePe console to capture real-time payment states.</p>
             </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-8 pt-4 border-t border-gray-100">
-            <button type="submit" class="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all text-sm">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-5 pt-3 border-t border-gray-100">
+            <button type="submit" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-blue-700 transition-all text-xs">
                 Save Payment Settings
             </button>
-            <button type="button" id="test-connection-btn" class="bg-gray-100 text-gray-700 font-semibold px-5 py-3 rounded-lg border border-gray-200 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all text-sm flex items-center justify-center gap-2">
+            <button type="button" id="test-connection-btn" class="bg-gray-100 text-gray-700 font-semibold px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all text-xs flex items-center justify-center gap-2">
                 <span>🔌</span> Test Connection
             </button>
         </div>
     </form>
 
-    <div id="test-result" class="mt-6 p-4 rounded-xl border hidden transition-all duration-300"></div>
+    <div id="test-result" class="mt-4 p-3 rounded-lg border hidden transition-all duration-300"></div>
 </div>
 
 @push('scripts')
