@@ -150,6 +150,50 @@ class PaymentWebhookController extends Controller
         Log::info('PhonePe webhook payload decoded', ['payload' => $decodedPayload]);
 
         $event = $this->gateway->parseWebhookEvent($decodedPayload);
+
+        // Check if this is a subscription webhook
+        $merchantSubscriptionId = $decodedPayload['paymentFlow']['merchantSubscriptionId']
+            ?? $decodedPayload['data']['paymentFlow']['merchantSubscriptionId']
+            ?? null;
+
+        if ($merchantSubscriptionId) {
+            $subscription = UserSubscription::where('gateway_subscription_id', $merchantSubscriptionId)->first();
+
+            if (!$subscription) {
+                Log::warning('PhonePe webhook: subscription not found', ['gateway_id' => $merchantSubscriptionId]);
+                return response()->json(['status' => 'error', 'message' => 'Subscription not found'], 404);
+            }
+
+            if ($event === 'subscription.charged') {
+                $paymentDetails = $decodedPayload['paymentDetails'][0]
+                    ?? $decodedPayload['data']['paymentDetails'][0]
+                    ?? null;
+
+                $paymentEntity = [
+                    'id' => $paymentDetails['transactionId'] 
+                        ?? $decodedPayload['data']['transactionId'] 
+                        ?? $decodedPayload['orderId'] 
+                        ?? $merchantSubscriptionId,
+                    'amount' => $paymentDetails['amount'] 
+                        ?? $decodedPayload['data']['amount'] 
+                        ?? $decodedPayload['amount'] 
+                        ?? 0,
+                    'invoice_id' => $decodedPayload['orderId'] 
+                        ?? $decodedPayload['data']['orderId'] 
+                        ?? null,
+                ];
+
+                $this->handleCharged($subscription, $paymentEntity);
+                Log::info('PhonePe webhook: subscription charged successfully', ['subscription_id' => $subscription->id]);
+            } else {
+                $this->handlePaymentFailed($subscription);
+                Log::warning('PhonePe webhook: subscription payment failed', ['subscription_id' => $subscription->id]);
+            }
+
+            $this->orchestrator->handleWebhookEvent('phonepe', $event, $decodedPayload);
+            return response()->json(['status' => 'success']);
+        }
+
         $merchantTransactionId = $decodedPayload['data']['merchantTransactionId'] ?? null;
 
         if (!$merchantTransactionId) {

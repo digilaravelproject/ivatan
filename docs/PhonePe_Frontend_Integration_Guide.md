@@ -12,7 +12,7 @@
 |---------|--------|
 | Ecommerce payments | ✅ Active |
 | Ad payments | ✅ Active |
-| Subscriptions | ❌ Not supported (PhonePe limitation) |
+| Subscriptions | ✅ Active (UPI AutoPay Mandate Setup) |
 | Webhook (server-to-server) | ✅ Dual endpoints |
 | Browser callback (redirect) | ✅ Plain text response in WebView |
 | Payment verification | ✅ Via API or auto via webhook |
@@ -287,7 +287,53 @@ Headers: Authorization: Bearer <token>
 
 ---
 
-## 4. Key Differences from Razorpay
+## 4. Subscription Payments (UPI AutoPay Mandates)
+
+### Initiate Subscription Setup
+
+```
+POST /api/v1/profiles/{profile_id}/subscriptions/initiate
+Headers: Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+    "subscription_plan_id": 2
+}
+```
+
+**Response (200):**
+```json
+{
+    "success": true,
+    "message": "Subscription initiated successfully.",
+    "data": {
+        "requires_payment": true,
+        "gateway": "phonepe",
+        "gateway_subscription_id": "SUB_648ef894a8210",
+        "razorpay_key": "",
+        "redirect_url": "https://mercury-uat.phonepe.com/transact/pgv2?token=...",
+        "plan": {
+            "id": 2,
+            "name": "Premium Plan",
+            "price": 499.00,
+            "currency": "INR"
+        }
+    }
+}
+```
+
+**Flow:**
+1. Frontend makes the initiate request.
+2. Extracts `redirect_url` and loads it in WebView/system browser.
+3. User authorizes the UPI AutoPay mandate with their UPI PIN.
+4. PhonePe redirects the user back to the redirect callback URL.
+5. PhonePe sends a server-to-server webhook containing `paymentFlow.merchantSubscriptionId` with `COMPLETED` state which activates the subscription.
+
+---
+
+## 5. Key Differences from Razorpay
 
 | Aspect | Razorpay (Old) | PhonePe (New) |
 |--------|---------------|---------------|
@@ -295,7 +341,7 @@ Headers: Authorization: Bearer <token>
 | **Initiate response** | `{ order_id, amount }` | `{ redirect_url, merchant_transaction_id }` |
 | **Verify payload** | `razorpay_payment_id + razorpay_order_id + razorpay_signature` | `merchantTransactionId` only |
 | **Verification** | Client-side signature + server-side | Server-side API call to PhonePe |
-| **Subscriptions** | ✅ Supported | ❌ Not supported |
+| **Subscriptions** | ✅ Supported | ✅ Supported (UPI AutoPay via Web Redirect) |
 | **Webhook signature** | `razorpay_signature` HMAC | `X-VERIFY` header (sha256) |
 | **Callback** | Redirect with `razorpay_payment_id` query params | POST with `code` + `merchantTransactionId` |
 | **Amount format** | Rupees (float) | Paise (integer * 100) |
@@ -303,7 +349,7 @@ Headers: Authorization: Bearer <token>
 
 ---
 
-## 5. Error Codes
+## 6. Error Codes
 
 | HTTP Code | Meaning | Frontend Action |
 |-----------|---------|-----------------|

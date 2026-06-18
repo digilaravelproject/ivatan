@@ -225,6 +225,7 @@ class SubscriptionController extends Controller
                 'gateway' => $gatewayName,
                 'gateway_subscription_id' => $result->gatewaySubscriptionId,
                 'razorpay_key' => $publicKey,
+                'redirect_url' => $result->redirectUrl,
                 'plan' => [
                     'id' => $plan->id,
                     'name' => $plan->name,
