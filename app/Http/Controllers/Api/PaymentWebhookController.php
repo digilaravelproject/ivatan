@@ -129,7 +129,13 @@ class PaymentWebhookController extends Controller
         $base64Response = $request->input('response');
 
         if (!$signature || !$base64Response) {
-            Log::warning('PhonePe webhook: missing signature or response data');
+            Log::warning('PhonePe webhook: missing signature or response data', [
+                'method' => $request->method(),
+                'has_signature' => !empty($signature),
+                'has_response' => !empty($base64Response),
+                'headers' => $request->headers->all(),
+                'payload' => $request->all(),
+            ]);
             return response()->json(['status' => 'error', 'message' => 'Missing signature or data'], 400);
         }
 
