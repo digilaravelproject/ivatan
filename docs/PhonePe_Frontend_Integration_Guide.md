@@ -322,12 +322,22 @@ Headers: Authorization: Bearer <token>
 }
 ```
 
-**Flow:**
-1. Frontend makes the initiate request.
-2. Extracts `redirect_url` and loads it in WebView/system browser.
-3. User authorizes the UPI AutoPay mandate with their UPI PIN.
-4. PhonePe redirects the user back to the redirect callback URL.
-5. PhonePe sends a server-to-server webhook containing `paymentFlow.merchantSubscriptionId` with `COMPLETED` state which activates the subscription.
+### Flow & Lifecycle:
+1. **Initiate Mandate Setup**: 
+   * Frontend calls the initiate request.
+   * Extracts `redirect_url` and loads it in a WebView or opens in the system browser.
+   * The user selects their UPI app (PhonePe, GPay, Paytm) and authorizes the **AutoPay Mandate Setup** using their UPI PIN.
+2. **First Payment & Activation**: 
+   * PhonePe redirects the user back to the redirect callback URL.
+   * PhonePe sends a server-to-server webhook callback to our backend.
+   * The backend processes the payment, activates the subscription, sets the `next_billing_at` date, and returns success.
+3. **Automated Auto-Renewal (Backend Managed)**:
+   * **Pre-Debit Notification (24-48 Hours Before Due Date)**: Our backend scheduler automatically calls PhonePe's `/v3/recurring/preDebit` API to notify the user's UPI app of the upcoming charge.
+   * **Execute Debit (On Due Date)**: 24 hours after the notification, the backend scheduler executes the charge using `/v3/recurring/debit/init`. The frontend does not need to trigger any payment calls for renewals.
+4. **Mandate Cancellation/Revocation Sync**:
+   * If the user revokes or cancels the AutoPay mandate directly from their UPI app (e.g., from PhonePe's mandate settings), PhonePe sends a server-to-server webhook `checkout.subscription.cancelled` or `checkout.mandate.revoked` to our backend.
+   * The backend automatically cancels the active subscription inside our database.
+   * The frontend can query the profile subscription status or active subscription API to dynamically sync the state.
 
 ---
 
