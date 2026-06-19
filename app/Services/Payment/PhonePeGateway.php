@@ -132,21 +132,24 @@ class PhonePeGateway implements PaymentGatewayInterface
                 }
 
                 $data = $response->json();
-                if (($data['state'] ?? '') === 'PENDING' && isset($data['redirect_url'])) {
+                $redirectUrl = $data['redirectUrl'] ?? $data['redirect_url'] ?? null;
+                $orderId = $data['orderId'] ?? $data['order_id'] ?? null;
+
+                if ((($data['state'] ?? '') === 'PENDING' || ($data['success'] ?? false) === true) && $redirectUrl) {
                     return PaymentResult::success(
                         transactionId: $merchantTransactionId,
-                        gatewayOrderId: $data['order_id'] ?? $merchantTransactionId,
+                        gatewayOrderId: $orderId ?? $merchantTransactionId,
                         status: 'created',
                         amount: $dto->amount,
                         currency: $dto->currency,
-                        redirectUrl: $data['redirect_url'],
+                        redirectUrl: $redirectUrl,
                         rawResponse: $data
                     );
                 }
 
                 return PaymentResult::failed(
                     $data['message'] ?? 'Failed to initialize payment with PhonePe.',
-                    $data['code'] ?? 'ERROR',
+                    $data['code'] ?? $data['state'] ?? 'ERROR',
                     $data
                 );
             }
@@ -366,6 +369,57 @@ class PhonePeGateway implements PaymentGatewayInterface
                     ]
                 ]
             ];
+
+            $token = $this->getAccessToken();
+            if ($token) {
+                $endpoint = '/checkout/v2/sdk/order';
+                
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'O-Bearer ' . $token,
+                ])->post("{$this->baseUrl}{$endpoint}", $payload);
+
+                if ($response->failed()) {
+                    Log::error('PhonePe V2 Subscription request failed', [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+                    return PaymentResult::failed(
+                        'PhonePe API Request Failed: ' . ($response->json('message') ?? 'Unknown error'),
+                        (string) $response->status(),
+                        $response->json()
+                    );
+                }
+
+                $data = $response->json();
+                $redirectUrl = $data['redirectUrl'] ?? $data['redirect_url'] ?? null;
+                
+                if ($response->successful() && $redirectUrl) {
+                    // Convert relative URL if needed
+                    if (!str_starts_with($redirectUrl, 'http')) {
+                        $host = $this->env === 'production' 
+                            ? 'https://mercury.phonepe.com' 
+                            : 'https://mercury-uat.phonepe.com';
+                        $redirectUrl = $host . '/' . ltrim($redirectUrl, './');
+                    }
+
+                    return PaymentResult::success(
+                        gatewayOrderId: $data['orderId'] ?? $merchantOrderId,
+                        gatewaySubscriptionId: $merchantSubscriptionId,
+                        status: 'pending',
+                        amount: $plan->price,
+                        currency: $plan->currency,
+                        redirectUrl: $redirectUrl,
+                        rawResponse: $data
+                    );
+                }
+
+                return PaymentResult::failed(
+                    $data['message'] ?? 'Failed to initialize subscription with PhonePe.',
+                    $data['code'] ?? $data['state'] ?? 'ERROR',
+                    $data
+                );
+            }
 
             $jsonPayload = json_encode($payload);
             $base64Payload = base64_encode($jsonPayload);
