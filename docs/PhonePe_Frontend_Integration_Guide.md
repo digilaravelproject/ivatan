@@ -246,15 +246,7 @@ Decoded `response` content:
 }
 ```
 
-### Architectural Enhancements (Security & Performance)
-
-1. **Webhook Deduplication**: Webhooks now perform a Cache-based deduplication check using the `merchantTransactionId`. If PhonePe delivers duplicate webhook notifications, the system automatically skips duplicate queue jobs.
-2. **Direct Status Fallback**: When the browser redirects to `/payment/callback/phonepe`, the system attempts to find the corresponding database order. If missing (such as sandbox/test panel transactions), it executes a direct gateway verification call to verify success/failure before redirecting.
-3. **Automatic Subscription Persistence**: Subscription initiation (`POST /api/v1/profiles/{id}/subscriptions/initiate`) now persists the subscription as `pending` with `gateway_subscription_id` immediately, ensuring webhook charging events never 404.
-
-**Backend processes automatically:** Updates order status to `paid`, dispatches `ProcessOrderPayment` job, sends notification.
-
-**Flow summary:** Even if frontend never calls verify endpoint, payment will be processed automatically via webhook within seconds.
+*Note: The backend automatically updates the order status to `paid` once the webhook is verified. The frontend can rely on the webhook or query `/api/v1/orders/{order_id}` to retrieve the final status.*
 
 ---
 
