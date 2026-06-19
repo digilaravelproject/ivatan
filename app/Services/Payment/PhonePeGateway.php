@@ -17,8 +17,16 @@ class PhonePeGateway implements PaymentGatewayInterface
     protected string $baseUrl;
     protected string $env;
 
+    protected string $clientId = '';
+    protected string $clientSecret = '';
+    protected string $clientVersion = '1';
+
     public function configure(array $config): void
     {
+        $this->clientId = $config['key'] ?? '';
+        $this->clientSecret = $config['secret'] ?? '';
+        $this->clientVersion = $config['webhook_secret'] ?? '1';
+
         $this->merchantId = $config['key'] ?? '';
         
         $saltKey = $config['secret'] ?? '';
@@ -30,18 +38,119 @@ class PhonePeGateway implements PaymentGatewayInterface
         }
         $this->saltKey = $saltKey;
 
+        // If clientId is a V2 client ID (e.g. M23NCDAG7VSKU_2604301424), extract merchantId
+        if (strpos($this->merchantId, '_') !== false) {
+            $parts = explode('_', $this->merchantId);
+            $this->merchantId = $parts[0];
+        }
+
         $this->saltIndex = $config['webhook_secret'] ?? '1';
         $this->env = $config['env'] ?? 'sandbox';
 
         $this->baseUrl = $this->env === 'production'
-            ? 'https://api.phonepe.com/apis/hermes'
+            ? 'https://api.phonepe.com/apis/pg-sandbox' // Default preprod host, but let's check
             : 'https://api-preprod.phonepe.com/apis/pg-sandbox';
+    }
+
+    protected function getAccessToken(): ?string
+    {
+        if (strpos($this->clientId, '_') === false) {
+            return null; // Not a V2 Client ID
+        }
+
+        $cacheKey = "phonepe_oauth_token_" . md5($this->clientId);
+        $cachedToken = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if ($cachedToken) {
+            return $cachedToken;
+        }
+
+        try {
+            $authUrl = $this->env === 'production'
+                ? 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token'
+                : 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token';
+
+            $response = Http::asForm()->post($authUrl, [
+                'client_id' => $this->clientId,
+                'client_secret' => $this->clientSecret,
+                'client_version' => $this->clientVersion,
+                'grant_type' => 'client_credentials',
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $token = $data['access_token'] ?? null;
+                if ($token) {
+                    $expiresIn = $data['expires_in'] ?? 3600;
+                    \Illuminate\Support\Facades\Cache::put($cacheKey, $token, $expiresIn - 60);
+                    return $token;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('PhonePe: failed to fetch OAuth token', ['error' => $e->getMessage()]);
+        }
+
+        return null;
     }
 
     public function createPaymentIntent(PaymentIntentDTO $dto): PaymentResult
     {
         try {
             $merchantTransactionId = $dto->orderId ?? uniqid('TXN_');
+
+            // If we have V2 credentials, use standard checkout v2
+            $token = $this->getAccessToken();
+            if ($token) {
+                $endpoint = '/checkout/v2/pay';
+                
+                $payload = [
+                    'merchantOrderId' => $merchantTransactionId,
+                    'amount' => (int) round($dto->amount * 100), // in paise
+                    'expireAfter' => 3600,
+                    'paymentFlow' => [
+                        'type' => 'PG_CHECKOUT',
+                        'merchantUrls' => [
+                            'redirectUrl' => route('payment.callback', ['gateway' => 'phonepe']),
+                        ]
+                    ]
+                ];
+
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'O-Bearer ' . $token,
+                ])->post("{$this->baseUrl}{$endpoint}", $payload);
+
+                if ($response->failed()) {
+                    Log::error('PhonePe V2 Checkout request failed', [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+                    return PaymentResult::failed(
+                        'PhonePe API Request Failed: ' . ($response->json('message') ?? 'Unknown error'),
+                        (string) $response->status(),
+                        $response->json()
+                    );
+                }
+
+                $data = $response->json();
+                if (($data['state'] ?? '') === 'PENDING' && isset($data['redirect_url'])) {
+                    return PaymentResult::success(
+                        transactionId: $merchantTransactionId,
+                        gatewayOrderId: $data['order_id'] ?? $merchantTransactionId,
+                        status: 'created',
+                        amount: $dto->amount,
+                        currency: $dto->currency,
+                        redirectUrl: $data['redirect_url'],
+                        rawResponse: $data
+                    );
+                }
+
+                return PaymentResult::failed(
+                    $data['message'] ?? 'Failed to initialize payment with PhonePe.',
+                    $data['code'] ?? 'ERROR',
+                    $data
+                );
+            }
+
             $payload = [
                 'merchantId' => $this->merchantId,
                 'merchantTransactionId' => $merchantTransactionId,
@@ -118,6 +227,48 @@ class PhonePeGateway implements PaymentGatewayInterface
             $merchantTransactionId = $payload['merchantTransactionId'] ?? $payload['transactionId'] ?? '';
             if (empty($merchantTransactionId)) {
                 return PaymentResult::failed('Missing transaction ID for verification.');
+            }
+
+            // If we have V2 credentials, use standard checkout v2 status check
+            $token = $this->getAccessToken();
+            if ($token) {
+                $endpoint = "/checkout/v2/order/{$merchantTransactionId}/status";
+                $response = Http::withHeaders([
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'O-Bearer ' . $token,
+                ])->get("{$this->baseUrl}{$endpoint}");
+
+                if ($response->failed()) {
+                    Log::error('PhonePe V2 Status request failed', [
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+                    return PaymentResult::failed(
+                        'PhonePe verification request failed: ' . ($response->json('message') ?? 'Unknown error'),
+                        (string) $response->status(),
+                        $response->json()
+                    );
+                }
+
+                $data = $response->json();
+                if (($data['state'] ?? '') === 'COMPLETED') {
+                    $phonepeTxnId = $data['paymentDetails'][0]['transactionId'] ?? null;
+                    return PaymentResult::success(
+                        transactionId: $merchantTransactionId,
+                        gatewayOrderId: $data['orderId'] ?? $merchantTransactionId,
+                        gatewayPaymentId: $phonepeTxnId,
+                        status: 'paid',
+                        amount: isset($data['amount']) ? ($data['amount'] / 100) : null,
+                        currency: 'INR',
+                        rawResponse: $data
+                    );
+                }
+
+                return PaymentResult::failed(
+                    $data['message'] ?? 'Payment status is not successful.',
+                    $data['state'] ?? 'ERROR',
+                    $data
+                );
             }
 
             $endpoint = "/pg/v1/status/{$this->merchantId}/{$merchantTransactionId}";
@@ -332,6 +483,14 @@ class PhonePeGateway implements PaymentGatewayInterface
 
     public function verifyWebhookSignature(string $payload, string $signature, string $secret): bool
     {
+        // Decode secret if base64 encoded Client Secret is provided
+        if (!empty($secret) && base64_decode($secret, true) !== false) {
+            $decoded = base64_decode($secret);
+            if (preg_match('/^[a-f0-9\-]{36}$/i', $decoded)) {
+                $secret = $decoded;
+            }
+        }
+
         $parts = explode('###', $signature);
         if (count($parts) !== 2) {
             return false;
@@ -358,6 +517,12 @@ class PhonePeGateway implements PaymentGatewayInterface
     public function testConnection(): bool
     {
         try {
+            // For Checkout V2, fetching the OAuth token is the auth check
+            $token = $this->getAccessToken();
+            if ($token) {
+                return true;
+            }
+
             // PhonePe preprod/sandbox status endpoint doesn't support basic requests without a transaction,
             // but we can query standard status with a fake transaction to test salt verification correctness.
             $fakeTxn = 'CONN_TEST_' . uniqid();
