@@ -138,6 +138,30 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Webhook Username (Optional)</label>
+                    <input type="text" name="services_phonepe_webhook_username" id="services_phonepe_webhook_username" value="{{ $settings['services_phonepe_webhook_username'] ?? '' }}" placeholder="e.g. ivatan_webhook" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                    <p class="text-[10px] text-gray-400 mt-1">Configured username for Webhook SHA authentication headers.</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 mb-1">Webhook Password (Optional)</label>
+                    <div class="relative">
+                        <input type="password" name="services_phonepe_webhook_password" id="services_phonepe_webhook_password" value="{{ $settings['services_phonepe_webhook_password'] ?? '' }}" placeholder="••••••••••••••••" class="w-full bg-white border border-gray-200 rounded-lg pl-3 pr-10 py-2 font-mono text-xs focus:ring-1 focus:ring-blue-500">
+                        <button type="button" onclick="togglePassword('services_phonepe_webhook_password', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
+                            <svg class="eye-open h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <svg class="eye-closed h-3.5 w-3.5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-1">Configured password for Webhook SHA authentication headers.</p>
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label class="block text-[11px] font-bold text-gray-500 mb-1">Webhook URL</label>
                 <input type="text" readonly value="{{ route('webhook.phonepe') }}" class="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 cursor-text select-all font-mono">
@@ -218,6 +242,8 @@ document.getElementById('test-connection-btn').addEventListener('click', async f
         bodyData.secret = document.getElementById('services_phonepe_salt_key').value;
         bodyData.webhook_secret = document.getElementById('services_phonepe_salt_index').value;
         bodyData.env = document.getElementById('services_phonepe_env').value;
+        bodyData.webhook_username = document.getElementById('services_phonepe_webhook_username').value;
+        bodyData.webhook_password = document.getElementById('services_phonepe_webhook_password').value;
     }
 
     try {

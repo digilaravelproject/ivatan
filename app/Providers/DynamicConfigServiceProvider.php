@@ -53,6 +53,8 @@ class DynamicConfigServiceProvider extends ServiceProvider
                 'services.phonepe.secret' => $settings->get('payment.phonepe.secret'),
                 'services.phonepe.webhook_secret' => $settings->get('payment.phonepe.webhook_secret'),
                 'services.phonepe.env' => $settings->get('payment.phonepe.env', 'sandbox'),
+                'services.phonepe.webhook_username' => $settings->get('payment.phonepe.webhook_username'),
+                'services.phonepe.webhook_password' => $settings->get('payment.phonepe.webhook_password'),
             ]);
         } catch (\Throwable $e) {
             Log::critical('DynamicConfigServiceProvider: Failed to load payment config from DB', [

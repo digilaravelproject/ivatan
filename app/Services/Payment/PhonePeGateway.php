@@ -21,11 +21,16 @@ class PhonePeGateway implements PaymentGatewayInterface
     protected string $clientSecret = '';
     protected string $clientVersion = '1';
 
+    protected string $webhookUsername = '';
+    protected string $webhookPassword = '';
+
     public function configure(array $config): void
     {
         $this->clientId = $config['key'] ?? '';
         $this->clientSecret = $config['secret'] ?? '';
         $this->clientVersion = $config['webhook_secret'] ?? '1';
+        $this->webhookUsername = $config['webhook_username'] ?? '';
+        $this->webhookPassword = $config['webhook_password'] ?? '';
 
         $this->merchantId = $config['key'] ?? '';
         
@@ -570,6 +575,14 @@ class PhonePeGateway implements PaymentGatewayInterface
 
     public function verifyV2WebhookSignature(string $rawBody, string $signature, string $secret): bool
     {
+        // If we have webhookUsername and webhookPassword configured:
+        if (!empty($this->webhookUsername) && !empty($this->webhookPassword)) {
+            $expected = hash('sha256', $this->webhookUsername . ':' . $this->webhookPassword);
+            if (hash_equals($expected, $signature)) {
+                return true;
+            }
+        }
+
         // Decode secret if base64 encoded Client Secret is provided
         if (!empty($secret) && base64_decode($secret, true) !== false) {
             $decoded = base64_decode($secret);

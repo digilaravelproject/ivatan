@@ -31,6 +31,8 @@ class AdminSettingController extends Controller
                 'services_phonepe_salt_key' => $this->settings->get('payment.phonepe.secret', ''),
                 'services_phonepe_salt_index' => $this->settings->get('payment.phonepe.webhook_secret', '1'),
                 'services_phonepe_env' => $this->settings->get('payment.phonepe.env', 'sandbox'),
+                'services_phonepe_webhook_username' => $this->settings->get('payment.phonepe.webhook_username', ''),
+                'services_phonepe_webhook_password' => $this->settings->get('payment.phonepe.webhook_password', ''),
                 'subscription_default_duration' => $this->settings->get('subscription.default_duration', 30),
                 'subscription_trial_days' => $this->settings->get('subscription.trial_days', 0),
                 'subscription_cancellation_mode' => $this->settings->get('subscription.cancel_mode', 'end_of_period'),
@@ -64,6 +66,8 @@ class AdminSettingController extends Controller
                 'services_phonepe_salt_key' => 'required_if:payment_active_gateway,phonepe|nullable|string|max:255',
                 'services_phonepe_salt_index' => 'required_if:payment_active_gateway,phonepe|nullable|string|max:255',
                 'services_phonepe_env' => 'required_if:payment_active_gateway,phonepe|nullable|string|in:sandbox,production',
+                'services_phonepe_webhook_username' => 'nullable|string|max:255',
+                'services_phonepe_webhook_password' => 'nullable|string|max:255',
             ]);
 
             $settings = [
@@ -91,6 +95,12 @@ class AdminSettingController extends Controller
             }
             if ($request->has('services_phonepe_env')) {
                 $settings['payment.phonepe.env'] = ['value' => $validated['services_phonepe_env'] ?? 'sandbox', 'group' => 'payment', 'description' => 'PhonePe Environment'];
+            }
+            if ($request->has('services_phonepe_webhook_username')) {
+                $settings['payment.phonepe.webhook_username'] = ['value' => $validated['services_phonepe_webhook_username'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'PhonePe Webhook Username'];
+            }
+            if ($request->has('services_phonepe_webhook_password')) {
+                $settings['payment.phonepe.webhook_password'] = ['value' => $validated['services_phonepe_webhook_password'] ?? '', 'group' => 'payment', 'encrypted' => true, 'description' => 'PhonePe Webhook Password'];
             }
 
             $this->settings->setMultiple($settings);
@@ -120,6 +130,8 @@ class AdminSettingController extends Controller
                 'secret' => $request->input('secret', $this->settings->get("payment.{$gatewayName}.secret")),
                 'webhook_secret' => $request->input('webhook_secret', $this->settings->get("payment.{$gatewayName}.webhook_secret")),
                 'env' => $request->input('env', $this->settings->get("payment.{$gatewayName}.env", 'sandbox')),
+                'webhook_username' => $request->input('webhook_username', $this->settings->get("payment.{$gatewayName}.webhook_username")),
+                'webhook_password' => $request->input('webhook_password', $this->settings->get("payment.{$gatewayName}.webhook_password")),
             ];
 
             $gateway = app(\App\Services\Payment\GatewayManager::class)->driver($gatewayName);
