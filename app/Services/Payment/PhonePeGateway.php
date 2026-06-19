@@ -20,7 +20,16 @@ class PhonePeGateway implements PaymentGatewayInterface
     public function configure(array $config): void
     {
         $this->merchantId = $config['key'] ?? '';
-        $this->saltKey = $config['secret'] ?? '';
+        
+        $saltKey = $config['secret'] ?? '';
+        if (!empty($saltKey) && base64_decode($saltKey, true) !== false) {
+            $decoded = base64_decode($saltKey);
+            if (preg_match('/^[a-f0-9\-]{36}$/i', $decoded)) {
+                $saltKey = $decoded;
+            }
+        }
+        $this->saltKey = $saltKey;
+
         $this->saltIndex = $config['webhook_secret'] ?? '1';
         $this->env = $config['env'] ?? 'sandbox';
 
@@ -369,8 +378,8 @@ class PhonePeGateway implements PaymentGatewayInterface
                 return true;
             }
 
-            // Also check if we received standard validation response but not authorization failure
-            if ($response->status() === 400 && $code && $code !== 'AUTHORIZATION_FAILED') {
+            // Also check if we received standard validation response but not authorization/configuration failure
+            if ($response->status() === 400 && $code && !in_array($code, ['AUTHORIZATION_FAILED', 'KEY_NOT_CONFIGURED'])) {
                 return true;
             }
 
