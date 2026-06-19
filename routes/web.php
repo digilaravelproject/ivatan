@@ -349,5 +349,63 @@ Route::get('/test-s3', function () {
 
 Route::get('/check-disk', fn() => config('filesystems.default'));
 
+// =====================
+// Temporary Payment Test Routes
+// =====================
+Route::get('/temp-payment-test', function() {
+    if (\App\Models\SubscriptionPlan::count() === 0) {
+        try {
+            \App\Models\SubscriptionPlan::create([
+                'profile_type' => 'personal',
+                'name' => 'Test Premium Plan',
+                'slug' => 'test-premium-plan',
+                'description' => 'Test premium subscription plan',
+                'price' => 10.00,
+                'currency' => 'INR',
+                'duration_days' => 30,
+                'features' => [],
+                'is_active' => true,
+                'is_default' => false,
+                'sort_order' => 1,
+                'gateway_plan_id' => 'test_plan_id_123',
+            ]);
+        } catch (\Exception $e) {}
+    }
+    $plans = \App\Models\SubscriptionPlan::all();
+    return view('temp_payment_test', compact('plans'));
+})->name('temp-payment.test');
+
+Route::post('/temp-payment-test/pay', function(\Illuminate\Http\Request $request) {
+    $mode = $request->input('mode', 'purchase');
+    try {
+        if ($mode === 'purchase') {
+            $amount = (float) $request->input('amount', 10);
+            $dto = new \App\Services\Payment\DTOs\PaymentIntentDTO(
+                amount: $amount,
+                currency: 'INR',
+                description: 'Temp Test Purchase',
+                customerId: 'CUST_' . uniqid(),
+                customerEmail: $request->input('email', 'test@example.com'),
+                customerPhone: $request->input('phone', '9999999999'),
+                orderId: 'ORD_' . uniqid()
+            );
+            $result = app(\App\Services\Payment\GatewayManager::class)->driver('phonepe')->createPaymentIntent($dto);
+        } else {
+            $planId = $request->input('plan_id');
+            $plan = \App\Models\SubscriptionPlan::findOrFail($planId);
+            $result = app(\App\Services\Payment\GatewayManager::class)->driver('phonepe')->createSubscription(
+                customerId: 'CUST_' . uniqid(),
+                planId: $plan->gateway_plan_id
+            );
+        }
+        if ($result->success && !empty($result->redirectUrl)) {
+            return redirect()->away($result->redirectUrl);
+        }
+        return back()->with('error', 'Payment Initiation Failed: ' . ($result->message ?? 'Unknown Error'));
+    } catch (\Exception $e) {
+        return back()->with('error', 'Error: ' . $e->getMessage());
+    }
+})->name('temp-payment.pay');
+
 // Auth scaffolding (Laravel Breeze / Jetstream / Fortify)
 require __DIR__ . '/auth.php';
