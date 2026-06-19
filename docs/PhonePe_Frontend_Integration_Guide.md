@@ -1,7 +1,7 @@
 # PhonePe Payment Integration — Frontend Integration Guide
 
 > **Gateway:** PhonePe (replaces Razorpay as primary)  
-> **Base API URL:** `https://your-api-domain.com/api/v1`  
+> **Base API URL:** `https://www.ivatan.in/api` or `https://your-api-domain.com/api` (all versioned endpoints use `/v1`)  
 > **Auth:** All payment endpoints require `Authorization: Bearer <sanctum_token>`
 
 ---
@@ -23,9 +23,11 @@
 
 ### Step 1 — Checkout (Create Order)
 
-```
+```http
 POST /api/v1/checkout
-Headers: Authorization: Bearer <token>
+Headers: 
+  Authorization: Bearer <token>
+  Content-Type: application/json
 ```
 
 **Request:**
@@ -63,9 +65,11 @@ Headers: Authorization: Bearer <token>
 
 > Extracts `redirect_url` from response and opens it in WebView/external browser.
 
-```
+```http
 POST /api/v1/payment/create
-Headers: Authorization: Bearer <token>
+Headers:
+  Authorization: Bearer <token>
+  Content-Type: application/json
 ```
 
 **Request:**
@@ -109,11 +113,8 @@ Headers: Authorization: Bearer <token>
 }
 ```
 
-**Backward-compat alias (same as above):**
-```
-POST /api/v1/payment/razorpay/order
-Body: { "order_id": 123 }
-```
+> [!NOTE]
+> **Backward Compatibility:** The endpoint `POST /api/v1/payment/razorpay/order` is maintained as an alias for backward compatibility. It accepts the same body: `{ "order_id": 123 }`.
 
 ---
 
@@ -122,16 +123,20 @@ Body: { "order_id": 123 }
 | Key | Value |
 |-----|-------|
 | `redirect_url` | `https://pay.phonepe.com/...` |
-| Action | Open in WebView or system browser |
+| Action | Open in WebView (Mobile App) or system browser |
 
-**Flow:**
-1. Frontend extracts `redirect_url` from Step 2 response
-2. Opens the URL in a WebView (in-app) or external browser
-3. User completes payment on PhonePe's hosted payment page
-4. PhonePe redirects back to our callback URL inside the WebView
-5. Callback returns plain text: `"Payment Successful"` or `"Payment Failed"`
-6. Frontend detects the text (or WebView finish event)
-7. Frontend calls **Step 4** to verify
+#### **Flow & Interception Details for Frontend Developers:**
+1. Frontend extracts the `redirect_url` from Step 2.
+2. Load this URL inside an in-app WebView or open in the system browser.
+3. The user will select a UPI app, scan a QR code, or enter credentials to pay.
+4. **WebView Interception Rule:** The frontend MUST monitor WebView page loads and intercept any URL matching the callback pattern:
+   * **Pattern:** `https://<your-domain>/payment/callback/phonepe` (e.g., `https://www.ivatan.in/payment/callback/phonepe`)
+5. **Handling the Callback:**
+   * When the WebView hits this URL, the backend processes the redirect.
+   * The page will return a plain text response body:
+     * **Success:** `"Payment Successful"` (HTTP 200)
+     * **Failure/Cancel:** `"Payment Failed"` (HTTP 200)
+   * The frontend should read this string or intercept the URL state, close the WebView, and proceed to verify the payment status via API.
 
 ---
 
@@ -139,9 +144,11 @@ Body: { "order_id": 123 }
 
 > Call this after the user returns from the PhonePe payment page.
 
-```
+```http
 POST /api/v1/payment/verify
-Headers: Authorization: Bearer <token>
+Headers:
+  Authorization: Bearer <token>
+  Content-Type: application/json
 ```
 
 **Request (PhonePe):**
@@ -152,44 +159,32 @@ Headers: Authorization: Bearer <token>
 }
 ```
 
-> `merchantTransactionId` = the same value returned from Step 2 as `merchant_transaction_id`
+> [!TIP]
+> The `merchantTransactionId` corresponds to the UUID of the order (or the `merchant_transaction_id` returned in Step 2).
 
 **Response (200) — Success:**
 ```json
 {
     "success": true,
-    "message": "Payment verified successfully",
-    "data": {
-        "order_id": 123,
-        "status": "paid",
-        "gateway": "phonepe",
-        "transaction_id": "TXN_PHONEPE_123"
-    }
+    "message": "Payment verified successfully. Order is being processed.",
+    "order_id": 123
 }
 ```
 
-**Response (200) — Failed:**
+**Response (422) — Failed:**
 ```json
 {
     "success": false,
-    "message": "Payment verification failed",
-    "error": "PAYMENT_ERROR"
-}
-```
-
-**Response (400) — Invalid:**
-```json
-{
-    "success": false,
-    "message": "Invalid merchantTransactionId"
+    "message": "Payment verification failed.",
+    "error": "Payment verification failed or was declined by PhonePe."
 }
 ```
 
 ---
 
-### Step 5 — Order Status (Alternative to Step 4)
+### Step 5 — Order Status (Alternative/Fallback)
 
-```
+```http
 GET /api/v1/orders/{order_id}
 Headers: Authorization: Bearer <token>
 ```
@@ -208,58 +203,31 @@ Headers: Authorization: Bearer <token>
 }
 ```
 
-> `payment_status` values: `initiated` → `paid` | `failed`
+> **Possible `payment_status` values:** `initiated` | `paid` | `failed`
 
 ---
 
-## 2. Webhook (Automatic Processing)
+## 2. Webhook (Automatic Server-to-Server Verification)
 
-PhonePe sends a server-to-server webhook to both endpoints below **simultaneously**:
+PhonePe sends automated server-to-server webhook callbacks directly to the backend. The frontend does not need to handle webhook notifications, but can query the Order Status endpoint to update the UI once the webhook resolves.
 
-| Endpoint | Type |
-|----------|------|
-| **`POST /api/webhooks/phonepe`** | Primary (PhonePe dashboard configured here) |
-| `POST /api/webhooks/payment/phonepe` | Unified (backward compat) |
-
-**Payload (PhonePe → Backend):**
-```
-Headers:
-  X-VERIFY: sha256(base64Response + saltKey)###saltIndex
-
-Body:
-{
-    "response": "<base64-encoded-JSON>"
-}
-```
-
-Decoded `response` content:
-```json
-{
-    "success": true,
-    "code": "PAYMENT_SUCCESS",
-    "data": {
-        "merchantId": "MERCH123",
-        "merchantTransactionId": "550e8400-e29b-41d4-a716-446655440000",
-        "transactionId": "TXN_PHONEPE_123",
-        "amount": 50000
-    }
-}
-```
-
-*Note: The backend automatically updates the order status to `paid` once the webhook is verified. The frontend can rely on the webhook or query `/api/v1/orders/{order_id}` to retrieve the final status.*
+| Webhook Route | Description |
+|---------------|-------------|
+| **`POST /api/webhooks/phonepe`** | Primary Webhook Endpoint |
+| **`POST /api/webhooks/payment/phonepe`** | Secondary (unified backward compat) |
 
 ---
 
 ## 3. Ad Payments
 
-### Get Pending Order
+### Get Pending Order & Pay
 
-```
+```http
 GET /api/v1/ads/{ad_id}/pending-order
 Headers: Authorization: Bearer <token>
 ```
 
-**Response (same structure as ecommerce initiate):**
+**Response:**
 ```json
 {
     "success": true,
@@ -271,12 +239,14 @@ Headers: Authorization: Bearer <token>
 
 ### Verify Ad Payment
 
-```
+```http
 POST /api/v1/ads/payments/verify
-Headers: Authorization: Bearer <token>
+Headers:
+  Authorization: Bearer <token>
+  Content-Type: application/json
 ```
 
-**Request:**
+**Request Body:**
 ```json
 {
     "merchantTransactionId": "ad_45_1700000000"
@@ -289,9 +259,11 @@ Headers: Authorization: Bearer <token>
 
 ### Initiate Subscription Setup
 
-```
+```http
 POST /api/v1/profiles/{profile_id}/subscriptions/initiate
-Headers: Authorization: Bearer <token>
+Headers:
+  Authorization: Bearer <token>
+  Content-Type: application/json
 ```
 
 **Request:**
@@ -322,22 +294,22 @@ Headers: Authorization: Bearer <token>
 }
 ```
 
-### Flow & Lifecycle:
-1. **Initiate Mandate Setup**: 
-   * Frontend calls the initiate request.
-   * Extracts `redirect_url` and loads it in a WebView or opens in the system browser.
-   * The user selects their UPI app (PhonePe, GPay, Paytm) and authorizes the **AutoPay Mandate Setup** using their UPI PIN.
-2. **First Payment & Activation**: 
-   * PhonePe redirects the user back to the redirect callback URL.
-   * PhonePe sends a server-to-server webhook callback to our backend.
-   * The backend processes the payment, activates the subscription, sets the `next_billing_at` date, and returns success.
-3. **Automated Auto-Renewal (Backend Managed)**:
-   * **Pre-Debit Notification (24-48 Hours Before Due Date)**: Our backend scheduler automatically calls PhonePe's `/v3/recurring/preDebit` API to notify the user's UPI app of the upcoming charge.
-   * **Execute Debit (On Due Date)**: 24 hours after the notification, the backend scheduler executes the charge using `/v3/recurring/debit/init`. The frontend does not need to trigger any payment calls for renewals.
-4. **Mandate Cancellation/Revocation Sync**:
-   * If the user revokes or cancels the AutoPay mandate directly from their UPI app (e.g., from PhonePe's mandate settings), PhonePe sends a server-to-server webhook `checkout.subscription.cancelled` or `checkout.mandate.revoked` to our backend.
-   * The backend automatically cancels the active subscription inside our database.
-   * The frontend can query the profile subscription status or active subscription API to dynamically sync the state.
+### Mandate Setup Lifecycle:
+1. **Redirect User:** 
+   * Extract `redirect_url` from the response.
+   * Open this URL in the WebView or external browser.
+2. **UPI Mandate Authorization:**
+   * The user **must** select their UPI app (PhonePe, GPay, Paytm, etc.) and complete the AutoPay setup inside their UPI application.
+   * > [!WARNING]
+   * > **Sandbox/UAT Constraint:** When testing in UAT/Sandbox environment, scanning the fallback default QR Code will execute a standard checkout transaction instead of a subscription setup. Users must choose the UPI intent/app options to authenticate the AutoPay mandate simulator.
+3. **Web Redirect Callback Interception:**
+   * Once setup completes, PhonePe redirects the WebView to our callback route:
+     * **Success Pattern:** `https://<domain>/payment/callback/phonepe?code=PAYMENT_SUCCESS&merchantTransactionId=ORD_...`
+     * **Cancel Pattern:** `https://<domain>/payment/callback/phonepe?code=PAYMENT_CANCELLED&merchantTransactionId=ORD_...`
+   * The WebView page returns plain text `"Payment Successful"` or `"Payment Failed"`. The frontend should detect this, close the WebView, and sync state.
+4. **Subscription Status Verification:**
+   * Query the profile subscription status endpoint to fetch the updated state:
+     * `GET /api/v1/profiles/{id}/subscriptions/active`
 
 ---
 
@@ -347,13 +319,11 @@ Headers: Authorization: Bearer <token>
 |--------|---------------|---------------|
 | **Payment page** | Razorpay checkout JS SDK (in-page) | PhonePe hosted page (redirect) |
 | **Initiate response** | `{ order_id, amount }` | `{ redirect_url, merchant_transaction_id }` |
-| **Verify payload** | `razorpay_payment_id + razorpay_order_id + razorpay_signature` | `merchantTransactionId` only |
+| **Verify payload** | `razorpay_payment_id + razorpay_order_id + razorpay_signature` | `order_id` + `merchantTransactionId` |
 | **Verification** | Client-side signature + server-side | Server-side API call to PhonePe |
-| **Subscriptions** | ✅ Supported | ✅ Supported (UPI AutoPay via Web Redirect) |
-| **Webhook signature** | `razorpay_signature` HMAC | `X-VERIFY` header (sha256) |
-| **Callback** | Redirect with `razorpay_payment_id` query params | POST with `code` + `merchantTransactionId` |
+| **Subscriptions** | ✅ Supported | ✅ Supported (UPI AutoPay via Web Redirect Setup) |
 | **Amount format** | Rupees (float) | Paise (integer * 100) |
-| **Credentials source** | `.env` (old) / DB settings (new) | DB settings only (`payment.phonepe.*`) |
+| **Credentials source** | `.env` | DB settings only (`payment.phonepe.*`) |
 
 ---
 
@@ -363,35 +333,20 @@ Headers: Authorization: Bearer <token>
 |-----------|---------|-----------------|
 | 200 | Success / Verified | Proceed to next screen |
 | 400 | Bad request / Invalid params | Show validation error |
-| 401 | Unauthenticated | Redirect to login |
+| 401 | Unauthenticated | Redirect to login / Refresh token |
 | 422 | Validation error | Show field errors |
 | 502 | Gateway error (PhonePe down) | Show "Try again later" |
 | 504 | Gateway timeout | Show "Try again later" |
 
 ---
 
-## 6. Frontend Integration Checklist
+## 7. Frontend Integration Checklist
 
-- [ ] Step 1: Call `POST /api/v1/checkout` with `"payment_method": "phonepe"`
-- [ ] Step 2: Extract `order_id` → call `POST /api/v1/payment/create`
-- [ ] Step 3: Extract `redirect_url` → open in WebView
-- [ ] Step 4: After WebView closes / callback text received → call `POST /api/v1/payment/verify`
-- [ ] Step 5: On verify success → show success screen
-- [ ] Step 6: On verify failure → call `GET /api/v1/orders/{id}` to double-check actual status
-- [ ] Remove: All Razorpay SDK references, `razorpay_payment_id`/`razorpay_order_id`/`razorpay_signature` from verify payloads
-- [ ] Replace: `merchantTransactionId` in verify payload for PhonePe
-
----
-
-## 7. Environment
-
-| Setting | Config Key | Where to set |
-|---------|-----------|-------------|
-| Active gateway | `payment.active_gateway` | Admin panel → Settings → Payment |
-| Merchant ID | `payment.phonepe.key` | Admin panel (encrypted) |
-| Salt Key | `payment.phonepe.secret` | Admin panel (encrypted) |
-| Salt Index | `payment.phonepe.webhook_secret` | Admin panel (encrypted) |
-| Environment | `payment.phonepe.env` | Admin panel → `sandbox` or `production` |
-
-> **Production URL:** `https://api.phonepe.com/apis/hermes`
-> **Sandbox URL:** `https://api-preprod.phonepe.com/apis/pg-sandbox`
+- [ ] **Step 1:** Call `POST /api/v1/checkout` with `"payment_method": "phonepe"`.
+- [ ] **Step 2:** Extract `order_id` → call `POST /api/v1/payment/create`.
+- [ ] **Step 3:** Extract `redirect_url` → open in WebView.
+- [ ] **Step 4:** Intercept callback route `/payment/callback/phonepe` in WebView.
+- [ ] **Step 5:** Detect plain text body response (`"Payment Successful"` vs `"Payment Failed"`).
+- [ ] **Step 6:** Call `POST /api/v1/payment/verify` to confirm payment and process the order on the backend.
+- [ ] **Step 7 (Fallback):** If verify times out, call `GET /api/v1/orders/{id}` to fetch final status.
+- [ ] **Cleanup:** Remove Razorpay checkout SDK scripts and references.
