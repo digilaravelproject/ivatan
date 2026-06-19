@@ -568,6 +568,21 @@ class PhonePeGateway implements PaymentGatewayInterface
         return hash_equals($expectedHash, $hash);
     }
 
+    public function verifyV2WebhookSignature(string $rawBody, string $signature, string $secret): bool
+    {
+        // Decode secret if base64 encoded Client Secret is provided
+        if (!empty($secret) && base64_decode($secret, true) !== false) {
+            $decoded = base64_decode($secret);
+            if (preg_match('/^[a-f0-9\-]{36}$/i', $decoded)) {
+                $secret = $decoded;
+            }
+        }
+
+        $expectedHash = hash('sha256', $rawBody . $secret);
+
+        return hash_equals($expectedHash, $signature);
+    }
+
     public function parseWebhookEvent(array $payload): string
     {
         $code = $payload['code'] ?? $payload['state'] ?? '';
