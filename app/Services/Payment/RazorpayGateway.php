@@ -271,4 +271,22 @@ class RazorpayGateway implements PaymentGatewayInterface
             return false;
         }
     }
+
+    public function sendPreDebitNotification(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $preDebitTxnId): PaymentResult
+    {
+        return PaymentResult::success(
+            transactionId: $preDebitTxnId,
+            status: 'success',
+            amount: $amount
+        );
+    }
+
+    public function chargeSubscription(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $debitTxnId): PaymentResult
+    {
+        return PaymentResult::success(
+            transactionId: $debitTxnId,
+            status: 'success',
+            amount: $amount
+        );
+    }
 }

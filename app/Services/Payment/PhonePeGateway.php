@@ -650,4 +650,129 @@ class PhonePeGateway implements PaymentGatewayInterface
             return false;
         }
     }
+
+    public function sendPreDebitNotification(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $preDebitTxnId): PaymentResult
+    {
+        try {
+            $endpoint = '/v3/recurring/preDebit';
+            $expiryDate = now()->addDay()->format('Y-m-d');
+
+            $payload = [
+                'merchantId' => $this->merchantId,
+                'merchantUserId' => $merchantUserId,
+                'subscriptionId' => $gatewaySubscriptionId,
+                'transactionId' => $preDebitTxnId,
+                'amount' => (int) round($amount * 100),
+                'expiryDate' => $expiryDate,
+                'autoDebit' => true,
+            ];
+
+            $jsonPayload = json_encode($payload);
+            $base64Payload = base64_encode($jsonPayload);
+
+            $xVerify = hash('sha256', $base64Payload . $endpoint . $this->saltKey) . '###' . $this->saltIndex;
+
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'X-VERIFY' => $xVerify,
+            ])->post("{$this->baseUrl}{$endpoint}", [
+                'request' => $base64Payload,
+            ]);
+
+            if ($response->failed()) {
+                Log::error('PhonePe: sendPreDebitNotification failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return PaymentResult::failed(
+                    'PhonePe Pre-Debit Request Failed: ' . ($response->json('message') ?? 'Unknown error'),
+                    (string) $response->status(),
+                    $response->json()
+                );
+            }
+
+            $data = $response->json();
+            if (($data['success'] ?? false) || ($data['code'] ?? '') === 'SUCCESS') {
+                return PaymentResult::success(
+                    transactionId: $preDebitTxnId,
+                    status: 'success',
+                    amount: $amount,
+                    rawResponse: $data
+                );
+            }
+
+            return PaymentResult::failed(
+                $data['message'] ?? 'Failed to send pre-debit notification.',
+                $data['code'] ?? 'ERROR',
+                $data
+            );
+        } catch (\Throwable $e) {
+            Log::error('PhonePe: sendPreDebitNotification exception', [
+                'error' => $e->getMessage(),
+            ]);
+            return PaymentResult::failed('Pre-debit request failed: ' . $e->getMessage());
+        }
+    }
+
+    public function chargeSubscription(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $debitTxnId): PaymentResult
+    {
+        try {
+            $endpoint = '/v3/recurring/debit/init';
+
+            $payload = [
+                'merchantId' => $this->merchantId,
+                'merchantUserId' => $merchantUserId,
+                'subscriptionId' => $gatewaySubscriptionId,
+                'transactionId' => $debitTxnId,
+                'amount' => (int) round($amount * 100),
+                'autoDebit' => true,
+            ];
+
+            $jsonPayload = json_encode($payload);
+            $base64Payload = base64_encode($jsonPayload);
+
+            $xVerify = hash('sha256', $base64Payload . $endpoint . $this->saltKey) . '###' . $this->saltIndex;
+
+            $response = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'X-VERIFY' => $xVerify,
+            ])->post("{$this->baseUrl}{$endpoint}", [
+                'request' => $base64Payload,
+            ]);
+
+            if ($response->failed()) {
+                Log::error('PhonePe: chargeSubscription failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return PaymentResult::failed(
+                    'PhonePe Debit Request Failed: ' . ($response->json('message') ?? 'Unknown error'),
+                    (string) $response->status(),
+                    $response->json()
+                );
+            }
+
+            $data = $response->json();
+            if (($data['success'] ?? false) || ($data['code'] ?? '') === 'SUCCESS') {
+                return PaymentResult::success(
+                    transactionId: $debitTxnId,
+                    gatewayPaymentId: $data['data']['transactionId'] ?? null,
+                    status: 'paid',
+                    amount: $amount,
+                    rawResponse: $data
+                );
+            }
+
+            return PaymentResult::failed(
+                $data['message'] ?? 'Failed to execute recurring charge.',
+                $data['code'] ?? 'ERROR',
+                $data
+            );
+        } catch (\Throwable $e) {
+            Log::error('PhonePe: chargeSubscription exception', [
+                'error' => $e->getMessage(),
+            ]);
+            return PaymentResult::failed('Subscription debit failed: ' . $e->getMessage());
+        }
+    }
 }

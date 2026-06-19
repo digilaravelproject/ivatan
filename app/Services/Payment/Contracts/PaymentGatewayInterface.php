@@ -29,4 +29,8 @@ interface PaymentGatewayInterface
     public function parseWebhookEvent(array $payload): string;
 
     public function testConnection(): bool;
+
+    public function sendPreDebitNotification(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $preDebitTxnId): PaymentResult;
+
+    public function chargeSubscription(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $debitTxnId): PaymentResult;
 }

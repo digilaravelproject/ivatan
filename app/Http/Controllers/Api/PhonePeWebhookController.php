@@ -158,6 +158,30 @@ class PhonePeWebhookController extends Controller
             Log::info('PhonePe V2 webhook payload verified', ['payload' => $decodedPayload]);
 
             $event = $decodedPayload['event'] ?? '';
+
+            // Handle Subscription/Mandate Revocation/Pause/Resume Events
+            if (in_array($event, ['checkout.subscription.cancelled', 'checkout.mandate.revoked', 'checkout.subscription.paused', 'checkout.subscription.resumed'])) {
+                $gatewaySubId = $decodedPayload['payload']['merchantSubscriptionId'] ?? null;
+                if ($gatewaySubId) {
+                    $subscription = UserSubscription::where('gateway_subscription_id', $gatewaySubId)->first();
+                    if ($subscription) {
+                        if ($event === 'checkout.subscription.cancelled' || $event === 'checkout.mandate.revoked') {
+                            $subscription->cancel('Mandate revoked/cancelled from UPI App', 'immediate');
+                            Log::info("Autopay Webhook: Subscription ID {$subscription->id} cancelled due to mandate revocation");
+                        } elseif ($event === 'checkout.subscription.paused') {
+                            $subscription->update(['status' => 'paused']);
+                            Log::info("Autopay Webhook: Subscription ID {$subscription->id} paused");
+                        } elseif ($event === 'checkout.subscription.resumed') {
+                            $subscription->update(['status' => 'active']);
+                            Log::info("Autopay Webhook: Subscription ID {$subscription->id} resumed");
+                        }
+                        return response()->json(['status' => 'success']);
+                    }
+                    Log::warning('PhonePe V2 Webhook: mandate event subscription not found', ['gatewaySubscriptionId' => $gatewaySubId]);
+                    return response()->json(['status' => 'error', 'message' => 'Subscription not found'], 404);
+                }
+            }
+
             $merchantOrderId = $decodedPayload['payload']['merchantOrderId'] ?? null;
 
             if (!$merchantOrderId) {

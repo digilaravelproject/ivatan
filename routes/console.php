@@ -17,6 +17,9 @@ Schedule::command('orders:restore-abandoned')->everyThirtyMinutes();
 // Expire past-due subscriptions daily
 Schedule::command('subscriptions:expire')->daily();
 
+// Process subscription pre-debit notifications and recurring charge debits daily
+Schedule::command('subscriptions:renew')->daily()->withoutOverlapping();
+
 // Payment gateway health check (hourly — logs only, no external alerting)
 Schedule::command('payments:health-check')->hourly()->withoutOverlapping();
 
