@@ -362,6 +362,7 @@ class PhonePeGateway implements PaymentGatewayInterface
                 'amount' => (int) round($plan->price * 100), // paise
                 'paymentFlow' => [
                     'type' => 'SUBSCRIPTION_CHECKOUT_SETUP',
+                    'message' => 'Subscription for ' . $plan->name,
                     'merchantUrls' => [
                         'redirectUrl' => route('payment.callback', [
                             'gateway' => 'phonepe',
