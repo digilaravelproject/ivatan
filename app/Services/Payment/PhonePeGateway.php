@@ -389,7 +389,7 @@ class PhonePeGateway implements PaymentGatewayInterface
 
             $token = $this->getAccessToken();
             if ($token) {
-                $endpoint = '/checkout/v2/sdk/order';
+                $endpoint = '/checkout/v2/pay';
                 
                 $response = Http::withHeaders([
                     'Content-Type' => 'application/json',
@@ -441,7 +441,7 @@ class PhonePeGateway implements PaymentGatewayInterface
             $jsonPayload = json_encode($payload);
             $base64Payload = base64_encode($jsonPayload);
 
-            $endpoint = '/checkout/v2/sdk/order';
+            $endpoint = '/checkout/v2/pay';
             $xVerify = hash('sha256', $base64Payload . $endpoint . $this->saltKey) . '###' . $this->saltIndex;
 
             $response = Http::withHeaders([
