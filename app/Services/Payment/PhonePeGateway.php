@@ -109,7 +109,11 @@ class PhonePeGateway implements PaymentGatewayInterface
                     'paymentFlow' => [
                         'type' => 'PG_CHECKOUT',
                         'merchantUrls' => [
-                            'redirectUrl' => route('payment.callback', ['gateway' => 'phonepe']),
+                            'redirectUrl' => route('payment.callback', [
+                                'gateway' => 'phonepe',
+                                'code' => 'PAYMENT_SUCCESS',
+                                'merchantTransactionId' => $merchantTransactionId
+                            ]),
                         ]
                     ]
                 ];
@@ -354,8 +358,16 @@ class PhonePeGateway implements PaymentGatewayInterface
                 'paymentFlow' => [
                     'type' => 'SUBSCRIPTION_CHECKOUT_SETUP',
                     'merchantUrls' => [
-                        'redirectUrl' => route('payment.callback', ['gateway' => 'phonepe']),
-                        'cancelRedirectUrl' => route('payment.callback', ['gateway' => 'phonepe']),
+                        'redirectUrl' => route('payment.callback', [
+                            'gateway' => 'phonepe',
+                            'code' => 'PAYMENT_SUCCESS',
+                            'merchantTransactionId' => $merchantOrderId
+                        ]),
+                        'cancelRedirectUrl' => route('payment.callback', [
+                            'gateway' => 'phonepe',
+                            'code' => 'PAYMENT_CANCELLED',
+                            'merchantTransactionId' => $merchantOrderId
+                        ]),
                     ],
                     'subscriptionDetails' => [
                         'subscriptionType' => 'RECURRING',
