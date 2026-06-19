@@ -106,9 +106,26 @@ class PaymentCallbackController extends Controller
                 ]);
             }
         } else {
-            Log::warning('PhonePe callback: no matching order or ad found', [
+            Log::warning('PhonePe callback: no matching order or ad found in database. Attempting direct gateway verification.', [
                 'merchantTransactionId' => $merchantTransactionId,
             ]);
+
+            try {
+                $this->orchestrator->resetDriver();
+                $result = $this->orchestrator->driver()->verifyPayment(['merchantTransactionId' => $merchantTransactionId]);
+
+                if ($result->success) {
+                    Log::info('PhonePe callback: payment verified directly with gateway (test/mock flow)', [
+                        'merchantTransactionId' => $merchantTransactionId,
+                    ]);
+                    return $this->redirectSuccess(['test' => true]);
+                }
+            } catch (\Throwable $e) {
+                Log::error('PhonePe callback: gateway verification exception', [
+                    'merchantTransactionId' => $merchantTransactionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return $this->redirectFailed();

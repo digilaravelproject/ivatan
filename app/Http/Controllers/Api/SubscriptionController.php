@@ -220,6 +220,17 @@ class SubscriptionController extends Controller
                 return $this->error($result->message ?? 'Failed to initiate subscription with payment gateway.', 502);
             }
 
+            // Persist the initiated pending subscription in database so webhook can locate it later
+            \App\Models\UserSubscription::create([
+                'user_id' => $user->id,
+                'profile_id' => $profileId,
+                'subscription_plan_id' => $plan->id,
+                'gateway_subscription_id' => $result->gatewaySubscriptionId,
+                'starts_at' => now(),
+                'ends_at' => $plan->duration_days === 36500 ? null : now()->addDays($plan->duration_days),
+                'status' => 'pending',
+            ]);
+
             return $this->success([
                 'requires_payment' => true,
                 'gateway' => $gatewayName,

@@ -45,47 +45,59 @@ class CallController extends Controller
                 'sdp_offer' => 'required|array',
             ]);
 
-            $user = Auth::user();
             $chat = UserChat::findOrFail($request->chat_id);
 
-            $isParticipant = $chat->participants()->where('user_id', $user->id)->exists();
+            $isParticipant = $chat->participants()->where('user_id', Auth::id())->exists();
             if (!$isParticipant) {
                 return $this->error('Unauthorized to call in this chat.', 403);
             }
 
-            $receiverId = null;
-            if ($chat->type === 'private') {
-                $otherParticipant = $chat->participants()->where('user_id', '!=', $user->id)->first();
-                if (!$otherParticipant) {
-                    return $this->error('No receiver found in this chat.', 404);
-                }
-                $receiverId = $otherParticipant->user_id;
+            try {
+                $session = \Illuminate\Support\Facades\DB::transaction(function () use ($chat, $request) {
+                    // Lock caller record
+                    $user = User::where('id', Auth::id())->lockForUpdate()->firstOrFail();
+                    if ($user->is_busy) {
+                        throw new \RuntimeException('You are currently busy.', 409);
+                    }
 
-                try {
-                    $this->chatService->validateMessagingPrivacy($user, $otherParticipant->user);
-                } catch (\Exception $e) {
-                    return $this->error($e->getMessage(), 403);
-                }
+                    $receiverId = null;
+                    if ($chat->type === 'private') {
+                        $otherParticipant = $chat->participants()->where('user_id', '!=', $user->id)->first();
+                        if (!$otherParticipant) {
+                            throw new \RuntimeException('No receiver found in this chat.', 404);
+                        }
+                        $receiverId = $otherParticipant->user_id;
 
-                if ($otherParticipant->user->is_busy) {
-                    return $this->error('User is currently busy.', 409);
-                }
+                        // Lock receiver record
+                        $receiver = User::where('id', $receiverId)->lockForUpdate()->firstOrFail();
+
+                        $this->chatService->validateMessagingPrivacy($user, $receiver);
+
+                        if ($receiver->is_busy) {
+                            throw new \RuntimeException('User is currently busy.', 409);
+                        }
+                    }
+
+                    $session = UserCallSession::create([
+                        'uuid' => (string) Str::uuid(),
+                        'chat_id' => $chat->id,
+                        'caller_id' => $user->id,
+                        'receiver_id' => $receiverId,
+                        'type' => $request->type,
+                        'status' => 'ringing',
+                    ]);
+
+                    $user->update(['is_busy' => true, 'busy_status' => 'calling_' . $request->type]);
+
+                    return $session;
+                });
+            } catch (\RuntimeException $e) {
+                $code = $e->getCode();
+                return $this->error($e->getMessage(), ($code >= 400 && $code < 600) ? $code : 400);
             }
 
-            if ($user->is_busy) {
-                return $this->error('You are currently busy.', 409);
-            }
-
-            $session = UserCallSession::create([
-                'uuid' => (string) Str::uuid(),
-                'chat_id' => $chat->id,
-                'caller_id' => $user->id,
-                'receiver_id' => $receiverId,
-                'type' => $request->type,
-                'status' => 'ringing',
-            ]);
-
-            $user->update(['is_busy' => true, 'busy_status' => 'calling_' . $request->type]);
+            $user = Auth::user();
+            $receiverId = $session->receiver_id;
 
             if ($receiverId) {
                 $callerInfo = [

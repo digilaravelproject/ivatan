@@ -106,10 +106,13 @@ class AdPaymentController extends Controller
             $gatewayOrderId = $request->input('merchantTransactionId')
                 ?? $request->input('razorpay_order_id');
 
-            $payment = AdPayment::where(function ($q) use ($gatewayOrderId) {
-                $q->where('gateway_order_id', $gatewayOrderId)
-                  ->orWhere('razorpay_order_id', $gatewayOrderId);
-            })->first();
+            // Acquire lock on the payment record to prevent race conditions during verification
+            $payment = DB::transaction(function () use ($gatewayOrderId) {
+                return AdPayment::where(function ($q) use ($gatewayOrderId) {
+                    $q->where('gateway_order_id', $gatewayOrderId)
+                      ->orWhere('razorpay_order_id', $gatewayOrderId);
+                })->lockForUpdate()->first();
+            });
 
             if (!$payment) {
                 return response()->json(['success' => false, 'message' => 'Payment record not found'], 404);

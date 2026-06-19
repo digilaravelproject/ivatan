@@ -201,6 +201,12 @@ class PaymentWebhookController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Missing transaction ID'], 400);
         }
 
+        $dedupKey = "webhook_dedup_phonepe_{$merchantTransactionId}";
+        if (Cache::get($dedupKey)) {
+            Log::info('PhonePe webhook: duplicate event skipped', ['merchantTransactionId' => $merchantTransactionId]);
+            return response()->json(['status' => 'duplicate']);
+        }
+
         $order = UserOrder::where('uuid', $merchantTransactionId)->first();
 
         if ($event === 'payment.success') {
@@ -218,6 +224,8 @@ class PaymentWebhookController extends Controller
                 $signature,
                 'phonepe',
             );
+
+            Cache::put($dedupKey, true, 3600);
 
             Log::info('PhonePe webhook: payment.success processed', ['order_id' => $order->id]);
         } else {

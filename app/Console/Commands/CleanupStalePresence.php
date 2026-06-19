@@ -32,6 +32,14 @@ class CleanupStalePresence extends Command
             ->where('status', 'ringing')
             ->update(['status' => 'missed', 'ended_at' => now()]);
 
+        // Clean up active/accepted/ringing call sessions for offline users
+        UserCallSession::where(function ($q) use ($userIds) {
+            $q->whereIn('caller_id', $userIds)
+              ->orWhereIn('receiver_id', $userIds);
+        })
+        ->whereIn('status', ['ringing', 'accepted'])
+        ->update(['status' => 'ended', 'ended_at' => now()]);
+
         User::whereIn('id', $userIds)->update([
             'is_online' => false,
             'is_busy' => false,

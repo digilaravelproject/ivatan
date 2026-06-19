@@ -63,6 +63,12 @@ class PhonePeWebhookController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Missing transaction ID'], 400);
             }
 
+            $dedupKey = "webhook_dedup_phonepe_{$merchantTransactionId}";
+            if (\Illuminate\Support\Facades\Cache::get($dedupKey)) {
+                Log::info('PhonePe webhook: duplicate event skipped', ['merchantTransactionId' => $merchantTransactionId]);
+                return response()->json(['status' => 'duplicate']);
+            }
+
             // Find matching order by UUID
             $order = UserOrder::where('uuid', $merchantTransactionId)->first();
 
@@ -82,6 +88,8 @@ class PhonePeWebhookController extends Controller
                     '', // no razorpay order id
                     $checksum
                 );
+
+                \Illuminate\Support\Facades\Cache::put($dedupKey, true, 3600);
 
                 Log::info('PhonePe webhook: payment.success processed', ['order_id' => $order->id]);
             } else {
