@@ -92,7 +92,8 @@ class PaymentOrchestrator
         $paymentRecord = UserPayment::where('order_id', $order->id)->first();
         if ($paymentRecord && isset($paymentRecord->meta['gateway_order_id'])) {
             $actualId = $result->gatewayOrderId ?? '';
-            if ($paymentRecord->meta['gateway_order_id'] !== $actualId) {
+            $txnId = $result->transactionId ?? '';
+            if ($paymentRecord->meta['gateway_order_id'] !== $actualId && $paymentRecord->meta['gateway_order_id'] !== $txnId) {
                 return PaymentResult::failed('Gateway Order ID mismatch.');
             }
         }
