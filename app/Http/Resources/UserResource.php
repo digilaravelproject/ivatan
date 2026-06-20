@@ -58,7 +58,7 @@ class UserResource extends JsonResource
 
         $activeProfile = $this->relationLoaded('activeProfile')
             ? $this->getRelation('activeProfile')
-            : ($this->relationLoaded('profiles') ? $this->getRelation('profiles')->firstWhere('is_active', true) : $this->activeProfile);
+            : ($this->relationLoaded('profiles') ? $this->getRelation('profiles')->where('status', 'active')->firstWhere('is_active', true) : $this->activeProfile);
 
         $profileType = 'personal';
         if ($activeProfile) {
