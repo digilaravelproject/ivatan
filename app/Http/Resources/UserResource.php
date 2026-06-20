@@ -61,8 +61,23 @@ class UserResource extends JsonResource
             : ($this->relationLoaded('profiles') ? $this->getRelation('profiles')->where('status', 'active')->firstWhere('is_active', true) : $this->activeProfile);
 
         $profileType = 'personal';
+        $profileSubType = null;
         if ($activeProfile) {
             $profileType = $activeProfile->type === 'seller' ? 'ecommerce' : $activeProfile->type;
+
+            if ($activeProfile->type === 'seller') {
+                $sellerDetails = $activeProfile->relationLoaded('sellerDetails')
+                    ? $activeProfile->getRelation('sellerDetails')
+                    : $activeProfile->sellerDetails;
+
+                if ($sellerDetails) {
+                    $profileSubType = match ($sellerDetails->seller_type) {
+                        'products' => 'product',
+                        'services' => 'service',
+                        default => $sellerDetails->seller_type,
+                    };
+                }
+            }
         }
 
         $data = [
@@ -99,6 +114,9 @@ class UserResource extends JsonResource
                 return $active ? new \App\Http\Resources\Profile\ProfileResource($active) : null;
             }),
             'profile_type' => $profileType,
+            'profile_sub_type' => $profileSubType,
+            'is_seller' => (bool) $this->is_seller,
+            'is_employer' => (bool) $this->is_employer,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
