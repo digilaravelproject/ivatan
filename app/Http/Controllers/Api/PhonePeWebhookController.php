@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Ecommerce\UserOrder;
 use App\Models\Ecommerce\UserPayment;
+use App\Models\UserSubscription;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Services\Payment\GatewayManager;
 use App\Services\Payment\Exceptions\PaymentGatewayException;
