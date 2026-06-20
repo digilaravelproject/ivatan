@@ -183,9 +183,9 @@ class SubscriptionController extends Controller
                 return $this->error("The selected plan is not available for {$profile->type} profiles.", 422);
             }
 
-            // Check if profile already has an active subscription
-            $activeSub = $profile->activeSubscription()->exists();
-            if ($activeSub) {
+            // Check if profile already has an active paid subscription
+            $activeSub = $profile->activeSubscription()->with('plan')->first();
+            if ($activeSub && $activeSub->plan && !$activeSub->plan->isFree()) {
                 return $this->error('This profile already has an active subscription.', 422);
             }
 

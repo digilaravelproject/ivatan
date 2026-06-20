@@ -36,8 +36,11 @@ class SubscriptionService
                 ->where(function ($q) {
                     $q->whereNull('ends_at')->orWhere('ends_at', '>', now());
                 })
+                ->with('plan')
                 ->lockForUpdate()
-                ->exists();
+                ->get()
+                ->filter(fn($sub) => $sub->plan && !$sub->plan->isFree())
+                ->isNotEmpty();
 
             if ($activeSub) {
                 throw new \RuntimeException('This profile already has an active subscription.');
