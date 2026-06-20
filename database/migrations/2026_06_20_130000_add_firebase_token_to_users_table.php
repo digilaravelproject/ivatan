@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'firebase_token')) {
-                $table->string('firebase_token')->nullable()->after('google_id');
+                $table->string('firebase_token')->nullable()->after('email');
             }
         });
     }
