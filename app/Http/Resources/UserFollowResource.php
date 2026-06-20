@@ -13,10 +13,8 @@ class UserFollowResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // Get the avatar URL from the database path
-        $avtarUrl = $this->profile_photo_path
-            ? asset('storage/' . $this->profile_photo_path)
-            : null;
+        // Get the avatar URL using the model's accessor (supports Local, S3, Google OAuth)
+        $avtarUrl = $this->profile_photo_url;
 
         // The property 'is_followed_by_auth_user' is added via DB::raw in the controller
         $isFollowed = $this->resource->getAttribute('is_followed_by_auth_user') ?? false;

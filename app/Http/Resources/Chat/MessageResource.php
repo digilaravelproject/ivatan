@@ -31,7 +31,7 @@ class MessageResource extends JsonResource
             'chat_id' => $this->chat_id,
             'content' => $this->content,
             'message_type' => $this->message_type, // text, image, file, system
-            'attachment_url' => $this->attachment_path ? url('/storage/' . $this->attachment_path) : null,
+            'attachment_url' => $this->attachment_path ? Storage::url($this->attachment_path) : null,
             'meta' => $this->meta,
             'is_mine' => $this->sender_id === $user->id,
             'status' => $this->status_for_user, // sent, delivered, read (Calculated in Model)
