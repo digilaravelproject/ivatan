@@ -31,11 +31,18 @@ class PaymentService
         $orderId = $data['order_id'] ?? null;
         $order = UserOrder::where('id', $orderId)
             ->where('buyer_id', $user->id)
-            ->where('payment_status', 'initiated')
             ->first();
 
         if (!$order) {
-            throw new Exception('Order not found or payment already processed.', 404);
+            throw new Exception('Order not found.', 404);
+        }
+
+        if ($order->payment_status === 'paid') {
+            return $order->id; // Success: Already processed by webhook
+        }
+
+        if ($order->payment_status !== 'initiated') {
+            throw new Exception('Payment already processed or invalid order state.', 422);
         }
 
         $activeGateway = $this->orchestrator->activeGateway();
