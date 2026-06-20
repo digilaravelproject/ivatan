@@ -59,7 +59,8 @@ class PaymentWebhookController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Missing signature'], 400);
         }
 
-        $webhookSecret = config('services.razorpay.webhook_secret');
+        $gatewayConfig = $this->settings->getGatewayConfig('razorpay');
+        $webhookSecret = $gatewayConfig['webhook_secret'] ?? '';
 
         if (empty($webhookSecret)) {
             Log::warning('Razorpay webhook: webhook secret not configured');
@@ -406,11 +407,29 @@ class PaymentWebhookController extends Controller
         }
 
         $order = UserOrder::where('uuid', $merchantOrderId)->first();
+        $subscription = null;
+        if (!$order) {
+            $subscription = UserSubscription::where('gateway_order_id', $merchantOrderId)->first();
+        }
 
         if ($event === 'checkout.order.completed' && ($decodedPayload['payload']['state'] ?? '') === 'COMPLETED') {
-            if (!$order) {
-                Log::warning('PhonePe V2 webhook: order not found', ['merchantOrderId' => $merchantOrderId]);
+            if (!$order && !$subscription) {
+                Log::warning('PhonePe V2 webhook: order or subscription not found', ['merchantOrderId' => $merchantOrderId]);
                 return response()->json(['status' => 'error', 'message' => 'Order not found'], 404);
+            }
+
+            if ($subscription) {
+                $paymentDetails = $decodedPayload['payload']['paymentDetails'][0] ?? null;
+                $paymentEntity = [
+                    'id' => $paymentDetails['transactionId'] ?? $merchantOrderId,
+                    'amount' => $paymentDetails['amount'] ?? 0,
+                    'invoice_id' => $decodedPayload['payload']['orderId'] ?? null,
+                ];
+
+                $this->handleCharged($subscription, $paymentEntity);
+                Cache::put($dedupKey, true, 3600);
+                Log::info('PhonePe V2 webhook: subscription charged successfully', ['subscription_id' => $subscription->id]);
+                return response()->json(['status' => 'success']);
             }
 
             $phonepeTxnId = $decodedPayload['payload']['paymentDetails'][0]['transactionId'] ?? $merchantOrderId;

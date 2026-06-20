@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AdPayment;
 use App\Models\Ecommerce\UserOrder;
+use App\Models\UserSubscription;
 use App\Services\Payment\GatewayManager;
 use App\Services\Payment\PaymentOrchestrator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentCallbackController extends Controller
@@ -59,6 +61,7 @@ class PaymentCallbackController extends Controller
 
         $order = UserOrder::where('uuid', $merchantTransactionId)->first();
         $adPayment = AdPayment::where('gateway_order_id', $merchantTransactionId)->first();
+        $subscription = UserSubscription::where('gateway_order_id', $merchantTransactionId)->first();
 
         if ($order) {
             try {
@@ -102,6 +105,40 @@ class PaymentCallbackController extends Controller
             } catch (\Throwable $e) {
                 Log::error('PhonePe callback: exception for ad', [
                     'ad_payment_id' => $adPayment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } elseif ($subscription) {
+            try {
+                $this->orchestrator->resetDriver();
+                $result = $this->orchestrator->driver()->verifyPayment(['merchantTransactionId' => $merchantTransactionId]);
+
+                if ($result->success) {
+                    DB::transaction(function () use ($subscription, $result, $merchantTransactionId) {
+                        $lockedSub = UserSubscription::where('id', $subscription->id)->lockForUpdate()->firstOrFail();
+                        
+                        $lockedSub->update([
+                            'status' => 'active',
+                            'gateway_payment_id' => $result->gatewayPaymentId ?? $merchantTransactionId,
+                            'next_billing_at' => $lockedSub->plan->duration_days ? now()->addDays($lockedSub->plan->duration_days) : null,
+                            'ends_at' => $lockedSub->plan->duration_days ? now()->addDays($lockedSub->plan->duration_days) : null,
+                        ]);
+
+                        $invoice = $lockedSub->generateInvoice();
+                        $invoice->markAsPaid(
+                            gatewayInvoiceId: $result->gatewayPaymentId ?? $merchantTransactionId,
+                            paymentMethod: 'phonepe'
+                        );
+                    });
+
+                    Log::info('PhonePe callback: subscription verified & processed', [
+                        'subscription_id' => $subscription->id,
+                    ]);
+                    return $this->redirectSuccess(['subscription_id' => $subscription->id]);
+                }
+            } catch (\Throwable $e) {
+                Log::error('PhonePe callback: exception for subscription', [
+                    'subscription_id' => $subscription->id,
                     'error' => $e->getMessage(),
                 ]);
             }

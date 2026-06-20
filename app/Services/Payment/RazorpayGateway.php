@@ -97,6 +97,7 @@ class RazorpayGateway implements PaymentGatewayInterface
 
     public function createSubscriptionPlan(string $name, float $amount, string $currency, string $interval, int $intervalCount = 1): PaymentResult
     {
+        $planData = [];
         try {
             $planData = [
                 'period' => $interval,
@@ -288,5 +289,10 @@ class RazorpayGateway implements PaymentGatewayInterface
             status: 'success',
             amount: $amount
         );
+    }
+
+    public function verifyV2WebhookSignature(string $rawBody, string $signature, string $secret): bool
+    {
+        return false;
     }
 }

@@ -33,4 +33,6 @@ interface PaymentGatewayInterface
     public function sendPreDebitNotification(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $preDebitTxnId): PaymentResult;
 
     public function chargeSubscription(string $gatewaySubscriptionId, float $amount, string $merchantUserId, string $debitTxnId): PaymentResult;
+
+    public function verifyV2WebhookSignature(string $rawBody, string $signature, string $secret): bool;
 }

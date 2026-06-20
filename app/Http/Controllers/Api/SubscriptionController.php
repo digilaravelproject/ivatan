@@ -226,6 +226,7 @@ class SubscriptionController extends Controller
                 'profile_id' => $profileId,
                 'subscription_plan_id' => $plan->id,
                 'gateway_subscription_id' => $result->gatewaySubscriptionId,
+                'gateway_order_id' => $result->gatewayOrderId,
                 'starts_at' => now(),
                 'ends_at' => $plan->duration_days === 36500 ? null : now()->addDays($plan->duration_days),
                 'status' => 'pending',

@@ -12,6 +12,7 @@ use App\Services\Payment\Exceptions\PaymentGatewayException;
 use App\Services\Setting\SettingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PhonePeWebhookController extends Controller
@@ -150,7 +151,9 @@ class PhonePeWebhookController extends Controller
             }
 
             // Verify signature using V2 helper
-            if (!$this->gateway()->verifyV2WebhookSignature($rawBody, $signature, $webhookSecret)) {
+            /** @var \App\Services\Payment\PhonePeGateway $gateway */
+            $gateway = $this->gateway();
+            if (!$gateway->verifyV2WebhookSignature($rawBody, $signature, $webhookSecret)) {
                 Log::warning('PhonePe V2 webhook: invalid signature');
                 return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 400);
             }
@@ -197,11 +200,29 @@ class PhonePeWebhookController extends Controller
             }
 
             $order = UserOrder::where('uuid', $merchantOrderId)->first();
+            $subscription = null;
+            if (!$order) {
+                $subscription = UserSubscription::where('gateway_order_id', $merchantOrderId)->first();
+            }
 
             if ($event === 'checkout.order.completed' && ($decodedPayload['payload']['state'] ?? '') === 'COMPLETED') {
-                if (!$order) {
-                    Log::warning('PhonePe V2 webhook: order not found', ['merchantOrderId' => $merchantOrderId]);
+                if (!$order && !$subscription) {
+                    Log::warning('PhonePe V2 webhook: order or subscription not found', ['merchantOrderId' => $merchantOrderId]);
                     return response()->json(['status' => 'error', 'message' => 'Order not found'], 404);
+                }
+
+                if ($subscription) {
+                    $paymentDetails = $decodedPayload['payload']['paymentDetails'][0] ?? null;
+                    $paymentEntity = [
+                        'id' => $paymentDetails['transactionId'] ?? $merchantOrderId,
+                        'amount' => $paymentDetails['amount'] ?? 0,
+                        'invoice_id' => $decodedPayload['payload']['orderId'] ?? null,
+                    ];
+
+                    $this->handleCharged($subscription, $paymentEntity);
+                    \Illuminate\Support\Facades\Cache::put($dedupKey, true, 3600);
+                    Log::info('PhonePe V2 webhook: subscription charged successfully', ['subscription_id' => $subscription->id]);
+                    return response()->json(['status' => 'success']);
                 }
 
                 $phonepeTxnId = $decodedPayload['payload']['paymentDetails'][0]['transactionId'] ?? $merchantOrderId;
@@ -211,7 +232,6 @@ class PhonePeWebhookController extends Controller
                     $phonepeTxnId,
                     '', // no razorpay order id
                     $signature,
-                    'phonepe',
                 );
 
                 \Illuminate\Support\Facades\Cache::put($dedupKey, true, 3600);
@@ -245,5 +265,64 @@ class PhonePeWebhookController extends Controller
             Log::error('PhonePe V2 webhook: processing failed', ['error' => $e->getMessage()]);
             return response()->json(['status' => 'error', 'message' => 'Processing failed'], 500);
         }
+    }
+
+    protected function handleCharged(UserSubscription $subscription, ?array $paymentEntity): void
+    {
+        DB::transaction(function () use ($subscription, $paymentEntity) {
+            $locked = UserSubscription::where('id', $subscription->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $chargedAmount = $paymentEntity['amount'] ?? 0;
+            $expectedAmount = $locked->plan ? (int) round($locked->plan->price * 100) : 0;
+
+            if ($expectedAmount > 0 && $chargedAmount !== $expectedAmount) {
+                Log::critical('Webhook: amount mismatch', [
+                    'subscription_id' => $locked->id,
+                    'charged' => $chargedAmount,
+                    'expected' => $expectedAmount,
+                ]);
+            }
+
+            $gatewayInvoiceId = $paymentEntity['invoice_id'] ?? null;
+
+            if ($gatewayInvoiceId) {
+                $existingInvoice = \App\Models\Invoice::where('gateway_invoice_id', $gatewayInvoiceId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existingInvoice) {
+                    Log::info('Webhook: duplicate charge skipped', [
+                        'subscription_id' => $locked->id,
+                        'gateway_invoice_id' => $gatewayInvoiceId,
+                    ]);
+                    return;
+                }
+            }
+
+            $locked->update([
+                'status' => 'active',
+                'gateway_payment_id' => $paymentEntity['id'] ?? $locked->gateway_payment_id,
+                'next_billing_at' => $locked->plan->duration_days
+                    ? now()->addDays($locked->plan->duration_days)
+                    : null,
+                'gateway_response' => array_merge(
+                    $locked->gateway_response ?? [],
+                    ['charged_at' => now()->toIso8601String()]
+                ),
+            ]);
+
+            $invoice = $locked->generateInvoice();
+            $invoice->markAsPaid(
+                gatewayInvoiceId: $gatewayInvoiceId,
+                paymentMethod: 'phonepe',
+            );
+
+            Log::info('Subscription charged + invoice generated', [
+                'subscription_id' => $locked->id,
+                'invoice_id' => $invoice->id,
+            ]);
+        });
     }
 }
