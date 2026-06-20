@@ -10,9 +10,10 @@ This document explains how to handle multi-profile flows, profile creation, swit
 * **Active Profile**: The session state on the frontend (e.g., "Switched to Employer Mode").
 * **Profile-Level Subscription**: Subscriptions are bound to a specific `Profile` (by `profile_id`), **not** to the User directly.
 * **Subscription Purchase Restrictions**:
-  1. A profile can have at most **one active subscription** at a time.
-  2. To upgrade/downgrade a plan on the same profile, the current subscription must first be cancelled/expired, or handled manually.
-  3. You can buy plans for other profiles without switching your current active session profile, but you must pass the correct `profile_id` in the API payload.
+  1. A profile can have at most **one active paid subscription** at a time.
+  2. Every profile is auto-assigned a **Default Free** plan upon creation. This free plan **does not** block the user from initiating or purchasing a paid plan.
+  3. To upgrade/downgrade between different paid plans on the same profile, the current subscription must first be cancelled/expired, or handled manually.
+  4. You can buy plans for other profiles without switching your current active session profile, but you must pass the correct `profile_id` in the API payload.
 
 ---
 
