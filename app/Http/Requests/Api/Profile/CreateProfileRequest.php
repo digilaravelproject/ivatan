@@ -18,9 +18,9 @@ class CreateProfileRequest extends FormRequest
             'type' => [
                 'required',
                 'string',
-                Rule::in(['employer', 'ecommerce', 'music', 'creator']),
+                Rule::in(['employer', 'ecommerce', 'seller', 'music', 'creator']),
             ],
-            'profile_sub_type' => 'required_if:type,ecommerce|string|in:product,service,both',
+            'profile_sub_type' => 'required_if:type,ecommerce,seller|string|in:product,service,both',
             'business_name' => 'nullable|string|max:255',
             'business_description' => 'nullable|string|max:2000',
             'business_email' => 'nullable|email|max:255',

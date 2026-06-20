@@ -18,7 +18,7 @@ class SwitchProfileRequest extends FormRequest
             'to_profile_type' => [
                 'required',
                 'string',
-                \Illuminate\Validation\Rule::in(['personal', 'employer', 'ecommerce', 'music', 'creator']),
+                \Illuminate\Validation\Rule::in(['personal', 'employer', 'ecommerce', 'seller', 'music', 'creator']),
             ],
             'notes' => 'nullable|string|max:2000',
             'profile_sub_type' => [
@@ -27,7 +27,7 @@ class SwitchProfileRequest extends FormRequest
                 \Illuminate\Validation\Rule::in(['product', 'service', 'both']),
                 function ($attribute, $value, $fail) {
                     $profileType = $this->input('to_profile_type');
-                    if ($profileType !== 'ecommerce') {
+                    if (!in_array($profileType, ['ecommerce', 'seller'])) {
                         $fail('The profile sub type must be null unless the profile type is ecommerce.');
                     }
                 }
