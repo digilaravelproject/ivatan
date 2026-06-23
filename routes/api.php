@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\RazorpayWebhookController;
 use App\Http\Controllers\Api\PhonePeWebhookController;
+use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Admin\ProfileApprovalController;
 
 
@@ -541,8 +542,10 @@ Route::prefix('v1')->group(function () {
         // ================================
         // Subscription Routes
         // ================================
+        Route::get('user/subscriptions/history', [SubscriptionController::class, 'userHistory']);
         Route::prefix('subscriptions')->controller(SubscriptionController::class)->group(function () {
             Route::post('/{id}/cancel', 'cancel')->middleware('throttle:5,1');
+
         });
 
         // ================================

@@ -142,6 +142,19 @@ class SubscriptionController extends Controller
         }
     }
 
+    public function userHistory(Request $request): JsonResponse
+    {
+        try {
+            $history = $this->subscriptionService->getUserHistory($request->user()->id);
+
+            return $this->success(['history' => $history], 'User subscription history retrieved successfully.');
+        } catch (Throwable $e) {
+            Log::error('Failed to fetch user subscription history', ['error' => $e->getMessage()]);
+            return $this->exceptionResponse($e, 'Failed to fetch user subscription history.');
+        }
+    }
+
+
     public function cancel(int $id, Request $request): JsonResponse
     {
         try {

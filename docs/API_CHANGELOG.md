@@ -410,6 +410,45 @@
 }
 ```
 
+### GET `/api/v1/user/subscriptions/history`
+**All past subscriptions of the authenticated user across all of their profiles.**
+
+**Response:**
+```json
+{
+  "status": true,
+  "message": "User subscription history retrieved successfully.",
+  "data": {
+    "history": [
+      {
+        "id": 5,
+        "user_id": 5,
+        "profile_id": 2,
+        "subscription_plan_id": 3,
+        "gateway_subscription_id": "sub_abc123",
+        "starts_at": "2026-06-04T12:00:00Z",
+        "ends_at": "2026-07-04T12:00:00Z",
+        "status": "expired",
+        "created_at": "2026-06-04T12:00:00Z",
+        "updated_at": "2026-06-04T12:00:00Z",
+        "plan": {
+          "id": 3,
+          "name": "Pro Seller",
+          "price": "499.00",
+          "currency": "INR",
+          "duration_days": 30
+        },
+        "profile": {
+          "id": 2,
+          "type": "seller",
+          "status": "active"
+        }
+      }
+    ]
+  }
+}
+```
+
 ### POST `/api/v1/subscriptions/{id}/cancel`
 **Cancel active subscription.**
 

@@ -135,6 +135,16 @@ class SubscriptionService
             ->toArray();
     }
 
+    public function getUserHistory(int $userId): array
+    {
+        return UserSubscription::where('user_id', $userId)
+            ->with(['plan', 'profile'])
+            ->latest()
+            ->get()
+            ->toArray();
+    }
+
+
     public function expirePastDue(): int
     {
         $count = 0;
