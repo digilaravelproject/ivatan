@@ -21,7 +21,7 @@ class UpdatePostTrendingScore implements ShouldQueue
         try {
             // Direct SQL Update (High Performance)
             // Using the scoring formula defined in the algorithm logic
-            DB::statement('
+            DB::statement("
                 UPDATE user_posts
                 SET trending_score = (
                     (
@@ -31,8 +31,8 @@ class UpdatePostTrendingScore implements ShouldQueue
                     )
                     *
                     (CASE
-                        WHEN type = "reel" THEN 1.5
-                        WHEN type = "video" THEN 1.2
+                        WHEN type = 'reel' THEN 1.5
+                        WHEN type = 'video' THEN 1.2
                         ELSE 1.0
                     END)
                     +
@@ -41,10 +41,26 @@ class UpdatePostTrendingScore implements ShouldQueue
                         ELSE 0
                     END)
                 )
+                *
+                COALESCE(
+                    (
+                        SELECT CAST(REPLACE(pf.limit_value, 'x', '') AS DECIMAL(10,2))
+                        FROM user_subscriptions us
+                        JOIN plan_features pf ON pf.subscription_plan_id = us.subscription_plan_id
+                        JOIN features f ON f.id = pf.feature_id
+                        WHERE us.user_id = user_posts.user_id
+                          AND us.status = 'active'
+                          AND (us.ends_at IS NULL OR us.ends_at > NOW())
+                          AND f.slug IN ('visibility_multiplier', 'visibility_boost_creator')
+                        ORDER BY CAST(REPLACE(pf.limit_value, 'x', '') AS DECIMAL(10,2)) DESC
+                        LIMIT 1
+                    ),
+                    1.0
+                )
                 /
                 POW((TIMESTAMPDIFF(HOUR, created_at, NOW()) + 2), 1.8)
-                WHERE status = "active"
-            ');
+                WHERE status = 'active'
+            ");
 
             // Log::info("Trending scores updated successfully.");
         } catch (\Exception $e) {

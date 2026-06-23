@@ -18,25 +18,24 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use App\Traits\HasSubscriptionFeatures;
 
 
 /**
- * @property Collection<int, Interest> $interests
+ * @property \Illuminate\Database\Eloquent\Collection<int, Interest> $interests
  */
 
 class User extends Authenticatable implements HasMedia
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
-    use InteractsWithMedia;
+    use InteractsWithMedia, HasSubscriptionFeatures;
 
     protected $fillable = [
         'uuid',
@@ -131,11 +130,13 @@ class User extends Authenticatable implements HasMedia
         if ($path) {
             // Detect which disk to use for generating URL
             // If AWS keys exist, generate S3 URL. If not, generate Public URL.
-            $disk = (config('filesystems.disks.s3.key') && config('filesystems.disks.s3.secret')) ? 's3' : 'public';
+            $diskName = (config('filesystems.disks.s3.key') && config('filesystems.disks.s3.secret')) ? 's3' : 'public';
+            $storageDisk = Storage::disk($diskName);
+            assert($storageDisk instanceof \Illuminate\Filesystem\FilesystemAdapter);
 
             // Returns: https://your-site.com/storage/49/filename.png (Public)
             // OR: https://s3.aws.../49/filename.png (S3)
-            return Storage::disk($disk)->url($path);
+            return $storageDisk->url($path);
         }
 
         // 3. Fallback: Spatie Media Library (If DB column is empty)
@@ -433,6 +434,11 @@ class User extends Authenticatable implements HasMedia
         return $this->cachedUnreadCount;
     }
 
+    /**
+     * Check if user is an employer
+     * @param mixed $value
+     * @return bool
+     */
     public function getIsEmployerAttribute($value): bool
     {
         if ($value) {
@@ -441,6 +447,11 @@ class User extends Authenticatable implements HasMedia
         return $this->activeProfile()->where('type', 'employer')->exists();
     }
 
+    /**
+     * Check if user is a seller
+     * @param mixed $value
+     * @return bool
+     */
     public function getIsSellerAttribute($value): bool
     {
         if ($value) {

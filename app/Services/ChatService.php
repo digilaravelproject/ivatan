@@ -8,10 +8,10 @@ use App\Events\Chat\MessageDelivered;
 use App\Events\Chat\MessageDeleted;
 use App\Events\Chat\MessageEdited;
 use App\Events\Chat\GroupCreated;
-use App\Events\Chat\GroupUpdated;
 use App\Events\Chat\ParticipantAdded;
 use App\Events\Chat\ParticipantRemoved;
 use App\Events\Chat\ParticipantLeft;
+use App\Events\Chat\AdminStatusChanged;
 use App\Models\Chat\UserChat;
 use App\Models\Chat\UserChatMessage;
 use App\Models\Chat\UserChatParticipant;
@@ -20,8 +20,8 @@ use App\Models\UserBlock;
 use App\Services\LiveChatGroupService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+
 
 class ChatService
 {
@@ -69,6 +69,15 @@ class ChatService
         if ($receiver->account_privacy === 'private' && !$isFollowing) {
             throw new \Exception('This account is private. You must follow them to send a message.');
         }
+
+        // 4. Recruiter / Business Profile Messaging Limit Check
+        $isRecruiter = $receiver->is_employer || $receiver->is_seller;
+        if ($isRecruiter) {
+            $dmLimit = $sender->getFeatureLimit('dm_recruiters_msme');
+            if (strtolower($dmLimit) === 'no' || !$dmLimit) {
+                throw new \Exception('Your current subscription plan does not allow messaging recruiter or business accounts.');
+            }
+        }
     }
 
     /**
@@ -93,7 +102,7 @@ class ChatService
                 }
                 broadcast(new MessageRead($chatId, $user->id, $lastReadMessageId, $targetUserId))->toOthers();
             } catch (\Exception $e) {
-                \Log::error('Broadcast Error: MessageRead failed', [
+                Log::error('Broadcast Error: MessageRead failed', [
                     'error' => $e->getMessage(),
                     'chat_id' => $chatId,
                     'target_user_id' => $targetUserId,
@@ -123,7 +132,7 @@ class ChatService
                     }
                 }
             } catch (\Exception $e) {
-                \Log::error('Broadcast Error: MessageDelivered failed', [
+                Log::error('Broadcast Error: MessageDelivered failed', [
                     'error' => $e->getMessage(),
                     'chat_id' => $chatId,
                     'target_user_id' => $otherParticipant->user_id ?? null,
@@ -202,7 +211,7 @@ class ChatService
                         $p->user_id
                     ))->toOthers();
                 } catch (\Exception $e) {
-                    \Log::error('Broadcast Error: GroupCreated failed', [
+                    Log::error('Broadcast Error: GroupCreated failed', [
                         'error' => $e->getMessage(),
                         'chat_id' => $chat->id,
                         'target_user_id' => $p->user_id ?? null,
@@ -246,7 +255,7 @@ class ChatService
                                 $user->id
                             ))->toOthers();
                         } catch (\Exception $e) {
-                            \Log::error('Broadcast Error: ParticipantAdded failed', [
+                            Log::error('Broadcast Error: ParticipantAdded failed', [
                                 'error' => $e->getMessage(),
                                 'chat_id' => $chat->id,
                                 'new_user_id' => $newUser->id ?? null,
@@ -289,7 +298,7 @@ class ChatService
             try {
                 broadcast(new ParticipantLeft($chat->id, $requester->id))->toOthers();
             } catch (\Exception $e) {
-                \Log::error('Broadcast Error: ParticipantLeft failed', [
+                Log::error('Broadcast Error: ParticipantLeft failed', [
                     'error' => $e->getMessage(),
                     'chat_id' => $chat->id,
                 ]);
@@ -309,7 +318,7 @@ class ChatService
                     try {
                         broadcast(new AdminStatusChanged($chat->id, $newAdmin->user_id, true, $requester->id))->toOthers();
                     } catch (\Exception $e) {
-                        \Log::error('Broadcast Error: AdminStatusChanged failed', [
+                        Log::error('Broadcast Error: AdminStatusChanged failed', [
                             'error' => $e->getMessage(),
                             'chat_id' => $chat->id,
                             'new_admin_id' => $newAdmin->user_id ?? null,
@@ -342,7 +351,7 @@ class ChatService
             try {
                 broadcast(new ParticipantRemoved($chat->id, $targetUserId, $requester->id))->toOthers();
             } catch (\Exception $e) {
-                \Log::error('Broadcast Error: ParticipantRemoved failed', [
+                Log::error('Broadcast Error: ParticipantRemoved failed', [
                     'error' => $e->getMessage(),
                     'chat_id' => $chat->id,
                     'target_user_id' => $targetUserId,
@@ -468,7 +477,12 @@ class ChatService
         ]);
         broadcast(new MessageSent($msg))->toOthers();
     }
-
+    /**
+     * Notify participants of a chat
+     * @param UserChat $chat
+     * @param UserChatMessage $message
+     * @param User $sender
+     */
     protected function notifyParticipants($chat, $message, $sender)
     {
         $recipients = $chat->participants()

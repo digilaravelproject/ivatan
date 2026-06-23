@@ -24,7 +24,7 @@ class SubscriptionController extends Controller
     public function plans(Request $request): JsonResponse
     {
         try {
-            $query = SubscriptionPlan::where('is_active', true)->orderBy('sort_order');
+            $query = SubscriptionPlan::with('features')->where('is_active', true)->orderBy('sort_order');
 
             if ($request->filled('profile_type')) {
                 $profileType = $request->profile_type;
@@ -49,7 +49,7 @@ class SubscriptionController extends Controller
     public function planDetails(int $id): JsonResponse
     {
         try {
-            $plan = SubscriptionPlan::where('is_active', true)->findOrFail($id);
+            $plan = SubscriptionPlan::with('features')->where('is_active', true)->findOrFail($id);
 
             return $this->success(['plan' => $plan], 'Plan details retrieved successfully.');
         } catch (ModelNotFoundException $e) {

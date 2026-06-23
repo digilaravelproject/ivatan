@@ -127,7 +127,26 @@ class JobApplicationController extends Controller
                 return $this->error('Unauthorized to view applications', 403);
             }
 
-            $applications = $job->applications()->with('applicant')->paginate(20);
+            $applications = $job->applications()
+                ->select('user_job_applications.*')
+                ->with('applicant')
+                ->leftJoin('user_subscriptions', function ($join) {
+                    $join->on('user_subscriptions.user_id', '=', 'user_job_applications.applicant_id')
+                        ->where('user_subscriptions.status', '=', 'active')
+                        ->where(function ($q) {
+                            $q->whereNull('user_subscriptions.ends_at')
+                              ->orWhere('user_subscriptions.ends_at', '>', now());
+                        });
+                })
+                ->leftJoin('plan_features', function ($join) {
+                    $join->on('plan_features.subscription_plan_id', '=', 'user_subscriptions.subscription_plan_id')
+                        ->whereIn('plan_features.feature_id', function ($q) {
+                            $q->select('id')->from('features')->where('slug', 'job_priority');
+                        });
+                })
+                ->orderByRaw('CAST(COALESCE(plan_features.limit_value, 0) AS UNSIGNED) DESC')
+                ->orderBy('user_job_applications.created_at', 'desc')
+                ->paginate(20);
 
             return $this->success($applications, 'Applications fetched successfully');
         } catch (Throwable $e) {
@@ -243,13 +262,16 @@ class JobApplicationController extends Controller
             }
 
             // Support legacy public disk resumes as well
-            $disk = Storage::disk('local')->exists($application->resume_path) ? 'local' : 'public';
+            $diskName = Storage::disk('local')->exists($application->resume_path) ? 'local' : 'public';
 
-            if (!$application->resume_path || !Storage::disk($disk)->exists($application->resume_path)) {
+            $storageDisk = Storage::disk($diskName);
+            assert($storageDisk instanceof \Illuminate\Filesystem\FilesystemAdapter);
+
+            if (!$application->resume_path || !$storageDisk->exists($application->resume_path)) {
                 return $this->error('Resume not found', 404);
             }
 
-            return Storage::disk($disk)->download(
+            return $storageDisk->download(
                 $application->resume_path,
                 $application->applicant->name . '_resume.pdf'
             );

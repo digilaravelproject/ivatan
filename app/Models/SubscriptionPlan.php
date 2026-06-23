@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class SubscriptionPlan extends Model
 {
@@ -41,6 +42,13 @@ class SubscriptionPlan extends Model
     public function subscriptions(): HasMany
     {
         return $this->hasMany(UserSubscription::class);
+    }
+
+    public function features(): BelongsToMany
+    {
+        return $this->belongsToMany(Feature::class, 'plan_features', 'subscription_plan_id', 'feature_id')
+            ->withPivot('limit_value')
+            ->withTimestamps();
     }
 
     public function scopeForProfileType(Builder $query, string $type): Builder

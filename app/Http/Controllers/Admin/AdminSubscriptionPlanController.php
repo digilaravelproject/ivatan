@@ -18,7 +18,7 @@ class AdminSubscriptionPlanController extends Controller
 
     public function index(): View
     {
-        $plans = SubscriptionPlan::orderBy('sort_order')
+        $plans = SubscriptionPlan::with('features')->orderBy('sort_order')
             ->orderBy('profile_type')
             ->get()
             ->groupBy('profile_type');

@@ -47,6 +47,8 @@ class UserServiceController extends Controller
 
     /**
      * Get services for a specific seller by seller ID
+     * @param int $sellerId
+     * @return \Illuminate\Http\JsonResponse
      */
     public function getSellerServices(Request $request, $sellerId): JsonResponse
     {
@@ -81,6 +83,18 @@ class UserServiceController extends Controller
             $user = $request->user();
             if (!$user) {
                 return $this->errorResponse('Unauthenticated.', 401);
+            }
+
+            // Check subscription limit for selling services
+            $sellServicesLimit = $user->getFeatureLimit('sell_services', 'seller');
+            if (strtolower($sellServicesLimit) === 'no' || !$sellServicesLimit) {
+                $sellServicesGigsLimit = $user->getFeatureLimit('sell_services_gigs', 'creator');
+                if (strtolower($sellServicesGigsLimit) === 'no' || !$sellServicesGigsLimit) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Your current subscription plan does not allow selling services or gigs.'
+                    ], 403);
+                }
             }
 
             $coverImage = $request->file('cover_image');
@@ -151,6 +165,8 @@ class UserServiceController extends Controller
 
     /**
      * Show service details by ID or slug
+     * @param string $serviceIdentifier
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show($serviceIdentifier): JsonResponse
     {
