@@ -24,7 +24,7 @@ trait VisibilityTrait
                         ->whereExists(function ($q) use ($user) {
                             $q->selectRaw(1)
                                 ->from('followers')
-                                ->where('followers.following_id', '=', 'user_posts.user_id')
+                                ->whereColumn('followers.following_id', '=', 'user_posts.user_id')
                                 ->where('followers.follower_id', '=', $user->id);
                         });
                 });
@@ -36,13 +36,13 @@ trait VisibilityTrait
                         ->whereExists(function ($q) use ($user) {
                             $q->selectRaw(1)
                                 ->from('followers')
-                                ->where('followers.following_id', '=', 'user_posts.user_id')
+                                ->whereColumn('followers.following_id', '=', 'user_posts.user_id')
                                 ->where('followers.follower_id', '=', $user->id);
                         })
                         ->whereExists(function ($q) use ($user) {
                             $q->selectRaw(1)
                                 ->from('followers')
-                                ->where('followers.follower_id', '=', 'user_posts.user_id')
+                                ->whereColumn('followers.follower_id', '=', 'user_posts.user_id')
                                 ->where('followers.following_id', '=', $user->id);
                         });
                 });

@@ -19,7 +19,7 @@ class UserPostPolicy
         }
 
         // A user can always view their own posts
-        if ($post->user_id === $user->id) {
+        if ($user && $post->user_id === $user->id) {
             return true; // Post owner can always view their own posts
         }
 

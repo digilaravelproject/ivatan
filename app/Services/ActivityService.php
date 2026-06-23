@@ -7,6 +7,7 @@ use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\DB;
 
 class ActivityService
 {
@@ -125,7 +126,7 @@ class ActivityService
                 ];
             }, $chunk);
 
-            \DB::table('activity_log')->insert($insert);
+            DB::table('activity_log')->insert($insert);
         }
     }
     /**

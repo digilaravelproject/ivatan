@@ -130,7 +130,7 @@ class ViewTrackingService
 
     public function getUserLogs(int $userId, int $perPage = 15)
     {
-        return \DB::table('activity_log')
+        return DB::table('activity_log')
             ->where('causer_id', $userId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
