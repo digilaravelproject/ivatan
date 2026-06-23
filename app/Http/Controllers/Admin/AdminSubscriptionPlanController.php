@@ -36,16 +36,13 @@ class AdminSubscriptionPlanController extends Controller
             'music' => 'Music Artist',
         ];
 
-        return view('admin.subscription-plans.create', compact('profileTypes'));
+        $features = \App\Models\Feature::orderBy('name')->get();
+
+        return view('admin.subscription-plans.create', compact('profileTypes', 'features'));
     }
 
     public function store(Request $request): RedirectResponse
     {
-        if ($request->has('features') && is_string($request->features)) {
-            $features = array_filter(array_map('trim', explode("\n", $request->features)));
-            $request->merge(['features' => $features]);
-        }
-
         $validated = $request->validate([
             'profile_type' => 'required|string|in:personal,seller,creator,employer,music',
             'name' => 'required|string|max:255',
@@ -54,16 +51,30 @@ class AdminSubscriptionPlanController extends Controller
             'price' => 'required|numeric|min:0',
             'currency' => 'required|string|size:3',
             'duration_days' => 'required|integer|min:1',
-            'features' => 'nullable|array',
-            'features.*' => 'string',
             'is_active' => 'boolean',
             'is_default' => 'boolean',
             'sort_order' => 'integer|min:0',
+            'selected_features' => 'nullable|array',
+            'selected_features.*' => 'integer|exists:features,id',
+            'feature_limits' => 'nullable|array',
+            'feature_limits.*' => 'nullable|string|max:255',
         ]);
 
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['is_default'] = $request->boolean('is_default', false);
-        $validated['features'] = $validated['features'] ?? [];
+
+        $featuresList = [];
+        $syncData = [];
+        if (!empty($validated['selected_features'])) {
+            $features = \App\Models\Feature::whereIn('id', $validated['selected_features'])->get();
+            foreach ($features as $feature) {
+                $limitValue = $request->input("feature_limits.{$feature->id}", '');
+                $syncData[$feature->id] = ['limit_value' => $limitValue];
+                
+                $featuresList[] = $feature->name . ($limitValue !== '' ? ": {$limitValue}" : '');
+            }
+        }
+        $validated['features'] = $featuresList;
 
         if ($validated['price'] > 0) {
             try {
@@ -85,7 +96,8 @@ class AdminSubscriptionPlanController extends Controller
             }
         }
 
-        SubscriptionPlan::create($validated);
+        $plan = SubscriptionPlan::create($validated);
+        $plan->features()->sync($syncData);
 
         $message = 'Subscription plan created successfully.';
         if ($validated['price'] > 0 && empty($validated['gateway_plan_id'])) {
@@ -98,7 +110,7 @@ class AdminSubscriptionPlanController extends Controller
 
     public function edit(int $id): View
     {
-        $plan = SubscriptionPlan::findOrFail($id);
+        $plan = SubscriptionPlan::with('features')->findOrFail($id);
         $profileTypes = [
             'personal' => 'Personal',
             'seller' => 'Product & Service Seller',
@@ -107,17 +119,14 @@ class AdminSubscriptionPlanController extends Controller
             'music' => 'Music Artist',
         ];
 
-        return view('admin.subscription-plans.edit', compact('plan', 'profileTypes'));
+        $features = \App\Models\Feature::orderBy('name')->get();
+
+        return view('admin.subscription-plans.edit', compact('plan', 'profileTypes', 'features'));
     }
 
     public function update(Request $request, int $id): RedirectResponse
     {
         $plan = SubscriptionPlan::findOrFail($id);
-
-        if ($request->has('features') && is_string($request->features)) {
-            $features = array_filter(array_map('trim', explode("\n", $request->features)));
-            $request->merge(['features' => $features]);
-        }
 
         $validated = $request->validate([
             'profile_type' => 'required|string|in:personal,seller,creator,employer,music',
@@ -127,16 +136,30 @@ class AdminSubscriptionPlanController extends Controller
             'price' => 'required|numeric|min:0',
             'currency' => 'required|string|size:3',
             'duration_days' => 'required|integer|min:1',
-            'features' => 'nullable|array',
-            'features.*' => 'string',
             'is_active' => 'boolean',
             'is_default' => 'boolean',
             'sort_order' => 'integer|min:0',
+            'selected_features' => 'nullable|array',
+            'selected_features.*' => 'integer|exists:features,id',
+            'feature_limits' => 'nullable|array',
+            'feature_limits.*' => 'nullable|string|max:255',
         ]);
 
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['is_default'] = $request->boolean('is_default', false);
-        $validated['features'] = $validated['features'] ?? [];
+
+        $featuresList = [];
+        $syncData = [];
+        if (!empty($validated['selected_features'])) {
+            $features = \App\Models\Feature::whereIn('id', $validated['selected_features'])->get();
+            foreach ($features as $feature) {
+                $limitValue = $request->input("feature_limits.{$feature->id}", '');
+                $syncData[$feature->id] = ['limit_value' => $limitValue];
+                
+                $featuresList[] = $feature->name . ($limitValue !== '' ? ": {$limitValue}" : '');
+            }
+        }
+        $validated['features'] = $featuresList;
 
         // If the price is > 0 and the plan doesn't have a gateway_plan_id yet, auto-create it
         if ($validated['price'] > 0 && empty($plan->gateway_plan_id)) {
@@ -163,6 +186,7 @@ class AdminSubscriptionPlanController extends Controller
         }
 
         $plan->update($validated);
+        $plan->features()->sync($syncData);
 
         $message = 'Subscription plan updated successfully.';
         if ($validated['price'] > 0 && !$plan->gateway_plan_id && empty($validated['gateway_plan_id'])) {

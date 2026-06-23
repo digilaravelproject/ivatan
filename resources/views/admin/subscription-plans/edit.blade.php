@@ -60,9 +60,36 @@
             <label class="block text-sm font-medium mb-1">Description</label>
             <textarea name="description" rows="3" class="w-full border rounded px-3 py-2">{{ old('description', $plan->description) }}</textarea>
         </div>
-        <div class="mb-4">
-            <label class="block text-sm font-medium mb-1">Features (one per line)</label>
-            <textarea name="features" rows="5" class="w-full border rounded px-3 py-2">{{ is_array($plan->features) ? implode("\n", $plan->features) : $plan->features }}</textarea>
+        <div class="mb-6">
+            <label class="block text-base font-semibold mb-2 border-b pb-1">Plan Features & Limits</label>
+            <p class="text-xs text-gray-500 mb-3">Check features to enable them for this plan, and enter their limit/multiplier values.</p>
+            
+            <div class="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto border rounded p-3 bg-gray-50">
+                @foreach($features as $feature)
+                @php
+                    $planFeature = $plan->features->firstWhere('id', $feature->id);
+                    $isChecked = !empty($planFeature);
+                    $limitValue = $isChecked ? $planFeature->pivot->limit_value : '';
+                @endphp
+                <div class="flex items-center justify-between p-2 border-b border-gray-200 bg-white rounded shadow-sm gap-4">
+                    <div class="flex items-start gap-2 max-w-[65%]">
+                        <input type="checkbox" name="selected_features[]" value="{{ $feature->id }}" id="feat_{{ $feature->id }}" @checked($isChecked) class="mt-1 rounded">
+                        <label for="feat_{{ $feature->id }}" class="text-sm font-medium cursor-pointer">
+                            {{ $feature->name }}
+                            @if(!$feature->is_implemented)
+                            <span class="ml-1 text-[10px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded font-normal">Static Placeholder</span>
+                            @else
+                            <span class="ml-1 text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-normal">Active Feature</span>
+                            @endif
+                            <span class="block text-xs text-gray-400 font-normal mt-0.5">{{ $feature->description }}</span>
+                        </label>
+                    </div>
+                    <div class="w-[30%]">
+                        <input type="text" name="feature_limits[{{ $feature->id }}]" class="w-full border rounded px-2 py-1 text-sm" placeholder="e.g. 1.4x, Medium, 10, Yes" value="{{ old('feature_limits.' . $feature->id, $limitValue) }}">
+                    </div>
+                </div>
+                @endforeach
+            </div>
         </div>
         <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Update Plan</button>
     </form>
