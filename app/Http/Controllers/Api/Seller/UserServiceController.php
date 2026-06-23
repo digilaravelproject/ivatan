@@ -2,22 +2,24 @@
 
 namespace App\Http\Controllers\Api\Seller;
 
-use App\Helpers\ImageHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ecommerce\StoreUserServiceRequest;
 use App\Http\Requests\Ecommerce\UpdateUserServiceRequest;
+use App\Http\Resources\Ecommerce\ServiceResource;
 use App\Models\Ecommerce\UserService;
-use App\Models\Ecommerce\UserServiceImage;
 use App\Models\User;
+use App\Services\Ecommerce\SellerServiceService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class UserServiceController extends Controller
 {
+    public function __construct(
+        protected SellerServiceService $sellerServiceService
+    ) {}
+
     /**
      * Get services for the authenticated seller
      */
@@ -30,14 +32,11 @@ class UserServiceController extends Controller
                 return $this->errorResponse('Unauthenticated.', 401);
             }
 
-            $services = UserService::with(['images', 'seller'])
-                ->where('seller_id', $user->id)
-                ->latest()
-                ->paginate(10);
+            $services = $this->sellerServiceService->getSellerServices($user->id);
 
             return $this->successResponse('Services fetched successfully.', $services);
         } catch (\Throwable $e) {
-            \Log::error('Failed to fetch seller services', [
+            Log::error('Failed to fetch seller services', [
                 'user_id' => optional($request->user())->id,
                 'error' => $e->getMessage(),
             ]);
@@ -60,14 +59,11 @@ class UserServiceController extends Controller
                 return $this->errorResponse('Seller not found or is not active.', 404);
             }
 
-            $services = UserService::with(['images', 'seller'])
-                ->where('seller_id', $seller->id)
-                ->latest()
-                ->paginate(10);
+            $services = $this->sellerServiceService->getSellerServices($seller->id);
 
             return $this->successResponse('Seller services fetched successfully.', $services);
         } catch (\Throwable $e) {
-            \Log::error('Failed to fetch services for seller', [
+            Log::error('Failed to fetch services for seller', [
                 'seller_id' => $sellerId,
                 'error' => $e->getMessage(),
             ]);
@@ -81,51 +77,31 @@ class UserServiceController extends Controller
      */
     public function store(StoreUserServiceRequest $request): JsonResponse
     {
-        DB::beginTransaction();
         try {
-            /** @var \Illuminate\Http\Request $request */
             $user = $request->user();
             if (!$user) {
-                DB::rollBack();
                 return $this->errorResponse('Unauthenticated.', 401);
             }
-            $slug = $this->generateUniqueSlug($request->title);
 
-            // Create the service
-            $service = UserService::create([
-                'uuid'        => (string) Str::uuid(),
-                'seller_id'   => $user->id,
-                'title'       => $request->title,
-                'slug'        => $slug,
-                'description' => $request->description ?? null,
-                'price'       => $request->price,
-                'discount_price' => $request->discount_price ?? null,
-                'status'      => 'pending',
-            ]);
-
-            // Handle cover image upload if available
-            if ($request->hasFile('cover_image')) {
-                $coverImagePath = $this->handleCoverImage($request->file('cover_image'), $user, $service);
-                $service->cover_image = $coverImagePath; // Assuming the `cover_image` column exists in the service model.
-                $service->save();
+            $coverImage = $request->file('cover_image');
+            $images = $request->file('images', []);
+            if (!is_array($images) && $request->hasFile('images')) {
+                $images = [$images];
             }
 
-            // Handle additional images upload
-            if ($request->hasFile('images')) {
-                $this->handleServiceImages($request->file('images'), $user, $service);
-            }
-            // Eager load images before returning the response
-            $service->load('images')->refresh(); // Load associated images
-            // Commit the transaction if everything is successful
-            DB::commit();
+            $service = $this->sellerServiceService->createService(
+                $user,
+                $request->only(['title', 'description', 'price', 'discount_price']),
+                $coverImage,
+                $images
+            );
+
             return $this->successResponse('Service created successfully.', $service);
         } catch (\Throwable $e) {
-            DB::rollBack();
-            \Log::error('Failed to store service', [
+            Log::error('Failed to store service', [
                 'user_id' => $request->user()?->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->except(['cover_image', 'images']),
             ]);
 
             return $this->errorResponse('Failed to create service. Please try again later.', 500);
@@ -137,62 +113,34 @@ class UserServiceController extends Controller
      */
     public function update(UpdateUserServiceRequest $request, UserService $service): JsonResponse
     {
-        DB::beginTransaction(); // Start transaction
         try {
-            /** @var \Illuminate\Http\Request $request */
             $user = $request->user();
 
-            // Check if the authenticated user is the owner of the service
+            // Check ownership
             if ($service->seller_id !== $user->id) {
                 return $this->errorResponse('Unauthorized', 403);
             }
 
-            // Get the fields to update
-            $updateFields = $request->only(['title', 'description', 'price', 'discount_price', 'status']);
-
-            // Update slug if title is changed
-            if (isset($updateFields['title'])) {
-                $updateFields['slug'] = $this->generateUniqueSlug($updateFields['title']);
+            $coverImage = $request->file('cover_image');
+            $images = $request->file('images', []);
+            if (!is_array($images) && $request->hasFile('images')) {
+                $images = [$images];
             }
 
-            // Update the service details
-            $service->update($updateFields);
+            $removeImageIds = $request->input('remove_image_ids', []);
 
-            // Handle cover image upload
-            if ($request->hasFile('cover_image')) {
-                // Delete old cover image if it exists
-                if ($service->cover_image) {
-                    ImageHelper::deleteEcomImage($service->cover_image);
-                }
-                
-                $coverImagePath = $this->handleCoverImage($request->file('cover_image'), $user, $service);
-                $service->update(['cover_image' => $coverImagePath]);
-            }
+            $updatedService = $this->sellerServiceService->updateService(
+                $user,
+                $service,
+                $request->only(['title', 'description', 'price', 'discount_price', 'status']),
+                $coverImage,
+                $images,
+                $removeImageIds
+            );
 
-            // Handle additional images upload
-            if ($request->hasFile('images')) {
-                $images = $request->file('images');
-                if (!is_array($images)) {
-                    $images = [$images];
-                }
-                $this->handleServiceImages($images, $user, $service);
-            }
-
-            // Remove images if any remove_image_ids are provided
-            if ($request->filled('remove_image_ids')) {
-                $this->removeServiceImages($request->input('remove_image_ids'), $service);
-            }
-
-            $service->load(['images'])->refresh(); // This will load the images relation and refresh the model
-            // Commit the transaction after all operations are successful
-            DB::commit();
-
-            // Return success response
-            return $this->successResponse('Service updated successfully.', $service);
+            return $this->successResponse('Service updated successfully.', $updatedService);
         } catch (\Throwable $e) {
-            DB::rollBack(); // Rollback in case of error
-
-            \Log::error('Failed to update service', [
+            Log::error('Failed to update service', [
                 'service_id' => $service->id,
                 'error' => $e->getMessage(),
             ]);
@@ -207,33 +155,19 @@ class UserServiceController extends Controller
     public function show($serviceIdentifier): JsonResponse
     {
         try {
-            // Try to retrieve the service from the cache first (cached for 1 day)
-            $cacheKey = "service_{$serviceIdentifier}"; // Cache key based on service identifier
-            $service = Cache::remember($cacheKey, now()->addDay(), function () use ($serviceIdentifier) {
-                // Try fetching the service by either ID or slug (SKU)
-                return UserService::with(['images', 'seller'])
-                    ->where('id', $serviceIdentifier) // Try finding by ID
-                    ->orWhere('slug', $serviceIdentifier) // Or try finding by slug (SKU)
-                    ->first();
-            });
-
-            if (!$service) {
-                throw new ModelNotFoundException("Service not found");
-            }
+            $service = $this->sellerServiceService->findService($serviceIdentifier);
 
             return response()->json([
                 'success' => true,
-                'data' => new ServiceResource($service->load('images', 'seller')),
+                'data' => new ServiceResource($service),
             ]);
         } catch (ModelNotFoundException $e) {
-            // Handle the case where the service wasn't found in both ID and slug queries
             return response()->json([
                 'success' => false,
                 'message' => 'Service not found. Please check the service ID or SKU.',
             ], 404);
-        } catch (\Exception $e) {
-            // Catch any other unexpected errors
-            \Log::error('Error fetching service details', [
+        } catch (\Throwable $e) {
+            Log::error('Error fetching service details', [
                 'error' => $e->getMessage(),
             ]);
 
@@ -243,82 +177,29 @@ class UserServiceController extends Controller
             ], 500);
         }
     }
+
     /**
      * Delete a service
      */
     public function destroy(Request $request, UserService $service): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        if ($service->seller_id !== $user->id) {
-            return $this->errorResponse('Unauthorized', 403);
-        }
+            if ($service->seller_id !== $user->id) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
 
-        $service->delete();
+            $this->sellerServiceService->deleteService($user, $service);
 
-        return $this->successResponse('Service deleted successfully.');
-    }
-
-    /**
-     * Generate a unique slug for the service
-     */
-    private function generateUniqueSlug(string $title): string
-    {
-        $slugBase = Str::slug($title) . '-' . Str::random(8);
-        $slug = $slugBase;
-
-        while (UserService::where('slug', $slug)->exists()) {
-            $slug = $slugBase . '-' . Str::random(4);
-        }
-
-        return $slug;
-    }
-
-    /**
-     * Handle the upload and saving of the cover image for the service.
-     *
-     * @param \Illuminate\Http\UploadedFile $coverImage
-     * @param \App\Models\User $user
-     * @param \App\Models\Ecommerce\UserService $service
-     * @return string $path
-     */
-    private function handleCoverImage($coverImage, $user, $service): string
-    {
-        // Upload the image using existing helper
-        return ImageHelper::uploadEcomImage($coverImage, $user->id, 'services/cover');
-    }
-
-    /**
-     * Handle the uploading and saving of service images.
-     *
-     * @param \Illuminate\Http\UploadedFile[] $images
-     * @param \App\Models\User $user
-     * @param \App\Models\Ecommerce\UserService $service
-     * @return void
-     */
-    private function handleServiceImages(array $images, $user, $service): void
-    {
-        foreach ($images as $img) {
-            $path = ImageHelper::uploadEcomImage($img, $user->id, 'services/gallery');
-            UserServiceImage::create([
+            return $this->successResponse('Service deleted successfully.');
+        } catch (\Throwable $e) {
+            Log::error('Failed to delete service', [
                 'service_id' => $service->id,
-                'image_path' => $path,
+                'error' => $e->getMessage(),
             ]);
+
+            return $this->errorResponse('Failed to delete service.', 500);
         }
     }
-
-
-    /**
-     * Remove service images based on the provided image IDs
-     */
-    private function removeServiceImages(array $ids, UserService $service): void
-    {
-        $images = UserServiceImage::whereIn('id', $ids)->where('service_id', $service->id)->get();
-        foreach ($images as $img) {
-            ImageHelper::deleteEcomImage($img->image_path);
-            $img->delete();
-        }
-    }
-
-
 }
