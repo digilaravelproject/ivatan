@@ -3,9 +3,11 @@
 use App\Http\Controllers\Api\Ad\AdController;
 use App\Http\Controllers\Api\Ad\AdPaymentController;
 use App\Http\Controllers\Api\Ad\AdServingController;
+use App\Http\Controllers\Api\Chat\CallController;
+use App\Http\Controllers\Api\Chat\ChatController;
+use App\Http\Controllers\Api\Ecommerce\AddressController;
 use App\Http\Controllers\Api\Ecommerce\CartController;
 use App\Http\Controllers\Api\Ecommerce\CheckoutController;
-use App\Http\Controllers\Api\Ecommerce\AddressController;
 use App\Http\Controllers\Api\Ecommerce\PaymentController;
 use App\Http\Controllers\Api\Ecommerce\ShippingController;
 use App\Http\Controllers\Api\FollowController;
@@ -13,46 +15,42 @@ use App\Http\Controllers\Api\InterestController;
 use App\Http\Controllers\Api\Jobs\JobApplicationController;
 use App\Http\Controllers\Api\Jobs\JobPostController;
 use App\Http\Controllers\Api\Jobs\RecruiterJobController;
+use App\Http\Controllers\Api\PresenceController;
 use App\Http\Controllers\Api\Seller\UserProductController;
 use App\Http\Controllers\Api\Seller\UserServiceController;
 use App\Http\Controllers\Api\Story\StoryController;
 use App\Http\Controllers\Api\Story\StoryHighlightController;
 use App\Http\Controllers\Api\UserPostController;
-use App\Http\Controllers\Api\Chat\ChatController;
-use App\Http\Controllers\Api\Chat\CallController;
-use App\Http\Controllers\Api\PresenceController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 // Register broadcasting auth endpoint
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
-use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Admin\ProfileApprovalController;
+use App\Http\Controllers\Api\BannerController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\Contact\ContactSyncController;
-use App\Http\Controllers\Api\NotificationController;
-use App\Http\Controllers\Api\Ecommerce\OrderController;
 use App\Http\Controllers\Api\Ecommerce\EnquiryController;
 use App\Http\Controllers\Api\Ecommerce\MarketplaceController;
-use App\Http\Controllers\Api\Seller\UserSellerController;
-use App\Http\Controllers\Api\Seller\SellerFinancialController;
-use App\Http\Controllers\Api\Seller\SellerTransactionController;
-use App\Http\Controllers\Api\Seller\SellerOrderController;
-use App\Http\Controllers\Api\ViewController;
-use App\Http\Controllers\Api\UserInteractionController;
-use App\Http\Controllers\Api\UserHistoryController;
-use App\Http\Controllers\CacheClearController;
+use App\Http\Controllers\Api\Ecommerce\OrderController;
+use App\Http\Controllers\Api\ForgotPasswordController;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\MobileLoginController;
-use App\Http\Controllers\Api\ForgotPasswordController;
-use App\Http\Controllers\Api\BannerController;
-use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\SubscriptionController;
-use App\Http\Controllers\Api\RazorpayWebhookController;
-use App\Http\Controllers\Api\PhonePeWebhookController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PaymentWebhookController;
-use App\Http\Controllers\Admin\ProfileApprovalController;
-
-
+use App\Http\Controllers\Api\PhonePeWebhookController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RazorpayWebhookController;
+use App\Http\Controllers\Api\Seller\SellerFinancialController;
+use App\Http\Controllers\Api\Seller\SellerOrderController;
+use App\Http\Controllers\Api\Seller\SellerTransactionController;
+use App\Http\Controllers\Api\Seller\UserSellerController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserHistoryController;
+use App\Http\Controllers\Api\UserInteractionController;
+use App\Http\Controllers\Api\ViewController;
+use App\Http\Controllers\CacheClearController;
 
 // use Illuminate\Support\Facades\Artisan;
 
@@ -113,11 +111,6 @@ Route::get('profile-types', [ProfileController::class, 'availableTypes']);
 Route::get('subscription-plans', [SubscriptionController::class, 'plans']);
 Route::get('subscription-plans/{id}', [SubscriptionController::class, 'planDetails']);
 
-
-
-
-
-
 /**
  * Versioned API Routes (v1)
  */
@@ -125,7 +118,6 @@ Route::prefix('v1')->group(function () {
     // clear Cache
     Route::get('/clear-cache', [CacheClearController::class, 'clearAllCache']);
     Route::get('/banners', [BannerController::class, 'index']);
-
 
     /**
      * ================================
@@ -246,8 +238,6 @@ Route::prefix('v1')->group(function () {
             // 2. Dynamic Route (Catches /{type}/{id}...) - Must be LAST
             Route::post('/{commentable_type}/{commentable_id}/{parent_id?}', [CommentController::class, 'store']);
         });
-
-
 
         /**
          * ================================
@@ -407,7 +397,6 @@ Route::prefix('v1')->group(function () {
 
         });
 
-
         // ================================
         // Jobs Routes
         // ================================
@@ -439,9 +428,6 @@ Route::prefix('v1')->group(function () {
                 Route::get('{identifier}', 'show');        // Show single job (Wildcard, must be last)
             });
         });
-
-
-
 
         // ================================
         // Live Chat Groups Routes
@@ -504,8 +490,6 @@ Route::prefix('v1')->group(function () {
             Route::post('/offline', 'offline');
         });
 
-
-
         // ================================
         // Profile Routes
         // ================================
@@ -545,7 +529,6 @@ Route::prefix('v1')->group(function () {
         Route::get('user/subscriptions/history', [SubscriptionController::class, 'userHistory']);
         Route::prefix('subscriptions')->controller(SubscriptionController::class)->group(function () {
             Route::post('/{id}/cancel', 'cancel')->middleware('throttle:5,1');
-
         });
 
         // ================================
@@ -563,12 +546,10 @@ Route::prefix('v1')->group(function () {
         Route::post('notifications/device-tokens', [NotificationController::class, 'registerToken']);
         Route::delete('notifications/device-tokens', [NotificationController::class, 'deleteToken']);
 
-
         // ================================
         // Ad Routes
         // ================================
         Route::prefix('ads')->group(function () {
-
             // Ad routes
             Route::controller(AdController::class)->group(function () {
                 Route::get('ad-packages', 'adPackages');      // GET /ads/ad-packages
@@ -593,11 +574,11 @@ Route::prefix('v1')->group(function () {
         // User History Routes
         // ================================
         Route::prefix('history')->controller(UserHistoryController::class)->group(function () {
-            Route::get('likes',        'likes');
-            Route::get('comments',     'comments');
-            Route::get('video-views',  'videoViews');
-            Route::get('purchases',    'purchases');
-            Route::get('services',     'services');
+            Route::get('likes', 'likes');
+            Route::get('comments', 'comments');
+            Route::get('video-views', 'videoViews');
+            Route::get('purchases', 'purchases');
+            Route::get('services', 'services');
         });
 
     });
