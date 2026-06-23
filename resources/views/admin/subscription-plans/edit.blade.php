@@ -67,7 +67,8 @@
             <div class="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto border rounded p-3 bg-gray-50">
                 @foreach($features as $feature)
                 @php
-                    $planFeature = $plan->features->firstWhere('id', $feature->id);
+                    $planFeatures = $plan->getRelation('features') ?: $plan->features()->get();
+                    $planFeature = $planFeatures->firstWhere('id', $feature->id);
                     $isChecked = !empty($planFeature);
                     $limitValue = $isChecked ? $planFeature->pivot->limit_value : '';
                 @endphp

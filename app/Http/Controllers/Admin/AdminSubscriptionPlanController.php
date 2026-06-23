@@ -36,7 +36,7 @@ class AdminSubscriptionPlanController extends Controller
             'music' => 'Music Artist',
         ];
 
-        $features = \App\Models\Feature::orderBy('name')->get();
+        $features = \App\Models\Feature::orderBy('is_implemented', 'desc')->orderBy('name', 'asc')->get();
 
         return view('admin.subscription-plans.create', compact('profileTypes', 'features'));
     }
@@ -119,7 +119,7 @@ class AdminSubscriptionPlanController extends Controller
             'music' => 'Music Artist',
         ];
 
-        $features = \App\Models\Feature::orderBy('name')->get();
+        $features = \App\Models\Feature::orderBy('is_implemented', 'desc')->orderBy('name', 'asc')->get();
 
         return view('admin.subscription-plans.edit', compact('plan', 'profileTypes', 'features'));
     }
