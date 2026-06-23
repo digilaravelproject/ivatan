@@ -271,18 +271,18 @@ class UserService
         $user->restore();
 
         // Cascade restore to user's content
-        UserPost::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
-        UserStory::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($s) => $s->restore());
-        UserStoryHighlight::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($h) => $h->restore());
-        Ad::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($a) => $a->restore());
+        UserPost::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->restore();
+        UserStory::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->restore();
+        UserStoryHighlight::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->restore();
+        Ad::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->restore();
 
         // Ecommerce items
-        UserProduct::withTrashed()->where('seller_id', $user->id)->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
-        UserServiceModel::withTrashed()->where('seller_id', $user->id)->whereNotNull('deleted_at')->each(fn($s) => $s->restore());
+        UserProduct::withTrashed()->where('seller_id', $user->id)->whereNotNull('deleted_at')->restore();
+        UserServiceModel::withTrashed()->where('seller_id', $user->id)->whereNotNull('deleted_at')->restore();
         UserJobPost::where('employer_id', $user->id)->where('status', 'inactive')->update(['status' => 'active']);
 
         // Profiles
-        Profile::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->each(fn($p) => $p->restore());
+        Profile::withTrashed()->where('user_id', $user->id)->whereNotNull('deleted_at')->restore();
 
         // Note: Subscriptions are marked expired, not restored automatically
         // Note: DeviceTokens are permanently deleted (not restored)

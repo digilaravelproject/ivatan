@@ -65,7 +65,67 @@ class ViewTrackingService
     private function incrementViewCount($model): void
     {
         $model->increment('view_count');
-        $model->refresh();
+    }
+
+    public function trackMultiple($models, Request $request): void
+    {
+        if (empty($models)) {
+            return;
+        }
+
+        $userId = Auth::id();
+        $ip = $request->ip();
+
+        try {
+            $models = collect($models);
+            $modelIds = $models->pluck('id')->filter()->toArray();
+            if (empty($modelIds)) {
+                return;
+            }
+
+            $firstModel = $models->first();
+            $morphClass = $firstModel->getMorphClass();
+            $className = get_class($firstModel);
+
+            $existingViews = View::whereIn('viewable_id', $modelIds)
+                ->whereIn('viewable_type', [$morphClass, $className])
+                ->when($userId, fn($q) => $q->where('user_id', $userId))
+                ->when(!$userId, fn($q) => $q->where('ip_address', $ip))
+                ->where('created_at', '>=', now()->subDay())
+                ->pluck('viewable_id')
+                ->toArray();
+
+            $nonDuplicateModels = $models->filter(function ($model) use ($existingViews) {
+                return !in_array($model->id, $existingViews);
+            });
+
+            if ($nonDuplicateModels->isEmpty()) {
+                return;
+            }
+
+            DB::transaction(function () use ($nonDuplicateModels, $userId, $ip, $morphClass) {
+                $records = [];
+                $now = now();
+                foreach ($nonDuplicateModels as $model) {
+                    $records[] = [
+                        'user_id' => $userId,
+                        'viewable_id' => $model->id,
+                        'viewable_type' => $morphClass,
+                        'ip_address' => $ip,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                    $model->newQuery()->whereKey($model->id)->increment('view_count');
+                }
+                View::insert($records);
+            });
+        } catch (\Exception $e) {
+            Log::error("Bulk view tracking failed: " . $e->getMessage(), [
+                'user_id' => $userId ?? 'guest',
+                'ip' => $ip,
+                'exception' => $e,
+            ]);
+        }
     }
 
     public function getUserLogs(int $userId, int $perPage = 15)

@@ -161,28 +161,25 @@ class CheckoutService
             ]);
         }
     }
-
     private function deductProductStock($ci)
     {
         if ($ci->item_type === 'user_products') {
             $product = UserProduct::where('id', $ci->item_id)->lockForUpdate()->first();
 
-            DB::transaction(function () use ($ci, $product) {
-                if ($product) {
-                    Log::info("Before deduction - Product ID: {$product->id}, Available Stock: {$product->stock}, Requested Quantity: {$ci->quantity}");
+            if ($product) {
+                Log::info("Before deduction - Product ID: {$product->id}, Available Stock: {$product->stock}, Requested Quantity: {$ci->quantity}");
 
-                    if ($product->stock < $ci->quantity) {
-                        throw ValidationException::withMessages([
-                            'error' => "Not enough stock available for product: {$product->title}. Only {$product->stock} units available."
-                        ]);
-                    }
-
-                    $product->decrement('stock', $ci->quantity);
-                    Log::info("After deduction - Product ID: {$product->id}, New Stock: {$product->stock}");
-                } else {
-                    throw new HttpException(404, "Product not found (ID: {$ci->item_id})");
+                if ($product->stock < $ci->quantity) {
+                    throw ValidationException::withMessages([
+                        'error' => "Not enough stock available for product: {$product->title}. Only {$product->stock} units available."
+                    ]);
                 }
-            });
+
+                $product->decrement('stock', $ci->quantity);
+                Log::info("After deduction - Product ID: {$product->id}, New Stock: {$product->stock}");
+            } else {
+                throw new HttpException(404, "Product not found (ID: {$ci->item_id})");
+            }
         }
     }
 
@@ -219,8 +216,10 @@ class CheckoutService
 
     private function createOrderItems($items, $order)
     {
+        $records = [];
+        $now = now();
         foreach ($items as $ci) {
-            UserOrderItem::create([
+            $records[] = [
                 'uuid' => (string) Str::uuid(),
                 'order_id' => $order->id,
                 'seller_id' => $ci->seller_id,
@@ -228,8 +227,11 @@ class CheckoutService
                 'item_id' => $ci->item_id,
                 'quantity' => $ci->quantity,
                 'price' => $ci->price,
-            ]);
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
+        UserOrderItem::insert($records);
     }
 
     private function createPayment($order, $total, $paymentMethod)

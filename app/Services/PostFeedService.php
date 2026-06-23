@@ -77,9 +77,7 @@ class PostFeedService
     private function trackFeedViews(Paginator $posts): void
     {
         $request = request();
-        foreach ($posts as $post) {
-            $this->viewService->track($post, $request);
-        }
+        $this->viewService->trackMultiple($posts->items(), $request);
     }
 
     public function mixedFeed(): Paginator
