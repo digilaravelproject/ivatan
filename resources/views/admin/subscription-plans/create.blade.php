@@ -65,6 +65,54 @@
             <p class="text-xs text-gray-500 mb-3">Check features to enable them for this plan, and enter their limit/multiplier values.</p>
             
             <div class="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto border rounded p-3 bg-gray-50">
+                @php
+                    $featureOptions = [
+                        'visibility_multiplier' => ['1.0x', '1.2x', '1.4x', '1.8x', '2.5x', '4.0x'],
+                        'ads_frequency' => ['High', 'Medium', 'Low', 'Major Low'],
+                        'job_priority' => ['0', '1', '3', '4', '5'],
+                        'dm_recruiters_msme' => ['No', 'Yes'],
+                        'boost_credits' => ['0', '1', '3', '5'],
+                        'ai_tools' => ['No', 'Yes'],
+                        'leaderboard_access' => ['No', 'Yes'],
+                        'custom_url' => ['No', 'Yes'],
+                        'support_level' => ['Basic', 'Standard', 'Priority'],
+                        'tipping_i_shoutpay' => ['No', 'Yes'],
+                        'sell_services' => ['No', 'Yes'],
+                        'creator_monetization' => ['No', 'Yes'],
+                        'affiliate_earnings' => ['No', 'Yes'],
+                        'job_referral_earnings' => ['No', 'Yes'],
+                        'ad_revenue_share' => ['No', 'Yes'],
+                        'platform_fee' => ['15%', '10%', '5%'],
+                        'transaction_charges' => ['Standard', 'Reduced', 'Waived'],
+                        'withdrawal_system' => ['No', 'Yes'],
+                        'feed_priority' => ['Low', 'Medium', 'High'],
+                        'content_reach_cap' => ['Limited', 'Unlimited'],
+                        'discovery_access' => ['Limited', 'Full'],
+                        'profile_intent_tag' => ['No', 'Yes'],
+                        'private_groups_access' => ['No', 'Yes'],
+                        'events_access' => ['No', 'Yes'],
+                        
+                        // Creator Features
+                        'creator_badge' => ['No', 'Yes', 'Yes (Highlighted)'],
+                        'visibility_boost_creator' => ['1.1x', '1.8x', '3.0x'],
+                        'content_reach_priority' => ['Low', 'Medium', 'High'],
+                        'monetization_access' => ['No', 'Limited', 'Full'],
+                        'tipping_i_shoutpay_creator' => ['No', 'Yes'],
+                        'boost_credits_creator' => ['0', '3/month', '15/month'],
+                        'creator_analytics' => ['Low basic (graph/bar/table)', 'Basic', 'Advanced'],
+                        'local_discovery_listing' => ['No', 'Yes', 'Priority'],
+                        'creator_storefront' => ['No', 'Yes'],
+                        'sell_services_gigs' => ['No', 'Limited', 'Full'],
+                        'upi_payments' => ['No', 'Yes'],
+                        'affiliate_earnings_creator' => ['No', 'Yes'],
+                        'ad_revenue_share_creator' => ['No', 'Yes'],
+                        'ai_content_assistant' => ['No', 'Yes'],
+                        'profile_customization' => ['No', 'Limited', 'Full'],
+                        'creator_score_trust_rank' => ['No', 'Yes'],
+                        'collab_access' => ['No', 'Basic', 'Priority'],
+                        'brand_deal_visibility' => ['No', 'Limited', 'High'],
+                    ];
+                @endphp
                 @foreach($features as $feature)
                 <div class="flex items-center justify-between p-2 border-b border-gray-200 bg-white rounded shadow-sm gap-4">
                     <div class="flex items-start gap-2 max-w-[65%]">
@@ -80,7 +128,16 @@
                         </label>
                     </div>
                     <div class="w-[30%]">
-                        <input type="text" name="feature_limits[{{ $feature->id }}]" class="w-full border rounded px-2 py-1 text-sm" placeholder="e.g. 1.4x, Medium, 10, Yes" value="">
+                        @if(array_key_exists($feature->slug, $featureOptions))
+                            <select name="feature_limits[{{ $feature->id }}]" class="w-full border rounded px-2 py-1 text-sm bg-white">
+                                <option value="">-- Select Limit --</option>
+                                @foreach($featureOptions[$feature->slug] as $opt)
+                                    <option value="{{ $opt }}">{{ $opt }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input type="text" name="feature_limits[{{ $feature->id }}]" class="w-full border rounded px-2 py-1 text-sm" placeholder="e.g. 1.4x, Medium, 10, Yes" value="">
+                        @endif
                     </div>
                 </div>
                 @endforeach
