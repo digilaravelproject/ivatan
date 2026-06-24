@@ -20,6 +20,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CallController extends Controller
@@ -121,7 +122,7 @@ class CallController extends Controller
                 'session' => $session
             ], 'Call initiated.', 201);
         } catch (\Throwable $e) {
-            \Log::error('CallController initiate error', [
+            Log::error('CallController initiate error', [
                 'error' => $e->getMessage(),
                 'chat_id' => $request->chat_id ?? null,
             ]);
@@ -134,15 +135,19 @@ class CallController extends Controller
      */
     public function ringing(string $uuid): JsonResponse
     {
-        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+        try {
+            $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
 
-        if (Auth::id() !== $session->receiver_id) {
-            return $this->error('Unauthorized to send ringing.', 403);
+            if (Auth::id() !== $session->receiver_id) {
+                return $this->error('Unauthorized to send ringing.', 403);
+            }
+
+            broadcast(new CallRinging($session->caller_id, $session->uuid))->toOthers();
+
+            return $this->success(null, 'Ringing broadcast sent.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
         }
-
-        broadcast(new CallRinging($session->caller_id, $session->uuid))->toOthers();
-
-        return $this->success(null, 'Ringing broadcast sent.');
     }
 
     /**
@@ -150,32 +155,36 @@ class CallController extends Controller
      */
     public function accept(Request $request, string $uuid): JsonResponse
     {
-        $request->validate([
-            'sdp_answer' => 'required|array',
-        ]);
+        try {
+            $request->validate([
+                'sdp_answer' => 'required|array',
+            ]);
 
-        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
-        
-        if (Auth::id() !== $session->receiver_id) {
-            return $this->error('Unauthorized to accept this call.', 403);
+            $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+            
+            if (Auth::id() !== $session->receiver_id) {
+                return $this->error('Unauthorized to accept this call.', 403);
+            }
+
+            if ($session->status !== 'ringing') {
+                return $this->error('Call session is no longer active.', 400);
+            }
+
+            $session->update([
+                'status' => 'accepted',
+                'started_at' => now(),
+            ]);
+
+            Auth::user()->update(['is_busy' => true, 'busy_status' => 'calling_' . $session->type]);
+
+            broadcast(new CallAccepted($session->caller_id, $session->uuid, $request->sdp_answer))->toOthers();
+
+            return $this->success([
+                'session' => $session
+            ], 'Call accepted.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
         }
-
-        if ($session->status !== 'ringing') {
-            return $this->error('Call session is no longer active.', 400);
-        }
-
-        $session->update([
-            'status' => 'accepted',
-            'started_at' => now(),
-        ]);
-
-        Auth::user()->update(['is_busy' => true, 'busy_status' => 'calling_' . $session->type]);
-
-        broadcast(new CallAccepted($session->caller_id, $session->uuid, $request->sdp_answer))->toOthers();
-
-        return $this->success([
-            'session' => $session
-        ], 'Call accepted.');
     }
 
     /**
@@ -183,31 +192,35 @@ class CallController extends Controller
      */
     public function decline(Request $request, string $uuid): JsonResponse
     {
-        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
-        
-        if (Auth::id() !== $session->receiver_id) {
-            return $this->error('Unauthorized to decline this call.', 403);
+        try {
+            $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+            
+            if (Auth::id() !== $session->receiver_id) {
+                return $this->error('Unauthorized to decline this call.', 403);
+            }
+
+            if ($session->status !== 'ringing') {
+                return $this->error('Call session is no longer active.', 400);
+            }
+
+            $reason = $request->input('reason', 'declined'); // declined, busy
+            $status = $reason === 'busy' ? 'busy' : 'rejected';
+
+            $session->update([
+                'status' => $status,
+                'ended_at' => now(),
+            ]);
+
+            broadcast(new CallDeclined($session->caller_id, $session->uuid, $reason))->toOthers();
+
+            User::where('id', $session->caller_id)->update(['is_busy' => false, 'busy_status' => null]);
+
+            return $this->success([
+                'session' => $session
+            ], 'Call declined.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
         }
-
-        if ($session->status !== 'ringing') {
-            return $this->error('Call session is no longer active.', 400);
-        }
-
-        $reason = $request->input('reason', 'declined'); // declined, busy
-        $status = $reason === 'busy' ? 'busy' : 'rejected';
-
-        $session->update([
-            'status' => $status,
-            'ended_at' => now(),
-        ]);
-
-        broadcast(new CallDeclined($session->caller_id, $session->uuid, $reason))->toOthers();
-
-        User::where('id', $session->caller_id)->update(['is_busy' => false, 'busy_status' => null]);
-
-        return $this->success([
-            'session' => $session
-        ], 'Call declined.');
     }
 
     /**
@@ -215,26 +228,30 @@ class CallController extends Controller
      */
     public function cancel(string $uuid): JsonResponse
     {
-        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
-        
-        if (Auth::id() !== $session->caller_id) {
-            return $this->error('Unauthorized to cancel this call.', 403);
+        try {
+            $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+            
+            if (Auth::id() !== $session->caller_id) {
+                return $this->error('Unauthorized to cancel this call.', 403);
+            }
+
+            $session->update([
+                'status' => 'cancelled',
+                'ended_at' => now(),
+            ]);
+
+            if ($session->receiver_id) {
+                broadcast(new CallCancelled($session->receiver_id, $session->uuid))->toOthers();
+            }
+
+            Auth::user()->update(['is_busy' => false, 'busy_status' => null]);
+
+            return $this->success([
+                'session' => $session
+            ], 'Call cancelled.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
         }
-
-        $session->update([
-            'status' => 'cancelled',
-            'ended_at' => now(),
-        ]);
-
-        if ($session->receiver_id) {
-            broadcast(new CallCancelled($session->receiver_id, $session->uuid))->toOthers();
-        }
-
-        Auth::user()->update(['is_busy' => false, 'busy_status' => null]);
-
-        return $this->success([
-            'session' => $session
-        ], 'Call cancelled.');
     }
 
     /**
@@ -242,24 +259,28 @@ class CallController extends Controller
      */
     public function busy(string $uuid): JsonResponse
     {
-        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
-        
-        if (Auth::id() !== $session->receiver_id) {
-            return $this->error('Unauthorized.', 403);
+        try {
+            $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+            
+            if (Auth::id() !== $session->receiver_id) {
+                return $this->error('Unauthorized.', 403);
+            }
+
+            $session->update([
+                'status' => 'busy',
+                'ended_at' => now(),
+            ]);
+
+            broadcast(new CallBusy($session->caller_id, $session->uuid))->toOthers();
+
+            User::where('id', $session->caller_id)->update(['is_busy' => false, 'busy_status' => null]);
+
+            return $this->success([
+                'session' => $session
+            ], 'Call busy state set.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
         }
-
-        $session->update([
-            'status' => 'busy',
-            'ended_at' => now(),
-        ]);
-
-        broadcast(new CallBusy($session->caller_id, $session->uuid))->toOthers();
-
-        User::where('id', $session->caller_id)->update(['is_busy' => false, 'busy_status' => null]);
-
-        return $this->success([
-            'session' => $session
-        ], 'Call busy state set.');
     }
 
     /**
@@ -267,35 +288,39 @@ class CallController extends Controller
      */
     public function end(string $uuid): JsonResponse
     {
-        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
-        
-        $userId = Auth::id();
-        if ($userId !== $session->caller_id && $userId !== $session->receiver_id) {
-            return $this->error('Unauthorized to end this call.', 403);
+        try {
+            $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+            
+            $userId = Auth::id();
+            if ($userId !== $session->caller_id && $userId !== $session->receiver_id) {
+                return $this->error('Unauthorized to end this call.', 403);
+            }
+
+            $session->update([
+                'status' => 'ended',
+                'ended_at' => now(),
+            ]);
+
+            $peerId = $userId === $session->caller_id ? $session->receiver_id : $session->caller_id;
+
+            if ($peerId) {
+                broadcast(new CallEnded($peerId, $session->uuid))->toOthers();
+            }
+
+            Auth::user()->update(['is_busy' => false, 'busy_status' => null]);
+
+            if ($peerId) {
+                User::withoutEvents(function () use ($peerId) {
+                    User::where('id', $peerId)->update(['is_busy' => false, 'busy_status' => null]);
+                });
+            }
+
+            return $this->success([
+                'session' => $session
+            ], 'Call ended.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
         }
-
-        $session->update([
-            'status' => 'ended',
-            'ended_at' => now(),
-        ]);
-
-        $peerId = $userId === $session->caller_id ? $session->receiver_id : $session->caller_id;
-
-        if ($peerId) {
-            broadcast(new CallEnded($peerId, $session->uuid))->toOthers();
-        }
-
-        Auth::user()->update(['is_busy' => false, 'busy_status' => null]);
-
-        if ($peerId) {
-            User::withoutEvents(function () use ($peerId) {
-                User::where('id', $peerId)->update(['is_busy' => false, 'busy_status' => null]);
-            });
-        }
-
-        return $this->success([
-            'session' => $session
-        ], 'Call ended.');
     }
 
     /**
@@ -303,23 +328,27 @@ class CallController extends Controller
      */
     public function iceCandidate(Request $request, string $uuid): JsonResponse
     {
-        $request->validate([
-            'candidate' => 'required|array',
-        ]);
+        try {
+            $request->validate([
+                'candidate' => 'required|array',
+            ]);
 
-        $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
-        
-        $userId = Auth::id();
-        if ($userId !== $session->caller_id && $userId !== $session->receiver_id) {
-            return $this->error('Unauthorized to exchange candidate.', 403);
+            $session = UserCallSession::where('uuid', $uuid)->firstOrFail();
+            
+            $userId = Auth::id();
+            if ($userId !== $session->caller_id && $userId !== $session->receiver_id) {
+                return $this->error('Unauthorized to exchange candidate.', 403);
+            }
+
+            $peerId = $userId === $session->caller_id ? $session->receiver_id : $session->caller_id;
+
+            if ($peerId) {
+                broadcast(new IceCandidateExchange($peerId, $session->uuid, $request->candidate))->toOthers();
+            }
+
+            return $this->success(null, 'ICE Candidate broadcasted.');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
         }
-
-        $peerId = $userId === $session->caller_id ? $session->receiver_id : $session->caller_id;
-
-        if ($peerId) {
-            broadcast(new IceCandidateExchange($peerId, $session->uuid, $request->candidate))->toOthers();
-        }
-
-        return $this->success(null, 'ICE Candidate broadcasted.');
     }
 }
