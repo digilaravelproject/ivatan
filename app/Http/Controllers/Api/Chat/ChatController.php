@@ -42,6 +42,20 @@ class ChatController extends Controller
 
             // Base Query: User must be a participant
             $query = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
+                ->select('user_chats.*')
+                ->selectSub(function ($q) use ($user) {
+                    $q->from('user_chat_messages')
+                        ->whereColumn('user_chat_messages.chat_id', 'user_chats.id')
+                        ->where('user_chat_messages.sender_id', '!=', $user->id)
+                        ->where('user_chat_messages.id', '>', function ($sub) use ($user) {
+                            $sub->from('user_chat_participants')
+                                ->selectRaw('COALESCE(last_read_message_id, 0)')
+                                ->whereColumn('user_chat_participants.chat_id', 'user_chats.id')
+                                ->where('user_chat_participants.user_id', $user->id)
+                                ->limit(1);
+                        })
+                        ->selectRaw('count(*)');
+                }, 'unread_count')
                 ->with(['participants.user', 'lastMessage.sender'])
                 ->withCount(['participants']);
 

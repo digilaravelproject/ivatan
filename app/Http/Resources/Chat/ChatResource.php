@@ -42,7 +42,15 @@ class ChatResource extends JsonResource
             'is_admin' => $this->participants->firstWhere('user_id', $user->id)->is_admin ?? false,
 
             // Unread Count Logic
-            'unread_count' => $this->unread_count,
+            'unread_count' => (int) ($this->unread_count ?? (function() use ($user) {
+                $participant = $this->participants->firstWhere('user_id', $user->id);
+                return $participant 
+                    ? $this->messages()
+                        ->where('id', '>', $participant->last_read_message_id ?? 0)
+                        ->where('sender_id', '!=', $user->id)
+                        ->count()
+                    : 0;
+            })()),
 
             // Last Message
             'last_message' => $this->lastMessage ? new MessageResource($this->lastMessage) : null,

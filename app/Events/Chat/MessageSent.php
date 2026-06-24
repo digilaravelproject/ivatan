@@ -5,6 +5,7 @@ namespace App\Events\Chat;
 use App\Models\Chat\UserChatMessage;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -22,9 +23,20 @@ class MessageSent implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [
+        $channels = [
             new PresenceChannel('presence-chat.' . $this->message->chat_id),
         ];
+
+        // Broadcast to all participants' private-user channels (except sender)
+        $participants = \App\Models\Chat\UserChatParticipant::where('chat_id', $this->message->chat_id)
+            ->where('user_id', '!=', $this->message->sender_id)
+            ->pluck('user_id');
+
+        foreach ($participants as $userId) {
+            $channels[] = new PrivateChannel('private-user.' . $userId);
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string
