@@ -37,78 +37,7 @@ class ChatController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
-            $filter = $request->query('filter');
-
-            // Base Query: User must be a participant
-            $query = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
-                ->select('user_chats.*')
-                ->selectSub(function ($q) use ($user) {
-                    $q->from('user_chat_messages')
-                        ->whereColumn('user_chat_messages.chat_id', 'user_chats.id')
-                        ->where('user_chat_messages.sender_id', '!=', $user->id)
-                        ->where('user_chat_messages.id', '>', function ($sub) use ($user) {
-                            $sub->from('user_chat_participants')
-                                ->selectRaw('COALESCE(last_read_message_id, 0)')
-                                ->whereColumn('user_chat_participants.chat_id', 'user_chats.id')
-                                ->where('user_chat_participants.user_id', $user->id)
-                                ->limit(1);
-                        })
-                        ->selectRaw('count(*)');
-                }, 'unread_count')
-                ->with(['participants.user', 'lastMessage.sender'])
-                ->withCount(['participants']);
-
-            // --- FILTER LOGIC ---
-
-            if ($filter === 'live_groups') {
-                $query->whereNotNull('live_chat_group_id');
-            } else {
-                $query->whereNull('live_chat_group_id');
-            }
-
-            if ($filter === 'groups') {
-                // Show only Group chats
-                $query->where('type', 'group');
-            } 
-            elseif ($filter === 'business') {
-                // Show chats where the OTHER user is a Seller
-                // (Hum check kar rahe hain ki participants mein koi aisa user hai jo seller hai aur main nahi hu)
-                $query->whereHas('participants.user', function ($q) use ($user) {
-                    $q->where('is_seller', true)
-                      ->where('id', '!=', $user->id);
-                });
-            } 
-            elseif ($filter === 'unread') {
-                // Show chats having messages newer than what I have read
-                $query->whereHas('lastMessage', function ($q) use ($user) {
-                    $q->whereRaw('user_chat_messages.id > (
-                        SELECT COALESCE(last_read_message_id, 0)
-                        FROM user_chat_participants 
-                        WHERE user_chat_participants.chat_id = user_chat_messages.chat_id 
-                        AND user_chat_participants.user_id = ?
-                    )', [$user->id]);
-                });
-            } 
-            elseif ($filter === 'read') {
-                // Show chats where I have read the last message OR chats with no messages
-                $query->where(function ($mainQ) use ($user) {
-                    // Condition A: Last message ID is <= my last_read_id
-                    $mainQ->whereHas('lastMessage', function ($q) use ($user) {
-                        $q->whereRaw('user_chat_messages.id <= (
-                            SELECT COALESCE(last_read_message_id, 0)
-                            FROM user_chat_participants 
-                            WHERE user_chat_participants.chat_id = user_chat_messages.chat_id 
-                            AND user_chat_participants.user_id = ?
-                        )', [$user->id]);
-                    })
-                    // Condition B: Or chats that strictly have no unread messages (catch-all)
-                    ->orWhereDoesntHave('lastMessage'); 
-                });
-            }
-
-            // Sorting: Newest message first
-            $chats = $query->orderByDesc('last_message_at')->simplePaginate(20);
+            $chats = $this->chatService->getUserChats(Auth::user(), $request->query('filter'));
 
             return $this->success([
                 'chats' => ChatResource::collection($chats)->response()->getData(true)
@@ -134,28 +63,15 @@ class ChatController extends Controller
         }
     }
 
-    /**
-     * 3. Fetch Messages
-     */
-         public function messages(UserChat $chat, Request $request): JsonResponse
+    public function messages(UserChat $chat, Request $request): JsonResponse
     {
         try {
-            $query = $chat->messages()
-                ->visibleToUser(Auth::id())
-                ->with(['sender', 'replyTo.sender']);
+            $result = $this->chatService->getChatMessages(Auth::user(), $chat, $request);
 
-            // ✅ LOGIC: Agar frontend last message ID bhejta hai (Polling)
-            if ($request->has('after_id')) {
-                $query->where('id', '>', $request->input('after_id'));
-                
-                // Polling ke time pagination nahi, direct naye messages chahiye
-                $messages = $query->oldest()->get(); 
-            } else {
-                // First time load ke time pagination chahiye
-                $messages = $query->latest()->cursorPaginate(30); 
-            }
-
-            return $this->success(MessageResource::collection($messages));
+            return $this->success([
+                'messages' => MessageResource::collection($result['messages'])->response()->getData(true),
+                'meta' => $result['meta']
+            ]);
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 403);
         }
@@ -307,6 +223,22 @@ class ChatController extends Controller
         try {
             $this->chatService->deleteMessage(Auth::user(), $message, $forEveryone);
             return $this->success(null, 'Message deleted');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 403);
+        }
+    }
+
+    /**
+     * 11. Message Read Receipts
+     */
+    public function messageReadReceipts(UserChatMessage $message): JsonResponse
+    {
+        try {
+            $readers = $this->chatService->getMessageReadReceipts(Auth::user(), $message);
+
+            return $this->success([
+                'readers' => $readers,
+            ], 'Read receipts retrieved.');
         } catch (\Exception $e) {
             return $this->error($e->getMessage(), 403);
         }

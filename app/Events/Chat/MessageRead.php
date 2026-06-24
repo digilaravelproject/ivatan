@@ -29,23 +29,15 @@ class MessageRead implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        $chat = UserChat::find($this->chatId);
-        
-        if ($chat && $chat->type === 'group') {
-            return [
-                new PresenceChannel('presence-chat.' . $this->chatId),
-            ];
-        }
-
-        if ($this->targetUserId) {
-            return [
-                new PrivateChannel('private-user.' . $this->targetUserId),
-            ];
-        }
-
-        return [
+        $channels = [
             new PresenceChannel('presence-chat.' . $this->chatId),
         ];
+
+        if ($this->targetUserId) {
+            $channels[] = new PrivateChannel('private-user.' . $this->targetUserId);
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string

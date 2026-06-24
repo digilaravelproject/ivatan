@@ -27,9 +27,20 @@ class PresenceChanged implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [
+        $channels = [
             new PresenceChannel('presence-chat.' . $this->chatId),
         ];
+
+        // For private chats, also broadcast to the other user's private channel so that the inbox/chat listing updates the online status in real-time
+        $chat = \App\Models\Chat\UserChat::find($this->chatId);
+        if ($chat && $chat->type === 'private') {
+            $otherParticipant = $chat->participants()->where('user_id', '!=', $this->userId)->first();
+            if ($otherParticipant) {
+                $channels[] = new \Illuminate\Broadcasting\PrivateChannel('private-user.' . $otherParticipant->user_id);
+            }
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string

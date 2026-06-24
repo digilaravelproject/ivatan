@@ -34,24 +34,12 @@ class UserChatMessage extends Model
         'delivered_at' => 'datetime',
     ];
 
+    protected static array $chatParticipantsCache = [];
+    protected static array $chatsCache = [];
+
     public function getStatusForUserAttribute(): string
     {
-        $userId = request()?->user()?->id;
-        if (!$userId) return 'sent';
-
-        $participant = UserChatParticipant::where('chat_id', $this->chat_id)
-            ->where('user_id', $userId)
-            ->first();
-
-        if ($participant && $participant->last_read_message_id !== null && $participant->last_read_message_id >= $this->id) {
-            return 'read';
-        }
-
-        if ($this->delivered_at) {
-            return 'delivered';
-        }
-
-        return 'sent';
+        return $this->statusForUser();
     }
 
     public function statusForUser(?int $userId = null): string
@@ -59,12 +47,52 @@ class UserChatMessage extends Model
         $userId ??= request()?->user()?->id;
         if (!$userId) return 'sent';
 
-        $participant = UserChatParticipant::where('chat_id', $this->chat_id)
-            ->where('user_id', $userId)
-            ->first();
+        $cacheKey = $this->chat_id;
+        if (!isset(self::$chatParticipantsCache[$cacheKey])) {
+            self::$chatParticipantsCache[$cacheKey] = UserChatParticipant::where('chat_id', $this->chat_id)->get();
+        }
+        $participants = self::$chatParticipantsCache[$cacheKey];
 
-        if ($participant && $participant->last_read_message_id !== null && $participant->last_read_message_id >= $this->id) {
-            return 'read';
+        // If I am the sender of this message, check if recipient(s) have read/received it
+        if ($this->sender_id === $userId) {
+            $otherParticipants = $participants->filter(fn($p) => $p->user_id !== $userId);
+            if ($otherParticipants->isNotEmpty()) {
+                if (!isset(self::$chatsCache[$cacheKey])) {
+                    self::$chatsCache[$cacheKey] = $this->chat;
+                }
+                $chat = self::$chatsCache[$cacheKey];
+                $chatType = $chat->type ?? 'private';
+
+                if ($chatType === 'private') {
+                    $otherParticipant = $otherParticipants->first();
+                    if ($otherParticipant->last_read_message_id !== null && $otherParticipant->last_read_message_id >= $this->id) {
+                        return 'read';
+                    }
+                    if ($otherParticipant->last_delivered_message_id !== null && $otherParticipant->last_delivered_message_id >= $this->id) {
+                        return 'delivered';
+                    }
+                } else {
+                    // Group chat: check if all others have read/received
+                    $totalOthers = $otherParticipants->count();
+                    $readCount = $otherParticipants->filter(fn($p) => $p->last_read_message_id !== null && $p->last_read_message_id >= $this->id)->count();
+                    if ($readCount === $totalOthers) {
+                        return 'read';
+                    }
+                    $deliveredCount = $otherParticipants->filter(fn($p) => $p->last_delivered_message_id !== null && $p->last_delivered_message_id >= $this->id)->count();
+                    if ($deliveredCount === $totalOthers || $readCount > 0) {
+                        return 'delivered';
+                    }
+                }
+            }
+        } else {
+            // If I am the receiver/recipient of this message
+            $participant = $participants->firstWhere('user_id', $userId);
+            if ($participant && $participant->last_read_message_id !== null && $participant->last_read_message_id >= $this->id) {
+                return 'read';
+            }
+            if ($participant && $participant->last_delivered_message_id !== null && $participant->last_delivered_message_id >= $this->id) {
+                return 'delivered';
+            }
         }
 
         if ($this->delivered_at) {

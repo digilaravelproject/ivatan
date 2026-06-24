@@ -28,6 +28,7 @@ class MessageDelivered implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
+            new \Illuminate\Broadcasting\PresenceChannel('presence-chat.' . $this->chatId),
             new PrivateChannel('private-user.' . $this->senderId),
         ];
     }

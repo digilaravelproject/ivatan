@@ -466,6 +466,7 @@ Route::prefix('v1')->group(function () {
             // Message Actions
             Route::delete('/messages/{message}', 'deleteMessage'); // Payload: { delete_for_everyone: true/false }
             Route::post('/messages/{message}/edit', 'editMessage');
+            Route::get('/messages/{message}/read-receipts', 'messageReadReceipts');
         });
 
         // ================================

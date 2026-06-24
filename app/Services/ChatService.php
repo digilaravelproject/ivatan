@@ -406,8 +406,13 @@ class ChatService
                 'attachment_path' => $attachmentPath,
                 'meta' => $meta,
                 'reply_to_message_id' => $data['reply_to_message_id'] ?? null,
-                'delivered_at' => now(),
+                'delivered_at' => null,
             ]);
+
+            // Update sender's last_read_message_id
+            UserChatParticipant::where('chat_id', $chat->id)
+                ->where('user_id', $sender->id)
+                ->update(['last_read_message_id' => $message->id]);
 
             $chat->touch('last_message_at');
 
@@ -496,5 +501,153 @@ class ChatService
             'sender_name' => $sender->name,
             'content' => $message->message_type === 'text' ? $message->content : 'Sent an attachment',
         ]);
+    }
+
+    /**
+     * Get and filter user chats (inbox)
+     */
+    public function getUserChats(User $user, ?string $filter)
+    {
+        $query = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
+            ->select('user_chats.*')
+            ->selectSub(function ($q) use ($user) {
+                $q->from('user_chat_messages')
+                    ->whereColumn('user_chat_messages.chat_id', 'user_chats.id')
+                    ->where('user_chat_messages.sender_id', '!=', $user->id)
+                    ->where('user_chat_messages.id', '>', function ($sub) use ($user) {
+                        $sub->from('user_chat_participants')
+                            ->selectRaw('COALESCE(last_read_message_id, 0)')
+                            ->whereColumn('user_chat_participants.chat_id', 'user_chats.id')
+                            ->where('user_chat_participants.user_id', $user->id)
+                            ->limit(1);
+                    })
+                    ->selectRaw('count(*)');
+            }, 'unread_count')
+            ->with(['participants.user', 'lastMessage.sender'])
+            ->withCount(['participants']);
+
+        if ($filter === 'live_groups') {
+            $query->whereNotNull('live_chat_group_id');
+        } else {
+            $query->whereNull('live_chat_group_id');
+        }
+
+        if ($filter === 'groups') {
+            $query->where('type', 'group');
+        } elseif ($filter === 'business') {
+            $query->whereHas('participants.user', function ($q) use ($user) {
+                $q->where('is_seller', true)
+                  ->where('id', '!=', $user->id);
+            });
+        } elseif ($filter === 'unread') {
+            $query->whereHas('lastMessage', function ($q) use ($user) {
+                $q->whereRaw('user_chat_messages.id > (
+                    SELECT COALESCE(last_read_message_id, 0)
+                    FROM user_chat_participants 
+                    WHERE user_chat_participants.chat_id = user_chat_messages.chat_id 
+                    AND user_chat_participants.user_id = ?
+                )', [$user->id]);
+            });
+        } elseif ($filter === 'read') {
+            $query->where(function ($mainQ) use ($user) {
+                $mainQ->whereHas('lastMessage', function ($q) use ($user) {
+                    $q->whereRaw('user_chat_messages.id <= (
+                        SELECT COALESCE(last_read_message_id, 0)
+                        FROM user_chat_participants 
+                        WHERE user_chat_participants.chat_id = user_chat_messages.chat_id 
+                        AND user_chat_participants.user_id = ?
+                    )', [$user->id]);
+                })
+                ->orWhereDoesntHave('lastMessage'); 
+            });
+        }
+
+        return $query->orderByDesc('last_message_at')->simplePaginate(20);
+    }
+
+    /**
+     * Get chat messages and generate unread/user metadata
+     */
+    public function getChatMessages(User $user, UserChat $chat, $request)
+    {
+        $query = $chat->messages()
+            ->visibleToUser($user->id)
+            ->with(['sender', 'replyTo.sender']);
+
+        if ($request->has('after_id')) {
+            $query->where('id', '>', $request->input('after_id'));
+            $messages = $query->oldest()->get(); 
+        } else {
+            $messages = $query->latest()->cursorPaginate(30); 
+        }
+
+        // Automatically mark the latest message as read when fetching messages
+        $latestMessage = $chat->messages()->latest('id')->first();
+        if ($latestMessage) {
+            $this->markAsRead($user, $chat->id, $latestMessage->id);
+        }
+
+        $chat->loadMissing('participants.user');
+
+        $unreadCount = 0;
+        $participant = $chat->participants->firstWhere('user_id', $user->id);
+        if ($participant) {
+            $unreadCount = $chat->messages()
+                ->where('id', '>', $participant->last_read_message_id ?? 0)
+                ->where('sender_id', '!=', $user->id)
+                ->count();
+        }
+
+        $otherUser = null;
+        if ($chat->type === 'private') {
+            $otherParticipant = $chat->participants->firstWhere('user_id', '!=', $user->id);
+            if ($otherParticipant && $otherParticipant->user) {
+                $otherUser = [
+                    'id' => $otherParticipant->user->id,
+                    'name' => $otherParticipant->user->name,
+                    'avatar' => $otherParticipant->user->profile_photo_url,
+                    'is_online' => (bool)$otherParticipant->user->is_online,
+                ];
+            }
+        }
+
+        return [
+            'messages' => $messages,
+            'meta' => [
+                'unread_count' => (int)$unreadCount,
+                'other_user' => $otherUser,
+            ]
+        ];
+    }
+
+    /**
+     * Retrieve read receipts for a message
+     */
+    public function getMessageReadReceipts(User $user, UserChatMessage $message)
+    {
+        $chat = $message->chat;
+
+        // Verify the user is a participant of this chat
+        $isParticipant = $chat->participants()->where('user_id', $user->id)->exists();
+        if (!$isParticipant) {
+            throw new \Exception('Unauthorized.', 403);
+        }
+
+        // Find all participants who have read up to or past this message ID (excluding sender of this message)
+        $readers = User::whereIn('id', function ($q) use ($message) {
+            $q->select('user_id')
+                ->from('user_chat_participants')
+                ->where('chat_id', $message->chat_id)
+                ->where('last_read_message_id', '>=', $message->id)
+                ->where('user_id', '!=', $message->sender_id);
+        })->get(['id', 'name', 'profile_photo_path']);
+
+        return $readers->map(function ($u) {
+            return [
+                'id' => $u->id,
+                'name' => $u->name,
+                'avatar' => $u->profile_photo_url,
+            ];
+        });
     }
 }
