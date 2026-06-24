@@ -42,11 +42,16 @@ class ChatController extends Controller
 
             // Base Query: User must be a participant
             $query = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
-                ->whereNull('live_chat_group_id')
                 ->with(['participants.user', 'lastMessage.sender'])
                 ->withCount(['participants']);
 
             // --- FILTER LOGIC ---
+
+            if ($filter === 'live_groups') {
+                $query->whereNotNull('live_chat_group_id');
+            } else {
+                $query->whereNull('live_chat_group_id');
+            }
 
             if ($filter === 'groups') {
                 // Show only Group chats
