@@ -158,6 +158,9 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
 
+        // Blocked list (defined before {username} to avoid routing conflict)
+        Route::get('users/blocked', [UserInteractionController::class, 'getBlockedUsers']);
+
         // Fetch User by Username
         Route::get('users/{username}', [UserController::class, 'show']);
 
@@ -211,7 +214,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/posts/{id}/bookmark', [UserInteractionController::class, 'toggleBookmark']);
         Route::get('/user/bookmarks', [UserInteractionController::class, 'getBookmarks']);
         Route::post('/users/{id}/block', [UserInteractionController::class, 'toggleBlock']);
-        Route::get('/users/blocked', [UserInteractionController::class, 'getBlockedUsers']);
         Route::get('/user/blocked-users', [UserInteractionController::class, 'getBlockedUsers']);
         Route::post('/posts/{id}/interested', [UserInteractionController::class, 'markInterested']);
         Route::post('/posts/{id}/not-interested', [UserInteractionController::class, 'markNotInterested']);
