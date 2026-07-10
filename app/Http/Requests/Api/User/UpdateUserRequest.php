@@ -64,7 +64,8 @@ class UpdateUserRequest extends FormRequest
             'is_seller' => 'sometimes|boolean',
             'hide_email' => 'sometimes|boolean',
             'hide_phone' => 'sometimes|boolean',
-            'contact_visibility' => 'nullable|string|in:both,email_only,phone_only,none',
+            'show_email' => 'sometimes|boolean',
+            'show_phone' => 'sometimes|boolean',
 
             // --- JSON Settings (Frontend sends JSON/Array) ---
             'settings' => 'nullable|array',

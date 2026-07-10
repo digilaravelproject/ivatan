@@ -80,15 +80,6 @@ class UserResource extends JsonResource
             }
         }
 
-        $contactVisibility = 'both';
-        if ($this->hide_email && $this->hide_phone) {
-            $contactVisibility = 'none';
-        } elseif ($this->hide_email && !$this->hide_phone) {
-            $contactVisibility = 'phone_only';
-        } elseif (!$this->hide_email && $this->hide_phone) {
-            $contactVisibility = 'email_only';
-        }
-
         $data = [
             'id' => $this->id,
             'uuid' => $this->uuid,
@@ -96,7 +87,8 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->getEmail($isMine),
             'phone' => $this->getPhone($isMine),
-            'contact_visibility' => $contactVisibility,
+            'show_email' => (bool) !$this->hide_email,
+            'show_phone' => (bool) !$this->hide_phone,
             'occupation' => $this->occupation,
             'bio' => $this->bio,
             'gender' => $this->gender,
