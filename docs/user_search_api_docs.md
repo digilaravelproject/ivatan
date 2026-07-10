@@ -17,6 +17,12 @@ Finds users by name or username with typo tolerance (if search driver is enabled
 * **Query Params:**
   * `q` [string, required] - Search query. Must be at least 2 characters.
   * `per_page` [integer, optional] - Results per page. Default: `20`.
+* **Curl Example:**
+  ```bash
+  curl --location 'https://www.ivatan.in/api/v1/users/search?q=saurabh%20sawant' \
+    --header 'Accept: application/json' \
+    --header 'Authorization: Bearer <token>'
+  ```
 * **Success Response:**
   * **Status Code:** `200 OK`
     ```json
