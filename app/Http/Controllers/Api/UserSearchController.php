@@ -18,8 +18,8 @@ class UserSearchController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $searchQuery = $request->query('q', '');
-        $perPage = (int) $request->query('per_page', 20);
+        $searchQuery = $request->input('q', '');
+        $perPage = (int) $request->input('per_page', 20);
 
         if (strlen($searchQuery) < 2) {
             return response()->json([
