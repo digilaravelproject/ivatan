@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\Seller\SellerTransactionController;
 use App\Http\Controllers\Api\Seller\UserSellerController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserSearchController;
 use App\Http\Controllers\Api\UserHistoryController;
 use App\Http\Controllers\Api\UserInteractionController;
 use App\Http\Controllers\Api\ViewController;
@@ -160,6 +161,9 @@ Route::prefix('v1')->group(function () {
 
         // Blocked list (defined before {username} to avoid routing conflict)
         Route::get('users/blocked', [UserInteractionController::class, 'getBlockedUsers']);
+
+        // Search Users (defined before {username} to avoid routing conflict)
+        Route::get('users/search', [UserSearchController::class, 'search']);
 
         // Fetch User by Username
         Route::get('users/{username}', [UserController::class, 'show']);

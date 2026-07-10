@@ -27,6 +27,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use App\Traits\BlocksUsers;
 use App\Traits\HasSubscriptionFeatures;
+use Laravel\Scout\Searchable;
 
 
 /**
@@ -36,7 +37,7 @@ use App\Traits\HasSubscriptionFeatures;
 class User extends Authenticatable implements HasMedia
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
-    use InteractsWithMedia, HasSubscriptionFeatures, BlocksUsers;
+    use InteractsWithMedia, HasSubscriptionFeatures, BlocksUsers, Searchable;
 
     protected $fillable = [
         'uuid',
@@ -242,6 +243,18 @@ class User extends Authenticatable implements HasMedia
     public function postPreferences()
     {
         return $this->hasMany(PostPreference::class);
+    }
+
+    /**
+     * Get the indexable data array for the model.
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (int) $this->id,
+            'name' => $this->name,
+            'username' => $this->username,
+        ];
     }
 
     protected static function booted(): void
