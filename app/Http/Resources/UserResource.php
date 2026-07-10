@@ -129,7 +129,7 @@ class UserResource extends JsonResource
         if ($isMine || !$this->hide_email) {
             return $this->email;
         }
-        return $this->maskEmail($this->email);
+        return null;
     }
 
     private function getPhone(bool $isMine): ?string
@@ -137,7 +137,7 @@ class UserResource extends JsonResource
         if ($isMine || !$this->hide_phone) {
             return $this->phone;
         }
-        return $this->maskPhone($this->phone);
+        return null;
     }
 
     private function maskEmail(?string $email): ?string

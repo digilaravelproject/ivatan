@@ -76,6 +76,28 @@ class UserService
         try {
             // Log::info("Starting profile update for User ID: {$user->id}");
 
+            // Map contact_visibility to hide_email and hide_phone columns
+            if (isset($data['contact_visibility'])) {
+                switch ($data['contact_visibility']) {
+                    case 'both':
+                        $user->hide_email = false;
+                        $user->hide_phone = false;
+                        break;
+                    case 'email_only':
+                        $user->hide_email = false;
+                        $user->hide_phone = true;
+                        break;
+                    case 'phone_only':
+                        $user->hide_email = true;
+                        $user->hide_phone = false;
+                        break;
+                    case 'none':
+                        $user->hide_email = true;
+                        $user->hide_phone = true;
+                        break;
+                }
+            }
+
             // 1. Update Allowed Fields
             $user->fill($data);
 
