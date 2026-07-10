@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\VisibilityTrait;
+use App\Traits\Blockable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -28,7 +29,7 @@ use Spatie\MediaLibrary\MediaCollections\File;
  */
 class UserPost extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, SoftDeletes;
+    use HasFactory, InteractsWithMedia, SoftDeletes, Blockable;
     use VisibilityTrait;
 
     protected $fillable = [

@@ -509,6 +509,7 @@ class ChatService
     public function getUserChats(User $user, ?string $filter)
     {
         $query = UserChat::whereHas('participants', fn($q) => $q->where('user_id', $user->id))
+            ->withoutBlocked($user)
             ->select('user_chats.*')
             ->selectSub(function ($q) use ($user) {
                 $q->from('user_chat_messages')

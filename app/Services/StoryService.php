@@ -26,6 +26,7 @@ class StoryService
         $idsString = !empty($followingIds) ? implode(',', $followingIds) : '0';
 
         return User::query()
+            ->withoutBlocked($user)
             ->whereHas('stories', fn($q) => $q->active())
             // Privacy Check: Only show if I follow them OR if their account is public
             ->where(function ($q) use ($followingIds) {
@@ -64,6 +65,11 @@ class StoryService
     public function getUserStories(User $authUser, string $username): array
     {
         $targetUser = User::where('username', $username)->firstOrFail();
+
+        // Check if a block relation exists between the users
+        if ($authUser->hasBlockRelationWith($targetUser)) {
+            return ['status' => 'private', 'user' => $targetUser, 'stories' => collect()];
+        }
 
         // Check if the viewer is allowed to see these stories
         $canView = ($authUser->id === $targetUser->id) ||

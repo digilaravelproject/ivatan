@@ -172,8 +172,14 @@ class UserController extends Controller
                 return $this->error('User not found.', 404);
             }
 
+            // Check block status if not own profile
+            $currentUser = auth('sanctum')->user();
+            if ($currentUser && $currentUser->id !== $user->id && $currentUser->hasBlockRelationWith($user)) {
+                return $this->error('User not found.', 404);
+            }
+
             // Check if the authenticated user is viewing their own profile
-            $user->is_own_profile = (auth('sanctum')->check() && auth('sanctum')->id() == $user->id);
+            $user->is_own_profile = ($currentUser && $currentUser->id == $user->id);
 
             // Get extra details (following status etc)
             $user = $this->userService->attachRelationStatus($user);

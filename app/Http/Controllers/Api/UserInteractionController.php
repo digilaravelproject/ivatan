@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PostResource;
-use App\Services\BlockService;
+use App\Services\UserBlockService;
 use App\Services\BookmarkService;
 use App\Services\PostPreferenceService;
 use Illuminate\Http\JsonResponse;
@@ -15,12 +15,12 @@ use Illuminate\Support\Facades\Log;
 class UserInteractionController extends Controller
 {
     protected BookmarkService $bookmarkService;
-    protected BlockService $blockService;
+    protected UserBlockService $blockService;
     protected PostPreferenceService $preferenceService;
 
     public function __construct(
         BookmarkService $bookmarkService,
-        BlockService $blockService,
+        UserBlockService $blockService,
         PostPreferenceService $preferenceService
     ) {
         $this->bookmarkService = $bookmarkService;

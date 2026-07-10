@@ -35,6 +35,14 @@ class NotificationController extends Controller
 
         $query = $user->notifications()->orderByDesc('created_at');
 
+        $blockedIds = $user->getAllBlockedIds();
+        if (!empty($blockedIds)) {
+            $query->where(function ($q) use ($blockedIds) {
+                $q->whereNotIn('data->actor_id', $blockedIds)
+                  ->orWhereNull('data->actor_id');
+            });
+        }
+
         if ($only === 'unread') {
             $query->whereNull('read_at');
         }

@@ -82,8 +82,9 @@ class ContactSyncController extends Controller
 
         // --- STEP 3: DATABASE QUERY ---
         
-        // Batch query for performance
-        $matchedUsers = User::whereIn('phone', $numbersToSearch)
+        // Batch query for performance, filtering out blocked users
+        $matchedUsers = User::withoutBlocked($loggedInUser)
+            ->whereIn('phone', $numbersToSearch)
             ->select(['id', 'name', 'username', 'email', 'phone', 'profile_photo_path', 'country_code']) // columns check karlena
             ->withCount([
                 'followers as is_following' => function ($q) use ($loggedInUser) {

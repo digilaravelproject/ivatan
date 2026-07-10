@@ -22,6 +22,27 @@ class CommentService
 
     public function addComment(Model $model, array $data, ?string $parentId = null): Comment
     {
+        $currentUser = Auth::user();
+
+        // 1. Check block relation with the content owner
+        $ownerId = $model->user_id ?? $model->seller_id ?? null;
+        if ($ownerId) {
+            $owner = User::find($ownerId);
+            if ($owner && $currentUser && $currentUser->hasBlockRelationWith($owner)) {
+                throw new \Exception('Action forbidden due to block status.', 403);
+            }
+        }
+
+        // 2. Check block relation with the parent comment author if it is a reply
+        if ($parentId) {
+            $parentComment = Comment::find($parentId);
+            if ($parentComment && $parentComment->user) {
+                if ($currentUser && $currentUser->hasBlockRelationWith($parentComment->user)) {
+                    throw new \Exception('Action forbidden due to block status.', 403);
+                }
+            }
+        }
+
         $comment = DB::transaction(function () use ($model, $data, $parentId) {
             $locked = $model->newQuery()
                 ->whereKey($model->id)

@@ -20,6 +20,15 @@ class NotificationService
             return;
         }
 
+        // Mute notifications between blocked users
+        $actorId = data_get($payload, 'actor_id');
+        if ($actorId) {
+            $actor = User::find($actorId);
+            if ($actor && $notifiable->hasBlockRelationWith($actor)) {
+                return;
+            }
+        }
+
         $notification = new GenericNotification($category, $payload);
 
         if ($channels !== null) {
@@ -57,8 +66,15 @@ class NotificationService
             $usersWithTokens = $notifiables->whereIn('id', $userIdsWithTokens)->pluck('id')->toArray();
         }
 
+        $actorId = data_get($payload, 'actor_id');
+        $actor = $actorId ? User::find($actorId) : null;
+
         foreach ($notifiables as $notifiable) {
             if ($notifiable instanceof User) {
+                if ($actor && $notifiable->hasBlockRelationWith($actor)) {
+                    continue;
+                }
+
                 $channels = config("notifications.categories.{$category}.channels", config('notifications.default_channels', ['database', 'broadcast']));
                 if (in_array($notifiable->id, $usersWithTokens)) {
                     $channels[] = FcmChannel::class;

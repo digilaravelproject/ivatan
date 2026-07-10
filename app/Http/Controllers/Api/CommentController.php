@@ -37,10 +37,17 @@ class CommentController extends Controller
                 return response()->json(['success' => false, 'message' => 'Post not found.'], 404);
             }
 
-            // Fetch top-level comments with replies and user data
+            // Fetch top-level comments with replies and user data, filtering out blocked users
+            $currentUser = auth('sanctum')->user();
             $comments = $post->comments()
+                ->withoutBlocked($currentUser)
                 ->whereNull('parent_id')
-                ->with(['user', 'replies.user', 'replies.likes'])
+                ->with([
+                    'user',
+                    'replies' => function ($q) use ($currentUser) {
+                        $q->withoutBlocked($currentUser)->with(['user', 'likes']);
+                    }
+                ])
                 ->withCount('replies')
                 ->latest()
                 ->simplePaginate(30);

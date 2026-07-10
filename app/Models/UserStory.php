@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasViews;
+use App\Traits\Blockable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class UserStory extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, HasViews;
+    use HasFactory, InteractsWithMedia, HasViews, Blockable;
 
     protected $fillable = [
         'user_id',

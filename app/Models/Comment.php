@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\Blockable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 
 class Comment extends Model
 {
+    use Blockable;
+
     protected $table = "comments";
 
     protected $fillable = [

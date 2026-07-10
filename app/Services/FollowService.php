@@ -35,6 +35,15 @@ class FollowService
                 return ['success' => false, 'message' => 'User not found.', 'code' => 'NOT_FOUND'];
             }
 
+            if ($follower->hasBlockRelationWith($userToFollow)) {
+                DB::rollBack();
+                return [
+                    'success' => false,
+                    'message' => 'Action forbidden due to block status.',
+                    'code' => 'FORBIDDEN'
+                ];
+            }
+
             if ($follower->isFollowing($userToFollow)) {
                 DB::rollBack();
                 return [

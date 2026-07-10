@@ -4,12 +4,13 @@ namespace App\Models\Chat;
 
 use App\Models\User;
 use App\Traits\AutoGeneratesUuid;
+use App\Traits\Blockable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class UserChat extends Model
 {
-    use HasFactory, AutoGeneratesUuid;
+    use HasFactory, AutoGeneratesUuid, Blockable;
 
     protected $table = 'user_chats';
 
