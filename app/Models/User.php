@@ -26,6 +26,7 @@ use Spatie\Permission\Traits\HasRoles;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use App\Traits\BlocksUsers;
+use App\Traits\Blockable;
 use App\Traits\HasSubscriptionFeatures;
 use Laravel\Scout\Searchable;
 
@@ -36,8 +37,8 @@ use Laravel\Scout\Searchable;
 
 class User extends Authenticatable implements HasMedia
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
-    use InteractsWithMedia, HasSubscriptionFeatures, BlocksUsers, Searchable;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes, Searchable;
+    use InteractsWithMedia, HasSubscriptionFeatures, BlocksUsers, Blockable;
 
     protected $fillable = [
         'uuid',
