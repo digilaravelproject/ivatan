@@ -18,6 +18,8 @@ class UserSearchController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
+        Log::info("UserSearch - Incoming Request All Inputs: " . json_encode($request->all()));
+
         $searchQuery = $request->input('q', '');
         $perPage = (int) $request->input('per_page', 20);
 
