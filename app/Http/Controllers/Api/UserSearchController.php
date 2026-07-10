@@ -67,12 +67,23 @@ class UserSearchController extends Controller
      */
     protected function performDatabaseSearch(string $searchQuery, ?User $currentUser, int $perPage)
     {
-        return User::query()
+        $blockedIds = $currentUser ? $currentUser->getAllBlockedIds() : [];
+        Log::info("UserSearch - Query: '{$searchQuery}', Auth ID: " . ($currentUser ? $currentUser->id : 'Guest') . ", Blocked IDs: " . json_encode($blockedIds));
+
+        $query = User::query()
             ->where(function ($q) use ($searchQuery) {
                 $q->where('name', 'like', "%{$searchQuery}%")
                   ->orWhere('username', 'like', "%{$searchQuery}%");
-            })
-            ->withoutBlocked($currentUser)
-            ->paginate($perPage);
+            });
+
+        if ($currentUser) {
+            $query->withoutBlocked($currentUser);
+        }
+
+        $results = $query->paginate($perPage);
+
+        Log::info("UserSearch - Total found in DB: " . $results->total());
+
+        return $results;
     }
 }
