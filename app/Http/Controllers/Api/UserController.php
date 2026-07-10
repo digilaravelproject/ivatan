@@ -111,6 +111,9 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request)
     {
         try {
+            Log::info("UserControllerUpdate - Raw: " . json_encode($request->all()));
+            Log::info("UserControllerUpdate - Validated: " . json_encode($request->validated()));
+
             $updatedUser = $this->userService->update($request->user(), $request->validated());
             $updatedUser->is_own_profile = true;
             return $this->success(['user' => new UserResource($updatedUser)], 'Profile updated successfully.');
