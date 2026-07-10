@@ -18,8 +18,6 @@ class UserSearchController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        Log::info("UserSearch - Incoming Request All Inputs: " . json_encode($request->all()));
-
         $searchQuery = $request->input('q', '');
         $perPage = (int) $request->input('per_page', 20);
 
@@ -69,9 +67,6 @@ class UserSearchController extends Controller
      */
     protected function performDatabaseSearch(string $searchQuery, ?User $currentUser, int $perPage)
     {
-        $blockedIds = $currentUser ? $currentUser->getAllBlockedIds() : [];
-        Log::info("UserSearch - Query: '{$searchQuery}', Auth ID: " . ($currentUser ? $currentUser->id : 'Guest') . ", Blocked IDs: " . json_encode($blockedIds));
-
         $query = User::query()
             ->where(function ($q) use ($searchQuery) {
                 $q->where('name', 'like', "%{$searchQuery}%")
@@ -83,8 +78,6 @@ class UserSearchController extends Controller
         }
 
         $results = $query->paginate($perPage);
-
-        Log::info("UserSearch - Total found in DB: " . $results->total());
 
         return $results;
     }
