@@ -42,6 +42,12 @@ class UserPost extends Model implements HasMedia
         'view_count',
         'status',       // 'active', 'inactive'
         'visibility',   // 'public', 'private'
+        'is_exclusive',
+        'price',
+        'exclusive_status',
+        'rejection_reason',
+        'override_platform_fee',
+        'override_platform_fee_type',
     ];
 
     protected $casts = [
@@ -146,9 +152,15 @@ class UserPost extends Model implements HasMedia
     public function scopeForYou($query)
     {
         return $query->active()
+            ->where('is_exclusive', false)
             ->where('created_at', '>=', now()->subDays(30))
             ->orderByRaw('(view_count + (like_count * 5) + (comment_count * 10)) DESC')
             ->inRandomOrder();
+    }
+
+    public function scopeExclusive($query)
+    {
+        return $query->where('is_exclusive', true);
     }
 
     /*
@@ -228,5 +240,15 @@ class UserPost extends Model implements HasMedia
     public function preferences()
     {
         return $this->hasMany(PostPreference::class, 'post_id');
+    }
+
+    public function accesses()
+    {
+        return $this->hasMany(ExclusiveContentAccess::class, 'user_post_id');
+    }
+
+    public function purchases()
+    {
+        return $this->hasMany(ExclusiveContentPurchase::class, 'user_post_id');
     }
 }

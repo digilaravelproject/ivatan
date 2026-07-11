@@ -41,6 +41,7 @@ class StorePostRequest extends FormRequest
             'caption' => 'nullable|string|max:2200', // Instagram caption limit
             'title'   => 'nullable|string|max:255',
             'visibility' => 'required|in:public,private,friends',
+            'price' => 'nullable|numeric|min:0',
         ];
 
         // ✅ 3. Dynamic Rules based on Post Type

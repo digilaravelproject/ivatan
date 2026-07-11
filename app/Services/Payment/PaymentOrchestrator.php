@@ -217,4 +217,51 @@ class PaymentOrchestrator
 
         return $response;
     }
+
+    public function createExclusiveContentPayment(\App\Models\ExclusiveContentPurchase $purchase, User $user): array
+    {
+        $gateway = $this->driver();
+        $activeGateway = $this->activeGateway();
+
+        $dto = new PaymentIntentDTO(
+            amount: (float) $purchase->final_paid_amount,
+            currency: 'INR',
+            orderId: 'exc_' . $purchase->uuid,
+            customerPhone: $user->phone ?? '',
+        );
+
+        $result = $gateway->createPaymentIntent($dto);
+
+        if (!$result->success) {
+            throw PaymentGatewayException::gatewayError($activeGateway, $result->message ?? 'Failed to create payment intent.');
+        }
+
+        $purchase->update([
+            'gateway' => $activeGateway,
+            'gateway_transaction_id' => $result->gatewayOrderId, // Store order ID first
+        ]);
+
+        $order = [
+            'id' => $result->gatewayOrderId,
+            'amount' => (int) round($purchase->final_paid_amount * 100),
+            'currency' => 'INR',
+        ];
+
+        if ($activeGateway === 'razorpay') {
+            $order['razorpay_order_id'] = $result->gatewayOrderId;
+        }
+
+        return [
+            'success' => true,
+            'purchase' => $purchase,
+            'gateway_order' => $order,
+            'razorpay_order' => $order,
+        ];
+    }
+
+    public function verifyExclusiveContentPayment(\App\Models\ExclusiveContentPurchase $purchase, array $gatewayPayload): PaymentResult
+    {
+        $gateway = $this->driver();
+        return $gateway->verifyPayment($gatewayPayload);
+    }
 }

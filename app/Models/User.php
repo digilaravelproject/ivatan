@@ -381,4 +381,36 @@ class User extends Authenticatable implements HasMedia
         }
         return $this->activeProfile()->where('type', 'seller')->exists();
     }
+
+    // Exclusive Content & Wallet Relations
+    public function wallet()
+    {
+        return $this->hasOne(Wallet::class);
+    }
+
+    public function enablement()
+    {
+        return $this->hasOne(ExclusiveContentEnablement::class);
+    }
+
+    public function purchasedExclusiveContent()
+    {
+        return $this->hasMany(ExclusiveContentPurchase::class, 'buyer_id');
+    }
+
+    public function exclusiveAccesses()
+    {
+        return $this->hasMany(ExclusiveContentAccess::class, 'user_id');
+    }
+
+    public function hasExclusiveAccessTo($postId): bool
+    {
+        return $this->exclusiveAccesses()
+            ->where('user_post_id', $postId)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>', now());
+            })
+            ->exists();
+    }
 }

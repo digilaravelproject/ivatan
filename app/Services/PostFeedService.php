@@ -24,9 +24,13 @@ class PostFeedService
         return Auth::guard('sanctum')->user();
     }
 
-    private function applyBaseQueryOptimizations($query, ?User $user = null)
+    private function applyBaseQueryOptimizations($query, ?User $user = null, bool $includeExclusive = false)
     {
         $userId = $user?->id;
+
+        if (!$includeExclusive) {
+            $query->where('is_exclusive', false);
+        }
 
         // Exclude posts from soft-deleted users
         $query->whereHas('user');
@@ -184,13 +188,15 @@ class PostFeedService
     {
         $query = UserPost::query()->where('user_id', $userId);
 
-        $query = $this->applyBaseQueryOptimizations($query, $this->authUser());
-
         if ($filter === 'posts') {
             $query->whereIn('type', PostType::userPostFilterTypes());
         } elseif ($filter === 'videos') {
             $query->whereIn('type', PostType::userVideoFilterTypes());
+        } elseif ($filter === 'exclusive') {
+            $query->where('is_exclusive', true)->where('exclusive_status', 'approved');
         }
+
+        $query = $this->applyBaseQueryOptimizations($query, $this->authUser(), $filter === 'exclusive');
 
         $posts = $query->orderBy('created_at', 'DESC')
             ->simplePaginate(12);

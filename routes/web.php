@@ -29,6 +29,8 @@ use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminInvoiceController;
 use App\Http\Controllers\Admin\AdminProfileApprovalController;
 use App\Http\Controllers\Admin\AdminSettingController;
+use App\Http\Controllers\Admin\AdminWalletController;
+use App\Http\Controllers\Admin\ExclusiveContentController as AdminExclusiveContentController;
 
 // Public Routes
 Route::get('/', fn() => view('web.index'))->name('web.index');
@@ -331,6 +333,33 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::post('/test-connection', 'testConnection')->name('test-connection');
         Route::post('/update-subscription', 'updateSubscription')->name('update-subscription');
         Route::post('/update-general', 'updateGeneral')->name('update-general');
+    });
+
+    // =====================
+    // Exclusive Content & Wallet (Admin)
+    // =====================
+    Route::prefix('exclusive')->name('exclusive.')->group(function () {
+        
+        // Blade Views Routes
+        Route::view('/moderation', 'admin.exclusive-content.moderation')->name('moderation');
+        Route::view('/financial', 'admin.exclusive-content.financial')->name('financial');
+        Route::view('/settings', 'admin.exclusive-content.settings')->name('settings');
+
+        // Content Moderation API hooks
+        Route::get('/enablements', [AdminExclusiveContentController::class, 'listEnablementRequests'])->name('enablements.list');
+        Route::post('/enablements/{id}/approve', [AdminExclusiveContentController::class, 'approveEnablement'])->name('enablements.approve');
+        Route::post('/enablements/{id}/reject', [AdminExclusiveContentController::class, 'rejectEnablement'])->name('enablements.reject');
+        
+        Route::get('/pending-content', [AdminExclusiveContentController::class, 'listPendingContent'])->name('pending.list');
+        Route::post('/pending-content/{id}/approve', [AdminExclusiveContentController::class, 'approveContent'])->name('pending.approve');
+        Route::post('/pending-content/{id}/reject', [AdminExclusiveContentController::class, 'rejectContent'])->name('pending.reject');
+        
+        Route::post('/refunds/{purchaseId}', [AdminExclusiveContentController::class, 'issueRefund'])->name('refunds');
+
+        // Wallet Visibility API hooks
+        Route::get('/wallets', [AdminWalletController::class, 'listWallets'])->name('wallets.list');
+        Route::get('/wallets/stats', [AdminWalletController::class, 'revenueStats'])->name('wallets.stats');
+        Route::get('/wallets/transactions', [AdminWalletController::class, 'allTransactions'])->name('wallets.transactions');
     });
 });
 

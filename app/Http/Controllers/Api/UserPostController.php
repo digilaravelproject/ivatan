@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+use App\Services\UserPostService;
+
 class UserPostController extends Controller
 {
     public function __construct(
@@ -30,6 +32,7 @@ class UserPostController extends Controller
         private LikeService        $likeService,
         private ReportService      $reportService,
         private ViewTrackingService $viewService,
+        private UserPostService    $postService,
     ) {}
 
     private function authUser(): User
@@ -161,39 +164,11 @@ class UserPostController extends Controller
         try {
             $user = $this->authUser();
 
-            $post = DB::transaction(function () use ($request, $user) {
-                $post = UserPost::create([
-                    'user_id' => $user->id,
-                    'uuid' => Str::uuid(),
-                    'type' => $request->type,
-                    'caption' => $request->caption,
-                    'visibility' => $request->visibility ?? 'public',
-                    'status' => 'active',
-                    'view_count' => 0,
-                    'like_count' => 0,
-                    'comment_count' => 0,
-                ]);
-
-                if ($request->hasFile('media')) {
-                    $mediaFiles = $request->file('media');
-
-                    if (!is_array($mediaFiles)) {
-                        $mediaFiles = [$mediaFiles];
-                    }
-
-                    $uploadInfo = $this->mediaService->uploadMedia($post, $mediaFiles);
-
-                    if ($uploadInfo->hasAny()) {
-                        $detectedType = $this->mediaService->detectPostType($uploadInfo, $request->type);
-
-                        if ($detectedType) {
-                            $post->update(['type' => $detectedType]);
-                        }
-                    }
-                }
-
-                return $post;
-            });
+            $post = $this->postService->createPost(
+                $user,
+                $request->only(['type', 'caption', 'visibility']),
+                $request->file('media')
+            );
 
             return response()->json([
                 'message' => 'Post created successfully',

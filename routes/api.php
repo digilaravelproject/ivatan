@@ -28,6 +28,11 @@ use Illuminate\Support\Facades\Route;
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 use App\Http\Controllers\Admin\ProfileApprovalController;
 use App\Http\Controllers\Api\BannerController;
+use App\Http\Controllers\Api\CreatorEnablementController;
+use App\Http\Controllers\Api\CreatorWalletController;
+use App\Http\Controllers\Api\ExclusiveContentController;
+use App\Http\Controllers\Api\ExclusiveContentPurchaseController;
+use App\Http\Controllers\Api\ExclusiveMediaController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\Contact\ContactSyncController;
 use App\Http\Controllers\Api\Ecommerce\EnquiryController;
@@ -210,6 +215,31 @@ Route::prefix('v1')->group(function () {
             Route::get('/feed/trending', 'globalTrendingFeed'); // Global Trending
             Route::get('/feed/trending/interests', 'trendingInterestsFeed'); // User Interest Based Trending
             Route::get('/feed/for-you', 'forYouFeed'); // Shuffled Interest Based Feed
+        });
+
+        // ================================
+        // Exclusive Content & Wallet Routes
+        // ================================
+        Route::prefix('exclusive')->group(function () {
+            // Content Creation
+            Route::post('/posts', [ExclusiveContentController::class, 'store']);
+            Route::put('/posts/{post}/price', [ExclusiveContentController::class, 'updatePrice']);
+            
+            // Media Access
+            Route::get('/posts/{post}/media/{media}', [ExclusiveMediaController::class, 'show']);
+
+            // Creator Enablement
+            Route::get('/enablement-status', [CreatorEnablementController::class, 'status']);
+            Route::post('/request-enablement', [CreatorEnablementController::class, 'requestEnablement']);
+            Route::post('/toggle', [CreatorEnablementController::class, 'toggle']);
+
+            // Purchase Flow
+            Route::post('/purchase/{post}/initiate', [ExclusiveContentPurchaseController::class, 'initiate']);
+            Route::post('/purchase/verify', [ExclusiveContentPurchaseController::class, 'verify']);
+
+            // Creator Wallet
+            Route::get('/wallet/balance', [CreatorWalletController::class, 'balance']);
+            Route::get('/wallet/transactions', [CreatorWalletController::class, 'transactions']);
         });
 
         // ================================
