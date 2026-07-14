@@ -115,4 +115,46 @@ class ExclusiveContentController extends Controller
             return response()->json(['message' => $e->getMessage()], 400);
         }
     }
+
+    // ---------------------------------------------------------
+    // SETTINGS MANAGEMENT
+    // ---------------------------------------------------------
+
+    public function getSettings(): JsonResponse
+    {
+        return response()->json([
+            'exclusive_content_enablement_fee' => \App\Models\Setting::where('key', 'exclusive_content_enablement_fee')->value('value') ?? 999,
+            'exclusive_content_global_fee_type' => \App\Models\Setting::where('key', 'exclusive_content_global_fee_type')->value('value') ?? 'percentage',
+            'exclusive_content_global_fee_value' => \App\Models\Setting::where('key', 'exclusive_content_global_fee_value')->value('value') ?? 2,
+        ]);
+    }
+
+    public function updateSettings(Request $request): JsonResponse
+    {
+        $request->validate([
+            'exclusive_content_enablement_fee' => 'required|numeric|min:0',
+            'exclusive_content_global_fee_type' => 'required|string|in:flat,percentage',
+            'exclusive_content_global_fee_value' => 'required|numeric|min:0',
+        ]);
+
+        \App\Models\Setting::updateOrCreate(
+            ['key' => 'exclusive_content_enablement_fee'],
+            ['value' => $request->exclusive_content_enablement_fee, 'group' => 'exclusive', 'type' => 'integer']
+        );
+
+        \App\Models\Setting::updateOrCreate(
+            ['key' => 'exclusive_content_global_fee_type'],
+            ['value' => $request->exclusive_content_global_fee_type, 'group' => 'exclusive', 'type' => 'string']
+        );
+
+        \App\Models\Setting::updateOrCreate(
+            ['key' => 'exclusive_content_global_fee_value'],
+            ['value' => $request->exclusive_content_global_fee_value, 'group' => 'exclusive', 'type' => 'integer']
+        );
+
+        \Illuminate\Support\Facades\Artisan::call('config:clear');
+        \Illuminate\Support\Facades\Artisan::call('cache:clear');
+
+        return response()->json(['success' => true, 'message' => 'Settings updated successfully.']);
+    }
 }

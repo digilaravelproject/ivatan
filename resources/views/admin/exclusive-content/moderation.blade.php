@@ -52,7 +52,108 @@
 
 @push('scripts')
 <script>
-    // JS Logic to fetch /api/admin/exclusive/pending-content and populate table
-    // JS Logic for approve/reject API calls
+    let activePostId = null;
+
+    $(document).ready(function() {
+        loadPendingContent();
+    });
+
+    function loadPendingContent() {
+        $('#pending-content-tbody').html('<tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">Loading pending content...</td></tr>');
+        
+        $.get('{{ route('admin.exclusive.pending.list') }}', function(response) {
+            let html = '';
+            const data = response.data || [];
+            
+            if (data.length === 0) {
+                html = '<tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">No pending exclusive content found.</td></tr>';
+            } else {
+                data.forEach(post => {
+                    const username = post.user ? post.user.username : 'Unknown';
+                    const creatorName = post.user ? post.user.name : 'Unknown';
+                    const price = post.price ? `₹${post.price}` : '₹0.00';
+                    const type = post.type || 'post';
+
+                    html += `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${creatorName} (@${username})</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 uppercase">${type}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">${price}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button onclick="openApproveModal(${post.id})" class="text-green-600 hover:text-green-900 font-semibold mr-3">Approve</button>
+                                <button onclick="rejectContent(${post.id})" class="text-red-600 hover:text-red-900 font-semibold">Reject</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            $('#pending-content-tbody').html(html);
+        });
+    }
+
+    function openApproveModal(id) {
+        activePostId = id;
+        $('#fee_type').val('');
+        $('#fee_value').val('');
+        $('#approveModal').removeClass('hidden');
+    }
+
+    function closeModal() {
+        $('#approveModal').addClass('hidden');
+        activePostId = null;
+    }
+
+    function submitApproval() {
+        if (!activePostId) return;
+
+        const feeType = $('#fee_type').val();
+        const feeValue = $('#fee_value').val();
+
+        $.ajax({
+            url: `/admin/exclusive/pending-content/${activePostId}/approve`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            data: {
+                override_platform_fee_type: feeType || null,
+                override_platform_fee: feeValue || null
+            },
+            success: function(response) {
+                alert('Content approved successfully!');
+                closeModal();
+                loadPendingContent();
+            },
+            error: function(xhr) {
+                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to approve'));
+            }
+        });
+    }
+
+    function rejectContent(id) {
+        const reason = prompt("Enter reason for rejection (Required):");
+        if (!reason) {
+            alert('Rejection reason is required!');
+            return;
+        }
+
+        $.ajax({
+            url: `/admin/exclusive/pending-content/${id}/reject`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            data: {
+                rejection_reason: reason
+            },
+            success: function(response) {
+                alert('Content rejected successfully!');
+                loadPendingContent();
+            },
+            error: function(xhr) {
+                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to reject'));
+            }
+        });
+    }
 </script>
 @endpush

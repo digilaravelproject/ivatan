@@ -46,6 +46,51 @@
 
 @push('scripts')
 <script>
-    // JS Logic to fetch /api/admin/exclusive/wallets/stats and /api/admin/exclusive/wallets/transactions
+    $(document).ready(function() {
+        loadFinancialStats();
+        loadTransactions();
+    });
+
+    function loadFinancialStats() {
+        $.get('{{ route('admin.exclusive.wallets.stats') }}', function(response) {
+            $('#stat-revenue').text(`₹${parseFloat(response.total_platform_revenue || 0).toFixed(2)}`);
+            $('#stat-gateway').text(`₹${parseFloat(response.total_gateway_fees || 0).toFixed(2)}`);
+            $('#stat-creators').text(`₹${parseFloat(response.total_creator_earnings || 0).toFixed(2)}`);
+        });
+    }
+
+    function loadTransactions() {
+        $('#transactions-tbody').html('<tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">Loading transactions...</td></tr>');
+        
+        $.get('{{ route('admin.exclusive.wallets.transactions') }}', function(response) {
+            let html = '';
+            const data = response.data || [];
+            
+            if (data.length === 0) {
+                html = '<tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">No recent transactions found.</td></tr>';
+            } else {
+                data.forEach(txn => {
+                    const creatorName = txn.wallet && txn.wallet.user ? txn.wallet.user.name : 'Unknown';
+                    const username = txn.wallet && txn.wallet.user ? txn.wallet.user.username : 'Unknown';
+                    const amount = txn.amount ? `₹${txn.amount}` : '₹0.00';
+                    const type = txn.type || 'credit';
+                    const date = txn.created_at ? new Date(txn.created_at).toLocaleString() : '';
+
+                    // Style type badge
+                    const typeColor = type === 'credit' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
+
+                    html += `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${creatorName} (@${username})</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm uppercase ${typeColor}">${type}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">${amount}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${date}</td>
+                        </tr>
+                    `;
+                });
+            }
+            $('#transactions-tbody').html(html);
+        });
+    }
 </script>
 @endpush

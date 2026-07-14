@@ -60,6 +60,151 @@
 
 @push('scripts')
 <script>
-    // Fetch global settings and Creator Enablement Requests from APIs
+    $(document).ready(function() {
+        loadSettings();
+        loadEnablementRequests();
+    });
+
+    function loadSettings() {
+        $.get('{{ route('admin.exclusive.settings.values') }}', function(response) {
+            $('#global_enablement_fee').val(response.exclusive_content_enablement_fee);
+            $('#global_fee_type').val(response.exclusive_content_global_fee_type);
+            $('#global_fee_value').val(response.exclusive_content_global_fee_value);
+        });
+    }
+
+    function saveGlobalSettings() {
+        const fee = $('#global_enablement_fee').val();
+        const type = $('#global_fee_type').val();
+        const val = $('#global_fee_value').val();
+
+        $.ajax({
+            url: '{{ route('admin.exclusive.settings.update') }}',
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            data: {
+                exclusive_content_enablement_fee: fee,
+                exclusive_content_global_fee_type: type,
+                exclusive_content_global_fee_value: val
+            },
+            success: function(response) {
+                alert('Global settings saved successfully!');
+                loadSettings();
+            },
+            error: function(xhr) {
+                alert('Failed to save settings: ' + (xhr.responseJSON?.message || 'Error occurred'));
+            }
+        });
+    }
+
+    function loadEnablementRequests() {
+        $('#enablements-tbody').html('<tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">Loading requests...</td></tr>');
+        
+        $.get('{{ route('admin.exclusive.enablements.list') }}', function(response) {
+            let html = '';
+            const data = response.data || [];
+            
+            if (data.length === 0) {
+                html = '<tr><td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">No pending enablement requests found.</td></tr>';
+            } else {
+                data.forEach(req => {
+                    const username = req.user ? req.user.username : 'Unknown';
+                    const feePaid = req.fee_paid ? `₹${req.fee_paid}` : '₹0.00';
+                    const paymentStatus = req.payment_status || 'none';
+                    
+                    // Show status styling
+                    let statusBadge = '';
+                    if (req.status === 'approved') {
+                        statusBadge = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Approved</span>';
+                    } else if (req.status === 'rejected') {
+                        statusBadge = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Rejected</span>';
+                    } else if (req.status === 'pending') {
+                        statusBadge = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending Approval</span>';
+                    } else {
+                        statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">${req.status}</span>`;
+                    }
+
+                    let actionsHtml = '';
+                    if (req.status === 'pending') {
+                        actionsHtml = `
+                            <button onclick="approveEnablement(${req.id})" class="text-indigo-600 hover:text-indigo-900 font-semibold mr-3">Approve</button>
+                            <button onclick="rejectEnablement(${req.id})" class="text-red-600 hover:text-red-900 font-semibold">Reject</button>
+                        `;
+                    } else {
+                        actionsHtml = '<span class="text-gray-400">No actions available</span>';
+                    }
+
+                    html += `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${req.user ? req.user.name : 'Unknown'} (@${username})</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${feePaid} (Payment: ${paymentStatus})</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${statusBadge}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${actionsHtml}</td>
+                        </tr>
+                    `;
+                });
+            }
+            $('#enablements-tbody').html(html);
+        });
+    }
+
+    function approveEnablement(id) {
+        const overrideFeeType = prompt("Optional: Enter platform fee override type ('flat' or 'percentage') or leave empty for default:");
+        let overrideFeeValue = null;
+        
+        if (overrideFeeType === 'flat' || overrideFeeType === 'percentage') {
+            overrideFeeValue = prompt("Enter fee override value (e.g. 5 for 5% or 50 for ₹50):");
+        }
+        
+        const notes = prompt("Enter optional admin notes:");
+
+        $.ajax({
+            url: `/admin/exclusive/enablements/${id}/approve`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            data: {
+                override_platform_fee_type: overrideFeeType || null,
+                override_platform_fee: overrideFeeValue || null,
+                admin_notes: notes || null
+            },
+            success: function(response) {
+                alert('Enablement request approved successfully!');
+                loadEnablementRequests();
+            },
+            error: function(xhr) {
+                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to approve'));
+            }
+        });
+    }
+
+    function rejectEnablement(id) {
+        const reason = prompt("Enter rejection reason (Required):");
+        if (!reason) {
+            alert('Rejection reason is required!');
+            return;
+        }
+
+        $.ajax({
+            url: `/admin/exclusive/enablements/${id}/reject`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            data: {
+                admin_notes: reason
+            },
+            success: function(response) {
+                alert('Enablement request rejected successfully!');
+                loadEnablementRequests();
+            },
+            error: function(xhr) {
+                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to reject'));
+            }
+        });
+    }
 </script>
 @endpush

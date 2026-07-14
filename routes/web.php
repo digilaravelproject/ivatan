@@ -344,6 +344,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::view('/moderation', 'admin.exclusive-content.moderation')->name('moderation');
         Route::view('/financial', 'admin.exclusive-content.financial')->name('financial');
         Route::view('/settings', 'admin.exclusive-content.settings')->name('settings');
+        Route::get('/settings/values', [AdminExclusiveContentController::class, 'getSettings'])->name('settings.values');
+        Route::post('/settings/values', [AdminExclusiveContentController::class, 'updateSettings'])->name('settings.update');
 
         // Content Moderation API hooks
         Route::get('/enablements', [AdminExclusiveContentController::class, 'listEnablementRequests'])->name('enablements.list');
