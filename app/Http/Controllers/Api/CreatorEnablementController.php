@@ -22,9 +22,16 @@ class CreatorEnablementController extends Controller
         $user = Auth::guard('sanctum')->user();
         $enablement = $user->enablement;
 
+        $globalFee = (float) (\App\Models\Setting::where('key', 'exclusive_content_enablement_fee')->value('value') ?? 999);
+        
+        $fee = $globalFee;
+        if ($enablement) {
+            $fee = ($enablement->payment_status === 'completed') ? (float) $enablement->fee_paid : $globalFee;
+        }
+
         return response()->json([
             'status' => $enablement ? $enablement->status : 'none',
-            'fee_paid' => $enablement ? $enablement->fee_paid : 0,
+            'fee_paid' => $fee,
             'payment_status' => $enablement ? $enablement->payment_status : 'none',
         ]);
     }
@@ -37,8 +44,8 @@ class CreatorEnablementController extends Controller
         try {
             $user = Auth::guard('sanctum')->user();
             
-            // Read enablement fee from Settings or default to 0.
-            $globalFee = (float) (\App\Models\Setting::where('key', 'exclusive_content_enablement_fee')->value('value') ?? 0);
+            // Read enablement fee from Settings or default to 999.
+            $globalFee = (float) (\App\Models\Setting::where('key', 'exclusive_content_enablement_fee')->value('value') ?? 999);
             
             if ($globalFee > 0) {
                 // Create or update the enablement record as pending payment and call gateway inside a transaction
