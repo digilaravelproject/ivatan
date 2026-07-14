@@ -264,4 +264,52 @@ class PaymentOrchestrator
         $gateway = $this->driver();
         return $gateway->verifyPayment($gatewayPayload);
     }
+
+    public function createEnablementPayment(\App\Models\ExclusiveContentEnablement $enablement, User $user): array
+    {
+        $gateway = $this->driver();
+        $activeGateway = $this->activeGateway();
+
+        $dto = new PaymentIntentDTO(
+            amount: (float) $enablement->fee_paid,
+            currency: 'INR',
+            orderId: 'ene_' . $enablement->id . '_' . time(),
+            customerPhone: $user->phone ?? '',
+        );
+
+        $result = $gateway->createPaymentIntent($dto);
+
+        if (!$result->success) {
+            throw PaymentGatewayException::gatewayError($activeGateway, $result->message ?? 'Failed to create payment intent.');
+        }
+
+        $enablement->update([
+            'gateway' => $activeGateway,
+            'gateway_transaction_id' => $result->gatewayOrderId,
+            'payment_status' => 'pending',
+        ]);
+
+        $order = [
+            'id' => $result->gatewayOrderId,
+            'amount' => (int) round($enablement->fee_paid * 100),
+            'currency' => 'INR',
+        ];
+
+        if ($activeGateway === 'razorpay') {
+            $order['razorpay_order_id'] = $result->gatewayOrderId;
+        }
+
+        return [
+            'success' => true,
+            'enablement' => $enablement,
+            'gateway_order' => $order,
+            'razorpay_order' => $order,
+        ];
+    }
+
+    public function verifyEnablementPayment(\App\Models\ExclusiveContentEnablement $enablement, array $gatewayPayload): PaymentResult
+    {
+        $gateway = $this->driver();
+        return $gateway->verifyPayment($gatewayPayload);
+    }
 }

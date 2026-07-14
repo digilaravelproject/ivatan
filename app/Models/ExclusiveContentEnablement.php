@@ -12,6 +12,9 @@ class ExclusiveContentEnablement extends Model
     protected $fillable = [
         'user_id',
         'fee_paid',
+        'gateway',
+        'gateway_transaction_id',
+        'payment_status',
         'status',
         'override_platform_fee',
         'override_platform_fee_type',

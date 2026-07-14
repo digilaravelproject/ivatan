@@ -231,6 +231,7 @@ Route::prefix('v1')->group(function () {
             // Creator Enablement
             Route::get('/enablement-status', [CreatorEnablementController::class, 'status']);
             Route::post('/request-enablement', [CreatorEnablementController::class, 'requestEnablement']);
+            Route::post('/request-enablement/verify', [CreatorEnablementController::class, 'verifyEnablement']);
             Route::post('/toggle', [CreatorEnablementController::class, 'toggle']);
 
             // Purchase Flow

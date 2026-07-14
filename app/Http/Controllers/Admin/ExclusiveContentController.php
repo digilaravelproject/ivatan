@@ -21,6 +21,10 @@ class ExclusiveContentController extends Controller
     public function listEnablementRequests(): JsonResponse
     {
         $requests = ExclusiveContentEnablement::with('user')
+            ->where(function ($q) {
+                $q->where('fee_paid', 0)
+                  ->orWhere('payment_status', 'completed');
+            })
             ->orderBy('created_at', 'desc')
             ->paginate(20);
             
@@ -30,6 +34,11 @@ class ExclusiveContentController extends Controller
     public function approveEnablement(Request $request, $id): JsonResponse
     {
         $enablement = ExclusiveContentEnablement::findOrFail($id);
+
+        if ($enablement->fee_paid > 0 && $enablement->payment_status !== 'completed') {
+            return response()->json(['message' => 'Cannot approve an unpaid enablement request.'], 400);
+        }
+
         $enablement->update([
             'status' => 'approved',
             'admin_notes' => $request->admin_notes,

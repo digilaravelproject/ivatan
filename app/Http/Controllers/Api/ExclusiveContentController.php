@@ -36,6 +36,12 @@ class ExclusiveContentController extends Controller
         try {
             $user = $this->authUser();
             
+            // Check if user is an approved exclusive creator
+            $enablement = $user->enablement;
+            if (!$enablement || $enablement->status !== 'approved') {
+                return response()->json(['message' => 'You do not have exclusive content feature enabled.'], 403);
+            }
+
             $price = $request->input('price');
             $isExclusive = $price !== null && (float) $price > 0;
 
@@ -74,6 +80,12 @@ class ExclusiveContentController extends Controller
 
             if ($post->user_id !== $user->id) {
                 return response()->json(['message' => 'Unauthorized action.'], 403);
+            }
+
+            // Check if user is an approved exclusive creator
+            $enablement = $user->enablement;
+            if (!$enablement || $enablement->status !== 'approved') {
+                return response()->json(['message' => 'You do not have exclusive content feature enabled.'], 403);
             }
 
             $request->validate([

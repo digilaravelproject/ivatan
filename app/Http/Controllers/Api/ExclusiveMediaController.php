@@ -14,13 +14,13 @@ class ExclusiveMediaController extends Controller
     /**
      * Serve exclusive media securely.
      */
-    public function show(Request $request, UserPost $post, $mediaId)
+    public function show(Request $request, UserPost $post, $media)
     {
         if (!Gate::allows('canAccessExclusiveContent', $post)) {
             return response()->json(['message' => 'Unauthorized or blocked. Purchase required.'], 403);
         }
 
-        $media = $post->media()->findOrFail($mediaId);
+        $media = $post->media()->findOrFail($media);
 
         // Serve the file directly if it exists
         if (Storage::disk($media->disk)->exists($media->id . '/' . $media->file_name)) {

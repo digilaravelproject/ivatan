@@ -48,7 +48,7 @@ Development: http://localhost:8000/api/v1
 ## 4. API Endpoints: Creator Actions
 
 ### 4.1 Check Enablement Status
-Check if the logged-in creator has the exclusive content feature enabled or pending.
+Check if the logged-in creator has the exclusive content feature enabled, pending, or requires payment.
 
 **Endpoint:** `GET /exclusive/enablement-status`
 
@@ -56,25 +56,80 @@ Check if the logged-in creator has the exclusive content feature enabled or pend
 ```json
 {
   "status": "pending",
-  "is_enabled": false,
-  "message": "Your request is currently under review."
+  "fee_paid": 999.00,
+  "payment_status": "pending"
 }
 ```
 
 ### 4.2 Request Enablement
-Initiate a request to become an exclusive content creator.
+Initiate a request to become an exclusive content creator. If a setup fee is active, this returns payment intent details.
 
 **Endpoint:** `POST /exclusive/request-enablement`
+
+**Response (200 OK - When Setup Fee is Active):**
+```json
+{
+  "success": true,
+  "enablement": {
+    "user_id": 10,
+    "fee_paid": 999.00,
+    "status": "pending",
+    "payment_status": "pending",
+    "updated_at": "2026-07-14T12:00:00.000000Z",
+    "created_at": "2026-07-14T12:00:00.000000Z",
+    "id": 5
+  },
+  "gateway_order": {
+    "id": "ORDS_987654",
+    "amount": 99900,
+    "currency": "INR"
+  },
+  "razorpay_order": {
+    "id": "ORDS_987654",
+    "amount": 99900,
+    "currency": "INR"
+  }
+}
+```
+
+**Response (200 OK - When Setup Fee is Free):**
+```json
+{
+  "success": true,
+  "message": "Enablement requested. Waiting for admin approval.",
+  "data": {
+    "user_id": 10,
+    "fee_paid": 0,
+    "status": "pending",
+    "payment_status": "completed"
+  }
+}
+```
+
+### 4.3 Verify Enablement Payment
+Verify the setup fee payment from the mobile app via the payment gateway status payload.
+
+**Endpoint:** `POST /exclusive/request-enablement/verify`
+
+**Request Payload:**
+```json
+{
+  "gateway_payload": {
+    "providerReferenceId": "T230711152000",
+    "code": "PAYMENT_SUCCESS"
+  }
+}
+```
 
 **Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Request submitted successfully. Pending admin approval."
+  "message": "Payment successful. Enablement requested."
 }
 ```
 
-### 4.3 Create Exclusive Post
+### 4.4 Create Exclusive Post
 Create a new post with a price tag. 
 *Note: This is an extension of the normal post creation API, but using a dedicated endpoint or passing `price` in the standard endpoint. In our new architecture, it is isolated.*
 
@@ -104,8 +159,8 @@ Create a new post with a price tag.
 }
 ```
 
-### 4.4 Update Post Price
-Update the price of an existing post. *Note: Changing the price will revert the post's status to `pending`.*
+### 4.5 Update Exclusive Post Price
+Update the price of an existing exclusive post. This will reset the post verification status back to pending.
 
 **Endpoint:** `PUT /exclusive/posts/{post_id}/price`
 
@@ -126,6 +181,27 @@ Update the price of an existing post. *Note: Changing the price will revert the 
     "price": "600.00",
     "exclusive_status": "pending"
   }
+}
+```
+
+### 4.6 Toggle Exclusive Feature
+Enable or disable the exclusive content feature for the logged-in creator without submitting a fresh admin request.
+
+**Endpoint:** `POST /exclusive/toggle`
+
+**Request Payload (JSON):**
+```json
+{
+  "is_enabled": true
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "is_enabled": true,
+  "message": "Exclusive content feature toggled."
 }
 ```
 
