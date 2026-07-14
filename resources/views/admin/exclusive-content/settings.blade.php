@@ -55,6 +55,39 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Modal for Enablement Approval (Platform-wide or Creator-Specific Fee) -->
+    <div id="approveEnablementModal" class="hidden fixed z-10 inset-0 overflow-y-auto bg-gray-500 bg-opacity-75">
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-96 border border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900 mb-4 font-semibold">Approve Creator Enablement</h3>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Override Platform Fee Type</label>
+                    <select id="enablement_override_fee_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">No Override (Use Default)</option>
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="flat">Flat Amount (₹)</option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Override Platform Fee Value</label>
+                    <input type="number" id="enablement_override_fee_value" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g. 5">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Admin Notes</label>
+                    <textarea id="enablement_admin_notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Optional notes..."></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2">
+                    <button onclick="closeApproveModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md text-sm font-medium">Cancel</button>
+                    <button onclick="submitEnablementApproval()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium">Approve</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 @endsection
 
@@ -150,29 +183,42 @@
         });
     }
 
+    let activeEnablementId = null;
+
     function approveEnablement(id) {
-        const overrideFeeType = prompt("Optional: Enter platform fee override type ('flat' or 'percentage') or leave empty for default:");
-        let overrideFeeValue = null;
-        
-        if (overrideFeeType === 'flat' || overrideFeeType === 'percentage') {
-            overrideFeeValue = prompt("Enter fee override value (e.g. 5 for 5% or 50 for ₹50):");
-        }
-        
-        const notes = prompt("Enter optional admin notes:");
+        activeEnablementId = id;
+        $('#enablement_override_fee_type').val('');
+        $('#enablement_override_fee_value').val('');
+        $('#enablement_admin_notes').val('');
+        $('#approveEnablementModal').removeClass('hidden');
+    }
+
+    function closeApproveModal() {
+        $('#approveEnablementModal').addClass('hidden');
+        activeEnablementId = null;
+    }
+
+    function submitEnablementApproval() {
+        if (!activeEnablementId) return;
+
+        const feeType = $('#enablement_override_fee_type').val();
+        const feeValue = $('#enablement_override_fee_value').val();
+        const notes = $('#enablement_admin_notes').val();
 
         $.ajax({
-            url: `/admin/exclusive/enablements/${id}/approve`,
+            url: `/admin/exclusive/enablements/${activeEnablementId}/approve`,
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
             data: {
-                override_platform_fee_type: overrideFeeType || null,
-                override_platform_fee: overrideFeeValue || null,
+                override_platform_fee_type: feeType || null,
+                override_platform_fee: feeValue || null,
                 admin_notes: notes || null
             },
             success: function(response) {
                 alert('Enablement request approved successfully!');
+                closeApproveModal();
                 loadEnablementRequests();
             },
             error: function(xhr) {

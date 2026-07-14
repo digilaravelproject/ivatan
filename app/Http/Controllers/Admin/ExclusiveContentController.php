@@ -33,6 +33,12 @@ class ExclusiveContentController extends Controller
 
     public function approveEnablement(Request $request, $id): JsonResponse
     {
+        $request->validate([
+            'override_platform_fee_type' => 'nullable|string|in:flat,percentage',
+            'override_platform_fee' => 'nullable|numeric|min:0',
+            'admin_notes' => 'nullable|string|max:1000',
+        ]);
+
         $enablement = ExclusiveContentEnablement::findOrFail($id);
 
         if ($enablement->fee_paid > 0 && $enablement->payment_status !== 'completed') {
