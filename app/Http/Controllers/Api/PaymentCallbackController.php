@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\AdPayment;
 use App\Models\Ecommerce\UserOrder;
 use App\Models\UserSubscription;
+use App\Models\ExclusiveContentEnablement;
+use App\Models\ExclusiveContentPurchase;
+use App\Services\ExclusiveContentService;
 use App\Services\Payment\GatewayManager;
 use App\Services\Payment\PaymentOrchestrator;
 use Illuminate\Http\Request;
@@ -139,6 +142,56 @@ class PaymentCallbackController extends Controller
             } catch (\Throwable $e) {
                 Log::error('PhonePe callback: exception for subscription', [
                     'subscription_id' => $subscription->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } elseif (str_starts_with($merchantTransactionId, 'ene_')) {
+            try {
+                $parts = explode('_', $merchantTransactionId);
+                $enablementId = $parts[1] ?? null;
+                $enablement = ExclusiveContentEnablement::find($enablementId);
+
+                if ($enablement) {
+                    $this->orchestrator->resetDriver();
+                    $result = $this->orchestrator->driver()->verifyPayment(['merchantTransactionId' => $merchantTransactionId]);
+
+                    if ($result->success) {
+                        DB::transaction(function () use ($enablement, $merchantTransactionId) {
+                            $enablement->update([
+                                'payment_status' => 'completed',
+                                'gateway_transaction_id' => $merchantTransactionId,
+                                'status' => 'pending',
+                            ]);
+                        });
+                        Log::info('PhonePe callback: creator enablement payment success processed', ['enablement_id' => $enablementId]);
+                        return $this->redirectSuccess(['enablement_id' => $enablementId]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('PhonePe callback: exception for enablement', [
+                    'merchantTransactionId' => $merchantTransactionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        } elseif (str_starts_with($merchantTransactionId, 'exc_')) {
+            try {
+                $purchaseUuid = substr($merchantTransactionId, 4);
+                $purchase = ExclusiveContentPurchase::where('uuid', $purchaseUuid)->first();
+
+                if ($purchase) {
+                    $this->orchestrator->resetDriver();
+                    $result = $this->orchestrator->driver()->verifyPayment(['merchantTransactionId' => $merchantTransactionId]);
+
+                    if ($result->success) {
+                        $exclusiveContentService = app(ExclusiveContentService::class);
+                        $exclusiveContentService->processSuccessfulPurchase($purchase);
+                        Log::info('PhonePe callback: exclusive content purchase success processed', ['purchase_id' => $purchase->id]);
+                        return $this->redirectSuccess(['purchase_id' => $purchase->id]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('PhonePe callback: exception for purchase', [
+                    'merchantTransactionId' => $merchantTransactionId,
                     'error' => $e->getMessage(),
                 ]);
             }

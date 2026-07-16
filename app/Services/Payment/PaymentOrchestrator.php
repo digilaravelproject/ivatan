@@ -251,12 +251,19 @@ class PaymentOrchestrator
             $order['razorpay_order_id'] = $result->gatewayOrderId;
         }
 
-        return [
+        $response = [
             'success' => true,
             'purchase' => $purchase,
             'gateway_order' => $order,
-            'razorpay_order' => $order,
         ];
+
+        if ($activeGateway === 'phonepe') {
+            if ($result->redirectUrl) {
+                $response['redirect_url'] = $result->redirectUrl;
+            }
+        }
+
+        return $response;
     }
 
     public function verifyExclusiveContentPayment(\App\Models\ExclusiveContentPurchase $purchase, array $gatewayPayload): PaymentResult
@@ -299,12 +306,19 @@ class PaymentOrchestrator
             $order['razorpay_order_id'] = $result->gatewayOrderId;
         }
 
-        return [
+        $response = [
             'success' => true,
             'enablement' => $enablement,
             'gateway_order' => $order,
-            'razorpay_order' => $order,
         ];
+
+        if ($activeGateway === 'phonepe') {
+            if ($result->redirectUrl) {
+                $response['redirect_url'] = $result->redirectUrl;
+            }
+        }
+
+        return $response;
     }
 
     public function verifyEnablementPayment(\App\Models\ExclusiveContentEnablement $enablement, array $gatewayPayload): PaymentResult

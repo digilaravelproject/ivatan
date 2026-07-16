@@ -10,6 +10,9 @@ use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Services\Payment\GatewayManager;
 use App\Services\Payment\Exceptions\PaymentGatewayException;
 use App\Services\Payment\PaymentOrchestrator;
+use App\Models\ExclusiveContentEnablement;
+use App\Models\ExclusiveContentPurchase;
+use App\Services\ExclusiveContentService;
 use App\Services\Setting\SettingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -113,6 +116,41 @@ class PaymentWebhookController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'No subscription ID'], 400);
             }
             Log::info('Razorpay webhook: direct payment event received', ['event' => $event]);
+
+            $razorpayOrderId = $payloadData['order']['entity']['id'] 
+                ?? $paymentEntity['order_id'] 
+                ?? null;
+
+            if ($razorpayOrderId) {
+                $enablement = ExclusiveContentEnablement::where('gateway_transaction_id', $razorpayOrderId)->first();
+                $purchase = ExclusiveContentPurchase::where('gateway_transaction_id', $razorpayOrderId)->first();
+
+                if ($enablement) {
+                    if ($event === 'order.paid' || $event === 'payment.captured') {
+                        DB::transaction(function () use ($enablement) {
+                            $enablement->update([
+                                'payment_status' => 'completed',
+                                'status' => 'pending',
+                            ]);
+                        });
+                        Log::info('Razorpay webhook: creator enablement payment success processed', ['enablement_id' => $enablement->id]);
+                    } elseif ($event === 'payment.failed') {
+                        DB::transaction(function () use ($enablement) {
+                            $enablement->update(['payment_status' => 'failed']);
+                        });
+                        Log::warning('Razorpay webhook: creator enablement payment failed', ['enablement_id' => $enablement->id]);
+                    }
+                } elseif ($purchase) {
+                    if ($event === 'order.paid' || $event === 'payment.captured') {
+                        $exclusiveContentService = app(ExclusiveContentService::class);
+                        $exclusiveContentService->processSuccessfulPurchase($purchase);
+                        Log::info('Razorpay webhook: exclusive content purchase success processed', ['purchase_id' => $purchase->id]);
+                    } elseif ($event === 'payment.failed') {
+                        $purchase->update(['status' => 'failed']);
+                        Log::warning('Razorpay webhook: exclusive content purchase failed', ['purchase_id' => $purchase->id]);
+                    }
+                }
+            }
         }
 
         if ($dedupKey) {
@@ -217,6 +255,52 @@ class PaymentWebhookController extends Controller
         if (Cache::get($dedupKey)) {
             Log::info('PhonePe webhook: duplicate event skipped', ['merchantTransactionId' => $merchantTransactionId]);
             return response()->json(['status' => 'duplicate']);
+        }
+
+        // Check if creator enablement payment
+        if (str_starts_with($merchantTransactionId, 'ene_')) {
+            $parts = explode('_', $merchantTransactionId);
+            $enablementId = $parts[1] ?? null;
+            if ($enablementId) {
+                $enablement = ExclusiveContentEnablement::find($enablementId);
+                if ($enablement) {
+                    if ($event === 'payment.success') {
+                        DB::transaction(function () use ($enablement, $merchantTransactionId) {
+                            $enablement->update([
+                                'payment_status' => 'completed',
+                                'gateway_transaction_id' => $merchantTransactionId,
+                                'status' => 'pending', // Pending admin approval
+                            ]);
+                        });
+                        Log::info('PhonePe webhook: creator enablement payment success processed', ['enablement_id' => $enablementId]);
+                    } else {
+                        DB::transaction(function () use ($enablement) {
+                            $enablement->update(['payment_status' => 'failed']);
+                        });
+                        Log::warning('PhonePe webhook: creator enablement payment failed', ['enablement_id' => $enablementId]);
+                    }
+                    Cache::put($dedupKey, true, 3600);
+                    return response()->json(['status' => 'success']);
+                }
+            }
+        }
+
+        // Check if exclusive content purchase
+        if (str_starts_with($merchantTransactionId, 'exc_')) {
+            $purchaseUuid = substr($merchantTransactionId, 4); // Remove 'exc_'
+            $purchase = ExclusiveContentPurchase::where('uuid', $purchaseUuid)->first();
+            if ($purchase) {
+                if ($event === 'payment.success') {
+                    $exclusiveContentService = app(ExclusiveContentService::class);
+                    $exclusiveContentService->processSuccessfulPurchase($purchase);
+                    Log::info('PhonePe webhook: exclusive content purchase success processed', ['purchase_id' => $purchase->id]);
+                } else {
+                    $purchase->update(['status' => 'failed']);
+                    Log::warning('PhonePe webhook: exclusive content purchase failed', ['purchase_id' => $purchase->id]);
+                }
+                Cache::put($dedupKey, true, 3600);
+                return response()->json(['status' => 'success']);
+            }
         }
 
         $order = UserOrder::where('uuid', $merchantTransactionId)->first();
@@ -404,6 +488,52 @@ class PaymentWebhookController extends Controller
         if (Cache::get($dedupKey)) {
             Log::info('PhonePe V2 webhook: duplicate event skipped', ['merchantOrderId' => $merchantOrderId]);
             return response()->json(['status' => 'duplicate']);
+        }
+
+        // Check if creator enablement payment
+        if (str_starts_with($merchantOrderId, 'ene_')) {
+            $parts = explode('_', $merchantOrderId);
+            $enablementId = $parts[1] ?? null;
+            if ($enablementId) {
+                $enablement = ExclusiveContentEnablement::find($enablementId);
+                if ($enablement) {
+                    if ($event === 'checkout.order.completed' && ($decodedPayload['payload']['state'] ?? '') === 'COMPLETED') {
+                        DB::transaction(function () use ($enablement, $merchantOrderId) {
+                            $enablement->update([
+                                'payment_status' => 'completed',
+                                'gateway_transaction_id' => $merchantOrderId,
+                                'status' => 'pending', // Pending admin approval
+                            ]);
+                        });
+                        Log::info('PhonePe V2 webhook: creator enablement payment success processed', ['enablement_id' => $enablementId]);
+                    } else {
+                        DB::transaction(function () use ($enablement) {
+                            $enablement->update(['payment_status' => 'failed']);
+                        });
+                        Log::warning('PhonePe V2 webhook: creator enablement payment failed', ['enablement_id' => $enablementId]);
+                    }
+                    Cache::put($dedupKey, true, 3600);
+                    return response()->json(['status' => 'success']);
+                }
+            }
+        }
+
+        // Check if exclusive content purchase
+        if (str_starts_with($merchantOrderId, 'exc_')) {
+            $purchaseUuid = substr($merchantOrderId, 4); // Remove 'exc_'
+            $purchase = ExclusiveContentPurchase::where('uuid', $purchaseUuid)->first();
+            if ($purchase) {
+                if ($event === 'checkout.order.completed' && ($decodedPayload['payload']['state'] ?? '') === 'COMPLETED') {
+                    $exclusiveContentService = app(ExclusiveContentService::class);
+                    $exclusiveContentService->processSuccessfulPurchase($purchase);
+                    Log::info('PhonePe V2 webhook: exclusive content purchase success processed', ['purchase_id' => $purchase->id]);
+                } else {
+                    $purchase->update(['status' => 'failed']);
+                    Log::warning('PhonePe V2 webhook: exclusive content purchase failed', ['purchase_id' => $purchase->id]);
+                }
+                Cache::put($dedupKey, true, 3600);
+                return response()->json(['status' => 'success']);
+            }
         }
 
         $order = UserOrder::where('uuid', $merchantOrderId)->first();

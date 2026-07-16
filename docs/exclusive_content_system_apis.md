@@ -1,352 +1,289 @@
-# Exclusive Content System API Documentation (Flutter)
+# Exclusive Content System API Documentation & Testing Guide
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Last Updated:** July 2026  
-**Project:** Ivatan Social Platform
+**Project:** Ivatan Social Platform  
 
 ---
 
-## 1. Overview
+## 1. System Overview & Workflow
 
-The **Exclusive Content System** allows creators to lock their posts (Images, Videos, Reels) behind a paywall. Followers must purchase access to view the media. 
+The **Exclusive Content System** allows creators to lock media (Images, Videos, Reels) behind a paywall. 
 
-### Start-to-End Flow
-1. **Enablement:** A Creator requests to enable the "Exclusive Content" feature and pays a one-time setup fee (if applicable). Admin approves/rejects this request.
-2. **Creation:** Once enabled, the Creator can upload a post and specify a `price`. The post enters a `pending` state for Admin review.
-3. **Approval:** Admin reviews the content and approves it (optionally overriding the platform fee percentage/flat amount).
-4. **Purchase:** A user sees the locked post, initiates a purchase via the payment gateway, and completes the transaction.
-5. **Wallet Distribution:** Upon successful payment, the funds are split. The Platform Fee is deducted, and the Creator's Share is credited to the Creator's Wallet.
-6. **Withdrawal:** Creator can view their wallet balance and transaction history.
-
----
-
-## 2. Authentication
-
-All APIs require **Laravel Sanctum** authentication.
-
-### Using Token
-
-Include in every request header:
-
-```
-Authorization: Bearer <sanctum-token>
-Content-Type: application/json
-Accept: application/json
-```
-
----
-
-## 3. Base URL
-
-```
-Production: https://www.ivatan.in/api/v1
-Development: http://localhost:8000/api/v1
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Creator as Creator (User)
+    actor Admin as Admin Panel
+    actor Buyer as Buyer (User)
+    
+    Note over Creator: Phase 1: Enablement
+    Creator->>Backend: Request Enablement (POST /exclusive/request-enablement)
+    Backend-->>Creator: Returns Gateway Order ID (e.g. ene_3_1711200) & Amount
+    Creator->>Gateway SDK: Pay Fee (PhonePe / Razorpay SDK in-app)
+    Gateway SDK->>Backend Webhook/Callback: Send Success Event (ene_3_1711200)
+    Backend Webhook/Callback->>Database: Mark Payment Status = 'completed'
+    Admin->>Backend: Fetch Enablements (GET /admin/exclusive/enablements)
+    Admin->>Backend: Approve Enablement (POST /admin/exclusive/enablements/{id}/approve)
+    Backend->>Database: Set Status = 'approved'
+    
+    Note over Creator: Phase 2: Content Creation
+    Creator->>Backend: Upload Post with Price (POST /exclusive/posts)
+    Admin->>Backend: Approve Content (POST /admin/exclusive/pending-content/{id}/approve)
+    
+    Note over Buyer: Phase 3: Access & Purchase
+    Buyer->>Backend: Initiate Purchase (POST /exclusive/purchase/{post_id}/initiate)
+    Backend-->>Buyer: Returns Gateway Order ID (exc_uuid) & URL
+    Buyer->>Gateway SDK: Pay Price
+    Gateway SDK->>Backend Webhook/Callback: Send Success Event (exc_uuid)
+    Backend Webhook/Callback->>Database: Mark status = 'completed' & split funds
+    Buyer->>Backend: View Secure Media (GET /exclusive/posts/{post_id}/media/{media_id})
 ```
 
 ---
 
-## 4. API Endpoints: Creator Actions
+## 2. Phase 1: Step-by-Step Creator Enablement Flow
 
-### 4.1 Check Enablement Status
-Check if the logged-in creator has the exclusive content feature enabled, pending, or requires payment.
-
-**Endpoint:** `GET /exclusive/enablement-status`
-
-**Response (200 OK):**
-```json
-{
-  "status": "pending",
-  "fee_paid": 999.00,
-  "payment_status": "pending"
-}
-```
-
-### 4.2 Request Enablement
-Initiate a request to become an exclusive content creator. If a setup fee is active, this returns payment intent details.
-
-**Endpoint:** `POST /exclusive/request-enablement`
-
-**Response (200 OK - When Setup Fee is Active):**
-```json
-{
-  "success": true,
-  "enablement": {
-    "user_id": 10,
-    "fee_paid": 999.00,
-    "status": "pending",
-    "payment_status": "pending",
-    "updated_at": "2026-07-14T12:00:00.000000Z",
-    "created_at": "2026-07-14T12:00:00.000000Z",
-    "id": 5
-  },
-  "gateway_order": {
-    "id": "ORDS_987654",
-    "amount": 99900,
-    "currency": "INR"
-  },
-  "razorpay_order": {
-    "id": "ORDS_987654",
-    "amount": 99900,
-    "currency": "INR"
+### Step 1: Check Current Status
+Before initiating any request, check if the creator is already approved, pending approval, or requires payment.
+* **Endpoint:** `GET /api/v1/exclusive/enablement-status`
+* **Response:**
+  ```json
+  {
+    "status": "none", 
+    "fee_paid": 979.0,
+    "payment_status": "none"
   }
-}
-```
+  ```
+  *(Status values: `none`, `pending`, `approved`, `rejected`, `disabled_by_creator`)*
 
-**Response (200 OK - When Setup Fee is Free):**
-```json
-{
-  "success": true,
-  "message": "Enablement requested. Waiting for admin approval.",
-  "data": {
-    "user_id": 10,
-    "fee_paid": 0,
-    "status": "pending",
-    "payment_status": "completed"
+### Step 2: Request Enablement (Initiate Payment)
+Call this to request enablement. If a global fee is active (e.g., ₹979), it creates a pending enablement record and generates a payment gateway intent.
+* **Endpoint:** `POST /api/v1/exclusive/request-enablement`
+* **Response (When PhonePe is Active):**
+  ```json
+  {
+    "success": true,
+    "enablement": {
+      "id": 3,
+      "user_id": 46,
+      "fee_paid": 979,
+      "gateway": "phonepe",
+      "gateway_transaction_id": "ene_3_1711200000",
+      "payment_status": "pending",
+      "status": "pending"
+    },
+    "gateway_order": {
+      "id": "ene_3_1711200000",
+      "amount": 97900,
+      "currency": "INR"
+    },
+    "redirect_url": "https://mercury-t2.phonepe.com/transact/..."
   }
-}
-```
+  ```
+  * **Note on `redirect_url`:** This represents the secure checkout page URL returned by the gateway (e.g. PhonePe). Since PhonePe V1 Pay Page and V2 Standard Checkout utilize web checkout, the Flutter app must load this URL in an In-App WebView (using `webview_flutter` or similar) or open it in a system browser to let the user complete the payment transaction.
 
-### 4.3 Verify Enablement Payment
-Verify the setup fee payment from the mobile app via the payment gateway status payload.
-
-**Endpoint:** `POST /exclusive/request-enablement/verify`
-
-**Request Payload:**
-```json
-{
-  "gateway_payload": {
-    "providerReferenceId": "T230711152000",
-    "code": "PAYMENT_SUCCESS"
+* **Response (When Razorpay is Active):**
+  ```json
+  {
+    "success": true,
+    "enablement": {
+      "id": 3,
+      "user_id": 46,
+      "fee_paid": 979,
+      "gateway": "razorpay",
+      "gateway_transaction_id": "order_xyz123",
+      "payment_status": "pending",
+      "status": "pending"
+    },
+    "gateway_order": {
+      "id": "order_xyz123",
+      "amount": 97900,
+      "currency": "INR"
+    }
   }
-}
-```
+  ```
+  *Note: The `gateway_order.id` represents the gateway order/transaction ID.*
 
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Payment successful. Enablement requested."
-}
-```
+### Step 3: Complete Payment & Verify Status
+Once the mobile app processes the payment via the gateway's SDK, the payment status needs to be updated from `pending` to `completed`. This happens via one of three channels:
 
-### 4.4 Create Exclusive Post
-Create a new post with a price tag. 
-*Note: This is an extension of the normal post creation API, but using a dedicated endpoint or passing `price` in the standard endpoint. In our new architecture, it is isolated.*
-
-**Endpoint:** `POST /exclusive/posts`  
-**Content-Type:** `multipart/form-data`
-
-**Request Payload:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `type` | string | Yes | `image`, `video`, `reel`, `text` |
-| `caption` | string | Yes | Post caption |
-| `visibility` | string | Yes | `public`, `private` |
-| `media` | file | Yes | The media file |
-| `price` | double | Yes | Must be > 0 for exclusive content |
-
-**Response (201 Created):**
-```json
-{
-  "message": "Exclusive Post created successfully and is pending review.",
-  "data": {
-    "id": 105,
-    "caption": "My exclusive photoshoot!",
-    "is_exclusive": true,
-    "price": "500.00",
-    "exclusive_status": "pending"
-  }
-}
-```
-
-### 4.5 Update Exclusive Post Price
-Update the price of an existing exclusive post. This will reset the post verification status back to pending.
-
-**Endpoint:** `PUT /exclusive/posts/{post_id}/price`
-
-**Request Payload (JSON):**
-```json
-{
-  "price": 600.00
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Post price updated successfully. Content is pending verification if exclusive.",
-  "data": {
-    "id": 105,
-    "price": "600.00",
-    "exclusive_status": "pending"
-  }
-}
-```
-
-### 4.6 Toggle Exclusive Feature
-Enable or disable the exclusive content feature for the logged-in creator without submitting a fresh admin request.
-
-**Endpoint:** `POST /exclusive/toggle`
-
-**Request Payload (JSON):**
-```json
-{
-  "is_enabled": true
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "is_enabled": true,
-  "message": "Exclusive content feature toggled."
-}
-```
-
----
-
-## 5. API Endpoints: Creator Wallet
-
-### 5.1 Get Wallet Balance
-Fetch the current available balance for the logged-in creator.
-
-**Endpoint:** `GET /exclusive/wallet/balance`
-
-**Response (200 OK):**
-```json
-{
-  "balance": "1500.00",
-  "status": "active"
-}
-```
-
-### 5.2 Get Wallet Transactions
-Fetch the paginated history of wallet credits/debits.
-
-**Endpoint:** `GET /exclusive/wallet/transactions`
-
-**Response (200 OK):**
-```json
-{
-  "current_page": 1,
-  "data": [
+* **Channel A (Client-Side Verification):**
+  The Flutter app explicitly calls the verification endpoint after the SDK returns success:
+  * **Endpoint:** `POST /api/v1/exclusive/request-enablement/verify`
+  * **Payload:**
+    ```json
     {
-      "id": 12,
-      "type": "credit",
-      "amount": "450.00",
-      "description": "Earnings from exclusive post #105",
-      "created_at": "2026-07-11T10:00:00.000000Z",
-      "buyer": {
-        "id": 45,
-        "name": "John Doe",
-        "username": "johndoe"
-      },
-      "content": {
-        "id": 105,
-        "caption": "My exclusive photoshoot!"
+      "gateway_payload": {
+        "merchantTransactionId": "ene_3_1711200000",
+        "code": "PAYMENT_SUCCESS"
       }
     }
-  ],
-  "total": 1
-}
-```
+    ```
+* **Channel B (Background Webhooks - Recommended for reliability):**
+  The payment gateway calls the backend's webhook URL asynchronously in the background. The webhook parses the transaction ID prefix `ene_` and marks the payment as completed.
+  * **PhonePe Webhook:** `POST /api/webhooks/phonepe`
+  * **Razorpay Webhook:** `POST /api/webhooks/razorpay`
+* **Channel C (Payment Redirect Callback):**
+  If the user completes checkout via a web checkout redirect, the gateway redirects them back to the callback route, which automatically triggers verification:
+  * **Route:** `GET/POST /payment/callback/phonepe?merchantTransactionId=ene_3_1711200000&code=PAYMENT_SUCCESS`
+
+*Upon successful verification by any channel, the DB changes to:*
+* `payment_status` = `completed`
+* `status` = `pending` *(Now ready for admin approval)*
+
+### Step 4: Admin Moderation
+1. **View Requests:** Admin lists enablement requests. Unpaid/pending payment requests are visible but cannot be approved.
+   * **Endpoint:** `GET /admin/exclusive/enablements`
+2. **Approve Request:** Admin approves the creator.
+   * **Endpoint:** `POST /admin/exclusive/enablements/{id}/approve`
+   * **Payload (Optional):**
+     ```json
+     {
+       "override_platform_fee_type": "percentage",
+       "override_platform_fee": 5.0,
+       "admin_notes": "Creator approved with customized 5% platform fee."
+     }
+     ```
+3. **Reject Request:** Admin rejects the request.
+   * **Endpoint:** `POST /admin/exclusive/enablements/{id}/reject`
+   * **Payload:**
+     ```json
+     {
+       "admin_notes": "Invalid profile verification."
+     }
+     ```
 
 ---
 
-## 6. API Endpoints: Buyer / User Flow
+## 3. Phase 2: Exclusive Content Creation & Moderation
 
-### 6.1 Initiate Purchase
-Call this when the user clicks "Unlock Content". This will return the payment intent details needed for PhonePe/Razorpay.
+Once the Creator's enablement status is `approved`, they can post exclusive content.
 
-**Endpoint:** `POST /exclusive/purchase/{post_id}/initiate`
+### Step 1: Upload Post with Price
+* **Endpoint:** `POST /api/v1/exclusive/posts` (Form-data)
+* **Parameters:**
+  * `type`: `image` | `video` | `reel`
+  * `caption`: "My exclusive reel!"
+  * `visibility`: `public`
+  * `media`: [Binary File]
+  * `price`: 500.00
+* **Response:** Returns the created post object with `exclusive_status` = `'pending'`.
 
-**Error Response (403 Forbidden - Blocked User):**
-```json
-{
-  "message": "You cannot purchase this content."
-}
-```
+### Step 2: Admin Moderation of Content
+* **List Pending Posts:** `GET /admin/exclusive/pending-content`
+* **Approve Post:** `POST /admin/exclusive/pending-content/{id}/approve`
+* **Reject Post:** `POST /admin/exclusive/pending-content/{id}/reject`
 
-**Error Response (400 Bad Request - Already Purchased):**
-```json
-{
-  "message": "You already have active access to this content."
-}
-```
+---
 
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "transactionId": "TXN_123456789",
-  "amount": 500,
-  "payment_url": "https://mercury-t2.phonepe.com/transact/..."
-}
-```
+## 4. Phase 3: Buyer Access & Purchase Flow
 
-### 6.2 Verify Purchase
-Call this after the payment gateway returns success to the mobile app.
-
-**Endpoint:** `POST /exclusive/purchase/verify`
-
-**Request Payload (JSON):**
-```json
-{
-  "purchase_id": 99,
-  "gateway_payload": {
-    "providerReferenceId": "T230711152000",
-    "code": "PAYMENT_SUCCESS"
+### Step 1: Initiate Purchase
+When a follower tries to unlock a post, they initiate a purchase intent.
+* **Endpoint:** `POST /api/v1/exclusive/purchase/{post_id}/initiate`
+* **Response (When PhonePe is Active):**
+  ```json
+  {
+    "success": true,
+    "purchase": {
+      "id": 99,
+      "buyer_id": 45,
+      "user_post_id": 105,
+      "final_paid_amount": 500.00,
+      "status": "pending",
+      "gateway_transaction_id": "exc_uuid"
+    },
+    "gateway_order": {
+      "id": "exc_uuid",
+      "amount": 50000,
+      "currency": "INR"
+    },
+    "redirect_url": "https://mercury-t2.phonepe.com/transact/..."
   }
-}
-```
+  ```
+  * **Note on `redirect_url`:** Similar to the enablement flow, this is the web pay page URL provided by PhonePe. Flutter developers must open this URL in a WebView to let users complete the payment and trigger the status updates.
 
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Payment successful. Content unlocked."
-}
-```
+* **Response (When Razorpay is Active):**
+  ```json
+  {
+    "success": true,
+    "purchase": {
+      "id": 99,
+      "buyer_id": 45,
+      "user_post_id": 105,
+      "final_paid_amount": 500.00,
+      "status": "pending",
+      "gateway_transaction_id": "order_xyz123"
+    },
+    "gateway_order": {
+      "id": "order_xyz123",
+      "amount": 50000,
+      "currency": "INR"
+    }
+  }
+  ```
 
-### 6.3 Secure Media Access
-To fetch the actual image/video file, the app must route through this secure endpoint instead of a direct S3/Storage URL. If the user hasn't paid, this returns a 403.
+### Step 2: Complete Payment & Verify
+Just like the enablement flow, once the payment is completed, verification can happen via:
+* **Client API:** `POST /api/v1/exclusive/purchase/verify` (Passing `purchase_id` and payload).
+* **Webhook/Callback:** Backends automatically handle transaction IDs starting with `exc_` to unlock the content.
+* **Result:** The system splits the funds (deducts platform fee, adds creator share to creator wallet) and grants access.
 
-**Endpoint:** `GET /exclusive/posts/{post_id}/media/{media_id}`
-
-*Usage Note for Flutter:* You must pass the Bearer token in the header of your Image/Video network fetching library (like `CachedNetworkImage` or `video_player`).
-
-**Error Response (403 Forbidden):**
-```json
-{
-  "message": "Unauthorized or blocked. Purchase required."
-}
-```
-
-**Response (200 OK):**
-*Returns raw Binary Stream of the image/video.*
-
----
-
-## 7. API Endpoints: Admin (Web / App)
-
-Admin APIs are secured behind the `is_admin` middleware.
-
-### 7.1 Wallet Visibility
-- `GET /admin/exclusive/wallets` - Lists all creator wallets and their balances.
-- `GET /admin/exclusive/wallets/stats` - Returns global platform revenue metrics.
-- `GET /admin/exclusive/wallets/transactions` - Global transaction log.
-
-### 7.2 Content Moderation
-- `GET /admin/exclusive/pending-content` - List content awaiting approval.
-- `POST /admin/exclusive/pending-content/{post_id}/approve` - Approve content (can optionally accept `fee_override_type` and `fee_override_value`).
-- `POST /admin/exclusive/pending-content/{post_id}/reject` - Reject content.
+### Step 3: Secure Media Retrieval
+The Flutter app must request the raw media file via the secure streaming endpoint passing the bearer token, rather than using raw S3 URLs.
+* **Endpoint:** `GET /api/v1/exclusive/posts/{post_id}/media/{media_id}`
 
 ---
 
-## 8. Frontend Integration Rules (Crucial for UI/UX)
+## 5. Local Testing & Verification Guide (Step-by-Step with Curl)
 
-1. **Pending Status:** If an exclusive post object has `exclusive_status == 'pending'`, the creator should see a banner saying "Awaiting Admin Approval". Other users should NOT see this post in their feed yet.
-2. **Blocked Users:** The backend API inherently prevents blocked users from initiating a purchase (Returns `403`). However, ensure the UI hides the "Buy" button if the user block relation is pre-fetched.
-3. **Media Fetching:** You cannot use standard Network Image widgets blindly for exclusive content. Ensure your HTTP client injects the Sanctum Token for the `ExclusiveMediaController` routes.
+Use the following sequence of terminal commands to verify the entire system.
+
+### 1. Request Enablement (Creator)
+Replace `CREATOR_TOKEN` with a valid Sanctum token.
+```bash
+curl --location 'https://www.ivatan.in/api/v1/exclusive/request-enablement' \
+--header 'Accept: application/json' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer CREATOR_TOKEN' \
+--data '{}'
+```
+*Take note of the `"id"` under `"enablement"` (e.g., `3`) and the `"id"` under `"gateway_order"` (e.g., `ene_3_1711200000`).*
+
+### 2. Verify Payment (Mocking the gateway call)
+Call the verification API to simulate a successful payment.
+```bash
+curl --location 'https://www.ivatan.in/api/v1/exclusive/request-enablement/verify' \
+--header 'Accept: application/json' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer CREATOR_TOKEN' \
+--data '{
+    "gateway_payload": {
+        "merchantTransactionId": "ene_3_1711200000",
+        "code": "PAYMENT_SUCCESS"
+    }
+}'
+```
+*Now, if you call `GET /api/v1/exclusive/enablement-status`, it will return `"status": "pending", "payment_status": "completed"`.*
+
+### 3. Approve the Creator (Admin Session)
+Replace `ADMIN_COOKIE` or use Admin Auth to make the POST call. Admin will find the request in `GET /admin/exclusive/enablements` and approve it.
+```bash
+curl --location 'https://www.ivatan.in/admin/exclusive/enablements/3/approve' \
+--header 'Accept: application/json' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer ADMIN_TOKEN' \
+--data '{
+    "admin_notes": "Approved for local testing"
+}'
+```
+
+### 4. Create Post & Approve Content
+The Creator uploads an exclusive post, and the Admin approves it using:
+```bash
+curl --location 'https://www.ivatan.in/admin/exclusive/pending-content/POST_ID/approve' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer ADMIN_TOKEN'
+```
+*(Now the content is unlocked and ready for purchase by users).*
