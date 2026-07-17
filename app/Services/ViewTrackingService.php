@@ -17,10 +17,12 @@ class ViewTrackingService
 
         try {
             return DB::transaction(function () use ($model, $userId, $ip) {
-                $locked = $model->newQuery()
-                    ->whereKey($model->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
+                $locked = get_class($model)::withoutEvents(function () use ($model) {
+                    return $model->newQuery()
+                        ->whereKey($model->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                });
 
                 if ($this->isDuplicateView($locked, $userId, $ip)) {
                     return false;
