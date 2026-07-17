@@ -15,7 +15,11 @@ Broadcast::channel('chat.{chatId}', function ($user, $chatId) {
     return UserChatParticipant::where('chat_id', $chatId)->where('user_id', $user->id)->exists();
 }, ['guards' => ['web', 'admin']]);
 
-// User private notification & calling channel
+// User private notification & calling channel (Standard & Compatibility fallback)
+Broadcast::channel('user.{id}', function ($user, int $id) {
+    return (int) $user->id === $id;
+}, ['guards' => ['sanctum']]);
+
 Broadcast::channel('private-user.{id}', function ($user, int $id) {
     return (int) $user->id === $id;
 }, ['guards' => ['sanctum']]);
