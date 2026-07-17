@@ -19,15 +19,23 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         $isLocal = $this->app->environment('local');
 
         Telescope::filter(function (IncomingEntry $entry) use ($isLocal) {
-            // Local me sab record ho jaye
+            // Production me request tab me sirf api/* paths capture honge
+            if (!$isLocal && $entry->type === 'request') {
+                $uri = $entry->content['uri'] ?? '';
+                $isApi = str_starts_with(ltrim($uri, '/'), 'api/');
+                if (!$isApi) {
+                    return false;
+                }
+            }
+
             return $isLocal
                 || $entry->isReportableException()
                 || $entry->isFailedRequest()
                 || $entry->isFailedJob()
                 || $entry->isScheduledTask()
                 || $entry->hasMonitoredTag()
-                // Production me normal requests & models bhi capture karna
-                || in_array($entry->type, ['query', 'model', 'request', 'view', 'job', 'log', 'exception']);
+                // Production me normal details bhi capture karna
+                || in_array($entry->type, ['query', 'model', 'request', 'view', 'job', 'log', 'exception', 'command', 'schedule', 'cache', 'redis', 'mail', 'notification']);
         });
 
         // Production me manual enable
