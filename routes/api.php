@@ -221,7 +221,8 @@ Route::prefix('v1')->group(function () {
         // Exclusive Content & Wallet Routes
         // ================================
         Route::prefix('exclusive')->group(function () {
-            // Content Creation
+            // Content Retrieval & Creation
+            Route::get('/posts', [ExclusiveContentController::class, 'index']);
             Route::post('/posts', [ExclusiveContentController::class, 'store']);
             Route::put('/posts/{post}/price', [ExclusiveContentController::class, 'updatePrice']);
             

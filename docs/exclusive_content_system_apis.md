@@ -179,6 +179,81 @@ Once the Creator's enablement status is `approved`, they can post exclusive cont
 
 ## 4. Phase 3: Buyer Access & Purchase Flow
 
+### Step 0: Get / List Exclusive Content
+Before purchasing, followers retrieve the list of approved exclusive posts.
+* **Endpoint:** `GET /api/v1/exclusive/posts`
+* **Query Parameters (Optional):**
+  - `username`: Filter by creator's username.
+  - `user_id`: Filter by creator's user ID.
+* **Headers:**
+  - `Authorization: Bearer <token>`
+* **Response:**
+  ```json
+  {
+    "data": [
+      {
+        "id": 105,
+        "uuid": "4f938d8f-7c1c-4b68-8de1-d7bb7e2fb2d3",
+        "type": "image",
+        "caption": "My exclusive photo!",
+        "visibility": "public",
+        "is_exclusive": true,
+        "price": 500.00,
+        "exclusive_status": "approved",
+        "has_access": false,
+        "is_mine": false,
+        "is_following": true,
+        "user": {
+          "id": 46,
+          "name": "Creator User",
+          "username": "creator_username",
+          "occupation": "Photographer",
+          "avatar": "https://...",
+          "is_verified": true,
+          "interests": "Photography, Travel"
+        },
+        "media": [
+          {
+            "id": 12,
+            "type": "image",
+            "url": null, 
+            "thumbnail": null,
+            "mime_type": "image/jpeg",
+            "aspect_ratio": null
+          }
+        ],
+        "stats": {
+          "like_count": 10,
+          "comment_count": 2,
+          "share_count": 0,
+          "view_count": 100,
+          "is_liked": false,
+          "is_saved": false,
+          "is_blocked": false
+        },
+        "created_at": "2026-07-17T05:27:44+00:00",
+        "created_human": "2 hours ago"
+      }
+    ],
+    "links": {
+      "first": "https://www.ivatan.in/api/v1/exclusive/posts?page=1",
+      "last": "https://www.ivatan.in/api/v1/exclusive/posts?page=1",
+      "prev": null,
+      "next": null
+    },
+    "meta": {
+      "current_page": 1,
+      "from": 1,
+      "last_page": 1,
+      "path": "https://www.ivatan.in/api/v1/exclusive/posts",
+      "per_page": 15,
+      "to": 1,
+      "total": 1
+    }
+  }
+  ```
+  * **Note on locked media:** When `has_access` is `false`, the media `url` and `thumbnail` will be `null` to protect the content. Once purchased (`has_access` becomes `true`), the `url` will point to the secure media streaming endpoint: `/api/v1/exclusive/posts/{post_id}/media/{media_id}`.
+
 ### Step 1: Initiate Purchase
 When a follower tries to unlock a post, they initiate a purchase intent.
 * **Endpoint:** `POST /api/v1/exclusive/purchase/{post_id}/initiate`

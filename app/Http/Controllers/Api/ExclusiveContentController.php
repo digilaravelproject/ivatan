@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Resources\PostResource;
+use App\Http\Resources\ExclusivePostResource;
 use App\Models\UserPost;
 use App\Models\User;
 use App\Services\UserPostService;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ExclusiveContentController extends Controller
 {
@@ -26,6 +29,58 @@ class ExclusiveContentController extends Controller
         /** @var User $user */
         $user = Auth::user();
         return $user;
+    }
+
+    /**
+     * List approved exclusive posts.
+     */
+    public function index(Request $request): AnonymousResourceCollection|JsonResponse
+    {
+        try {
+            $user = $this->authUser();
+
+            $query = UserPost::query()
+                ->exclusive()
+                ->where('exclusive_status', 'approved');
+
+            // Filter by creator if specified
+            if ($request->has('username')) {
+                $query->whereHas('user', function ($q) use ($request) {
+                    $q->where('username', $request->input('username'));
+                });
+            } elseif ($request->has('user_id')) {
+                $query->where('user_id', $request->input('user_id'));
+            }
+
+            // Eager load relations to avoid N+1 query bugs
+            $query->with([
+                'media',
+                'user' => function ($q) use ($user) {
+                    $q->with(['interests', 'media']);
+                    $q->withExists([
+                        'followers as is_followed_by_me' => function ($f) use ($user) {
+                            $f->where('follower_id', $user->id);
+                        }
+                    ]);
+                }
+            ]);
+
+            $query->withExists([
+                'likes as likes_exists' => function ($l) use ($user) {
+                    $l->where('user_id', $user->id);
+                },
+                'bookmarks as bookmarks_exists' => function ($b) use ($user) {
+                    $b->where('user_id', $user->id);
+                }
+            ]);
+
+            $posts = $query->orderBy('created_at', 'desc')->paginate(15);
+
+            return ExclusivePostResource::collection($posts);
+        } catch (\Exception $e) {
+            Log::error("List Exclusive Content Error: " . $e->getMessage());
+            return response()->json(['error' => 'Failed to retrieve exclusive content.'], 500);
+        }
     }
 
     /**
@@ -62,7 +117,7 @@ class ExclusiveContentController extends Controller
 
             return response()->json([
                 'message' => 'Exclusive Post created successfully and is pending review.',
-                'data' => new PostResource($post->load('media', 'user')),
+                'data' => new ExclusivePostResource($post->load('media', 'user')),
             ], 201);
         } catch (\Exception $e) {
             Log::error("Store Exclusive Post Error: " . $e->getMessage());
@@ -107,7 +162,7 @@ class ExclusiveContentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Post price updated successfully. Content is pending verification if exclusive.',
-                'data' => new PostResource($post->fresh()),
+                'data' => new ExclusivePostResource($post->fresh()),
             ]);
         } catch (ValidationException $e) {
             return response()->json([
