@@ -105,6 +105,25 @@
                             <span id="preview-price-badge" class="px-3 py-1 text-xs font-bold bg-green-100 text-green-800 rounded-full"></span>
                         </div>
 
+                        <!-- Platform Fee Breakdown Section -->
+                        <div id="preview-fee-breakdown" class="bg-indigo-50 p-4 rounded-lg border border-indigo-100 hidden">
+                            <h5 class="text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2">Override Platform Fee Details</h5>
+                            <div class="space-y-1 text-sm text-indigo-950">
+                                <div class="flex justify-between">
+                                    <span>Creator Base Price:</span>
+                                    <span class="font-semibold" id="breakdown-base-price">₹0.00</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Override Platform Fee:</span>
+                                    <span class="font-semibold" id="breakdown-override-fee">No Override</span>
+                                </div>
+                                <div class="flex justify-between border-t border-indigo-200 pt-1 mt-1 font-bold text-indigo-900">
+                                    <span>Final Buyer Price:</span>
+                                    <span id="breakdown-final-price">₹0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Caption -->
                         <div class="bg-gray-50 p-4 rounded-lg">
                             <p class="text-gray-700 text-sm whitespace-pre-line" id="preview-caption"></p>
@@ -284,6 +303,41 @@
         
         $('#preview-price-badge').text(price);
         $('#preview-caption').text(post.caption || 'No caption provided.');
+
+        // Reset and hide breakdown by default
+        $('#preview-fee-breakdown').addClass('hidden');
+
+        // Show breakdown if post is already approved
+        if (post.exclusive_status === 'approved') {
+            const basePrice = parseFloat(post.price || 0);
+            
+            if (post.override_platform_fee !== null && post.override_platform_fee !== undefined && post.override_platform_fee_type) {
+                const feeVal = parseFloat(post.override_platform_fee);
+                const feeType = post.override_platform_fee_type;
+                
+                let calculatedFee = 0;
+                let feeString = '';
+                
+                if (feeType === 'percentage') {
+                    calculatedFee = basePrice * (feeVal / 100);
+                    feeString = `${feeVal}% (₹${calculatedFee.toFixed(2)})`;
+                } else if (feeType === 'flat') {
+                    calculatedFee = feeVal;
+                    feeString = `₹${feeVal.toFixed(2)} (Flat)`;
+                }
+
+                const finalPrice = basePrice + calculatedFee;
+
+                $('#breakdown-base-price').text(`₹${basePrice.toFixed(2)}`);
+                $('#breakdown-override-fee').text(feeString);
+                $('#breakdown-final-price').text(`₹${finalPrice.toFixed(2)}`);
+            } else {
+                $('#breakdown-base-price').text(`₹${basePrice.toFixed(2)}`);
+                $('#breakdown-override-fee').text('No Override (Uses Global Settings)');
+                $('#breakdown-final-price').text(`₹${basePrice.toFixed(2)} + Global Fee`);
+            }
+            $('#preview-fee-breakdown').removeClass('hidden');
+        }
 
         // Render Media
         let mediaHtml = '';
