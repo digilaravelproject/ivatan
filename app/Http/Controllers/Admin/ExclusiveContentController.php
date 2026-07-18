@@ -93,6 +93,13 @@ class ExclusiveContentController extends Controller
                 ];
             });
 
+            // Calculate and attach active platform fee breakdown
+            if ($post->user) {
+                $post->platform_fee_breakdown = $this->service->calculatePurchaseBreakdown($post, $post->user);
+            } else {
+                $post->platform_fee_breakdown = null;
+            }
+
             return $post;
         });
 
@@ -124,6 +131,13 @@ class ExclusiveContentController extends Controller
                     'mime_type' => $media->mime_type,
                 ];
             });
+
+            // Calculate and attach active platform fee breakdown
+            if ($post->user) {
+                $post->platform_fee_breakdown = $this->service->calculatePurchaseBreakdown($post, $post->user);
+            } else {
+                $post->platform_fee_breakdown = null;
+            }
 
             return $post;
         });

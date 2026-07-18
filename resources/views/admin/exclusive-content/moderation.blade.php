@@ -308,34 +308,24 @@
         $('#preview-fee-breakdown').addClass('hidden');
 
         // Show breakdown if post is already approved
-        if (post.exclusive_status === 'approved') {
-            const basePrice = parseFloat(post.price || 0);
-            
+        if (post.exclusive_status === 'approved' && post.platform_fee_breakdown) {
+            const breakdown = post.platform_fee_breakdown;
+            const basePrice = parseFloat(breakdown.creator_price || 0);
+            const platformFee = parseFloat(breakdown.platform_fee || 0);
+            const finalPrice = parseFloat(breakdown.final_price || 0);
+
+            let feeString = '';
             if (post.override_platform_fee !== null && post.override_platform_fee !== undefined && post.override_platform_fee_type) {
                 const feeVal = parseFloat(post.override_platform_fee);
                 const feeType = post.override_platform_fee_type;
-                
-                let calculatedFee = 0;
-                let feeString = '';
-                
-                if (feeType === 'percentage') {
-                    calculatedFee = basePrice * (feeVal / 100);
-                    feeString = `${feeVal}% (₹${calculatedFee.toFixed(2)})`;
-                } else if (feeType === 'flat') {
-                    calculatedFee = feeVal;
-                    feeString = `₹${feeVal.toFixed(2)} (Flat)`;
-                }
-
-                const finalPrice = basePrice + calculatedFee;
-
-                $('#breakdown-base-price').text(`₹${basePrice.toFixed(2)}`);
-                $('#breakdown-override-fee').text(feeString);
-                $('#breakdown-final-price').text(`₹${finalPrice.toFixed(2)}`);
+                feeString = feeType === 'percentage' ? `${feeVal}% (₹${platformFee.toFixed(2)})` : `₹${platformFee.toFixed(2)} (Flat)`;
             } else {
-                $('#breakdown-base-price').text(`₹${basePrice.toFixed(2)}`);
-                $('#breakdown-override-fee').text('No Override (Uses Global Settings)');
-                $('#breakdown-final-price').text(`₹${basePrice.toFixed(2)} + Global Fee`);
+                feeString = `₹${platformFee.toFixed(2)} (Uses Global/User Settings)`;
             }
+
+            $('#breakdown-base-price').text(`₹${basePrice.toFixed(2)}`);
+            $('#breakdown-override-fee').text(feeString);
+            $('#breakdown-final-price').text(`₹${finalPrice.toFixed(2)}`);
             $('#preview-fee-breakdown').removeClass('hidden');
         }
 
