@@ -60,7 +60,7 @@
 
         <!-- Modal content -->
         <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
             <div class="bg-white px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                 <h3 class="text-lg font-bold text-gray-900">Post Details & Preview</h3>
                 <button onclick="closePreviewModal()" class="text-gray-400 hover:text-gray-600 focus:outline-none">
@@ -70,38 +70,44 @@
                 </button>
             </div>
             
-            <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                <!-- Creator Profile & Details -->
-                <div class="flex items-center space-x-3">
-                    <img id="preview-avatar" class="w-12 h-12 rounded-full object-cover border-2 border-indigo-100" src="" alt="Creator Avatar">
-                    <div>
-                        <h4 class="font-semibold text-gray-800" id="preview-creator-name"></h4>
-                        <p class="text-xs text-indigo-600" id="preview-creator-handle"></p>
-                    </div>
-                </div>
-
-                <!-- Price and Type Badge -->
-                <div class="flex space-x-2">
-                    <span id="preview-type-badge" class="px-3 py-1 text-xs font-semibold rounded-full uppercase"></span>
-                    <span id="preview-price-badge" class="px-3 py-1 text-xs font-bold bg-green-100 text-green-800 rounded-full"></span>
-                </div>
-
-                <!-- Caption -->
-                <div class="bg-gray-50 p-4 rounded-lg">
-                    <p class="text-gray-700 text-sm whitespace-pre-line" id="preview-caption"></p>
-                </div>
-
-                <!-- Media Preview Area -->
-                <div id="preview-media-container" class="mt-4 rounded-lg overflow-hidden border border-gray-200 bg-black flex justify-center items-center min-h-[300px] max-h-[500px]">
+            <!-- Flex container for 2 columns - fixed height on desktop to prevent screen scrolling -->
+            <div class="flex flex-col md:flex-row h-[70vh] min-h-[400px] max-h-[600px] overflow-hidden">
+                <!-- Left Column: Media Preview (Fits inside the container) -->
+                <div id="preview-media-container" class="w-full md:w-1/2 bg-black flex justify-center items-center h-full overflow-hidden border-r border-gray-100">
                     <!-- Populated via Javascript -->
                 </div>
-            </div>
 
-            <!-- Footer / Action Buttons -->
-            <div class="bg-gray-50 px-6 py-4 flex justify-between items-center border-t border-gray-100">
-                <button onclick="closePreviewModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium text-sm transition">Close</button>
-                <div class="flex space-x-2" id="preview-action-buttons">
-                    <!-- Dynamic Approve/Reject buttons -->
+                <!-- Right Column: Content Details and Actions -->
+                <div class="w-full md:w-1/2 p-6 flex flex-col justify-between h-full bg-white">
+                    <div class="space-y-4 overflow-y-auto pr-1">
+                        <!-- Creator Profile & Details -->
+                        <div class="flex items-center space-x-3">
+                            <img id="preview-avatar" class="w-12 h-12 rounded-full object-cover border-2 border-indigo-100" src="" alt="Creator Avatar">
+                            <div>
+                                <h4 class="font-semibold text-gray-800" id="preview-creator-name"></h4>
+                                <p class="text-xs text-indigo-600" id="preview-creator-handle"></p>
+                            </div>
+                        </div>
+
+                        <!-- Price and Type Badge -->
+                        <div class="flex space-x-2">
+                            <span id="preview-type-badge" class="px-3 py-1 text-xs font-semibold rounded-full uppercase"></span>
+                            <span id="preview-price-badge" class="px-3 py-1 text-xs font-bold bg-green-100 text-green-800 rounded-full"></span>
+                        </div>
+
+                        <!-- Caption -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-gray-700 text-sm whitespace-pre-line" id="preview-caption"></p>
+                        </div>
+                    </div>
+
+                    <!-- Actions Footer -->
+                    <div class="pt-4 border-t border-gray-100 flex justify-between items-center">
+                        <button onclick="closePreviewModal()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium text-sm transition">Close</button>
+                        <div class="flex space-x-2" id="preview-action-buttons">
+                            <!-- Dynamic Approve/Reject buttons -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -204,12 +210,12 @@
         let mediaHtml = '';
         if (post.images && post.images.length > 0) {
             post.images.forEach(img => {
-                mediaHtml += `<img src="${img.original_url}" class="object-contain max-h-[450px] w-full" alt="Post Image">`;
+                mediaHtml += `<img src="${img.original_url}" class="object-contain w-full h-full max-h-full" alt="Post Image">`;
             });
         } else if (post.videos && post.videos.length > 0) {
             post.videos.forEach(vid => {
                 mediaHtml += `
-                    <video controls controlsList="nodownload" oncontextmenu="return false;" class="w-full max-h-[450px] object-contain">
+                    <video controls controlsList="nodownload" oncontextmenu="return false;" class="w-full h-full max-h-full object-contain">
                         <source src="${vid.original_url}" type="${vid.mime_type || 'video/mp4'}">
                         Your browser does not support the video tag.
                     </video>
