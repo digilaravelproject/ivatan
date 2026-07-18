@@ -4,7 +4,17 @@
 <div class="container mx-auto px-4 py-6">
     <h1 class="text-2xl font-bold mb-6">Exclusive Content Moderation</h1>
 
-    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+    {{-- Tab Toggles --}}
+    <div class="flex border-b border-gray-200 mb-6 bg-white rounded-t-lg shadow-sm">
+        <button onclick="switchTab('pending')" id="tab-pending" class="px-6 py-3 border-b-2 border-indigo-600 text-indigo-600 font-bold text-sm focus:outline-none transition-all duration-200">
+            Pending Content
+        </button>
+        <button onclick="switchTab('approved')" id="tab-approved" class="px-6 py-3 border-b-2 border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-300 font-semibold text-sm focus:outline-none transition-all duration-200">
+            Approved Content
+        </button>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-b-lg">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
@@ -119,6 +129,7 @@
 <script>
     let activePostId = null;
     let pendingPosts = [];
+    let activeTab = 'pending';
 
     $(document).ready(function() {
         loadPendingContent();
@@ -134,6 +145,19 @@
             }
         });
     });
+
+    function switchTab(tab) {
+        activeTab = tab;
+        if (tab === 'pending') {
+            $('#tab-pending').addClass('border-indigo-600 text-indigo-600 font-bold').removeClass('border-transparent text-gray-500 font-semibold');
+            $('#tab-approved').addClass('border-transparent text-gray-500 font-semibold').removeClass('border-indigo-600 text-indigo-600 font-bold');
+            loadPendingContent();
+        } else {
+            $('#tab-approved').addClass('border-indigo-600 text-indigo-600 font-bold').removeClass('border-transparent text-gray-500 font-semibold');
+            $('#tab-pending').addClass('border-transparent text-gray-500 font-semibold').removeClass('border-indigo-600 text-indigo-600 font-bold');
+            loadApprovedContent();
+        }
+    }
 
     function loadPendingContent() {
         $('#pending-content-tbody').html('<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Loading pending content...</td></tr>');
@@ -169,16 +193,59 @@
                     `;
                 });
             }
-            // Update table headers dynamically if needed, let's make sure we have 5 columns
-            if ($('thead th').length === 4) {
-                $('thead tr').html(`
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested Price</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                `);
+            
+            $('thead tr').html(`
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requested Price</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            `);
+            $('#pending-content-tbody').html(html);
+        });
+    }
+
+    function loadApprovedContent() {
+        $('#pending-content-tbody').html('<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Loading approved content...</td></tr>');
+        
+        $.get('{{ route('admin.exclusive.approved.list') }}', function(response) {
+            let html = '';
+            pendingPosts = response.data || [];
+            
+            if (pendingPosts.length === 0) {
+                html = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No approved exclusive content found.</td></tr>';
+            } else {
+                pendingPosts.forEach(post => {
+                    const username = post.user ? post.user.username : 'Unknown';
+                    const creatorName = post.user ? post.user.name : 'Unknown';
+                    const price = post.price ? `₹${post.price}` : '₹0.00';
+                    const type = post.type || 'post';
+
+                    html += `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${creatorName} (@${username})</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 uppercase">${type}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">${price}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <button onclick="showPreview(${post.id})" class="text-blue-600 hover:text-blue-900 font-semibold flex items-center gap-1">
+                                    <i class="fas fa-eye"></i> View Post
+                                </button>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button onclick="rejectContent(${post.id})" class="text-red-600 hover:text-red-900 font-semibold">Reject</button>
+                            </td>
+                        </tr>
+                    `;
+                });
             }
+            
+            $('thead tr').html(`
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            `);
             $('#pending-content-tbody').html(html);
         });
     }
@@ -227,11 +294,17 @@
 
         $('#preview-media-container').html(mediaHtml);
 
-        // Render Actions inside preview
-        $('#preview-action-buttons').html(`
-            <button onclick="closePreviewModal(); openApproveModal(${post.id})" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium text-sm transition">Approve</button>
-            <button onclick="closePreviewModal(); rejectContent(${post.id})" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium text-sm transition">Reject</button>
-        `);
+        // Render Actions inside preview depending on active tab
+        if (activeTab === 'pending') {
+            $('#preview-action-buttons').html(`
+                <button onclick="closePreviewModal(); openApproveModal(${post.id})" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium text-sm transition">Approve</button>
+                <button onclick="closePreviewModal(); rejectContent(${post.id})" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium text-sm transition">Reject</button>
+            `);
+        } else {
+            $('#preview-action-buttons').html(`
+                <button onclick="closePreviewModal(); rejectContent(${post.id})" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium text-sm transition">Reject</button>
+            `);
+        }
 
         $('#previewModal').removeClass('hidden');
     }
@@ -275,7 +348,8 @@
             success: function(response) {
                 alert('Content approved successfully!');
                 closeModal();
-                loadPendingContent();
+                if (activeTab === 'pending') loadPendingContent();
+                else loadApprovedContent();
             },
             error: function(xhr) {
                 alert('Error: ' + (xhr.responseJSON?.message || 'Failed to approve'));
@@ -300,8 +374,9 @@
                 rejection_reason: reason
             },
             success: function(response) {
-                alert('Content rejected successfully!');
-                loadPendingContent();
+                alert('Content status updated to Rejected successfully!');
+                if (activeTab === 'pending') loadPendingContent();
+                else loadApprovedContent();
             },
             error: function(xhr) {
                 alert('Error: ' + (xhr.responseJSON?.message || 'Failed to reject'));

@@ -99,6 +99,38 @@ class ExclusiveContentController extends Controller
         return response()->json($posts);
     }
 
+    public function listApprovedContent(): JsonResponse
+    {
+        $posts = UserPost::exclusive()->where('exclusive_status', 'approved')
+            ->with(['user', 'media'])
+            ->orderBy('updated_at', 'desc')
+            ->paginate(20);
+
+        $posts->getCollection()->transform(function ($post) {
+            $post->images = $post->getMedia('images')->map(function ($media) {
+                return [
+                    'id' => $media->id,
+                    'original_url' => $media->getUrl(),
+                    'thumb_url' => $media->getUrl('thumb'),
+                    'mime_type' => $media->mime_type,
+                ];
+            });
+
+            $post->videos = $post->getMedia('videos')->map(function ($media) {
+                return [
+                    'id' => $media->id,
+                    'original_url' => $media->getUrl(),
+                    'thumb_url' => $media->getUrl('thumb'),
+                    'mime_type' => $media->mime_type,
+                ];
+            });
+
+            return $post;
+        });
+
+        return response()->json($posts);
+    }
+
     public function approveContent(Request $request, $id): JsonResponse
     {
         $request->validate([

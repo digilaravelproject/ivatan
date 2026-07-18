@@ -353,6 +353,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'is_admin'])->group(
         Route::post('/enablements/{id}/reject', [AdminExclusiveContentController::class, 'rejectEnablement'])->name('enablements.reject');
         
         Route::get('/pending-content', [AdminExclusiveContentController::class, 'listPendingContent'])->name('pending.list');
+        Route::get('/approved-content', [AdminExclusiveContentController::class, 'listApprovedContent'])->name('approved.list');
         Route::post('/pending-content/{id}/approve', [AdminExclusiveContentController::class, 'approveContent'])->name('pending.approve');
         Route::post('/pending-content/{id}/reject', [AdminExclusiveContentController::class, 'rejectContent'])->name('pending.reject');
         
