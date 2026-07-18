@@ -92,6 +92,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     $(document).ready(function() {
         loadSettings();
@@ -123,11 +124,21 @@
                 exclusive_content_global_fee_value: val
             },
             success: function(response) {
-                alert('Global settings saved successfully!');
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Global settings saved successfully!',
+                    icon: 'success',
+                    confirmButtonColor: '#3085d6'
+                });
                 loadSettings();
             },
             error: function(xhr) {
-                alert('Failed to save settings: ' + (xhr.responseJSON?.message || 'Error occurred'));
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Failed to save settings: ' + (xhr.responseJSON?.message || 'Error occurred'),
+                    icon: 'error',
+                    confirmButtonColor: '#3085d6'
+                });
             }
         });
     }
@@ -217,38 +228,71 @@
                 admin_notes: notes || null
             },
             success: function(response) {
-                alert('Enablement request approved successfully!');
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Enablement request approved successfully!',
+                    icon: 'success',
+                    confirmButtonColor: '#3085d6'
+                });
                 closeApproveModal();
                 loadEnablementRequests();
             },
             error: function(xhr) {
-                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to approve'));
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Error: ' + (xhr.responseJSON?.message || 'Failed to approve'),
+                    icon: 'error',
+                    confirmButtonColor: '#3085d6'
+                });
             }
         });
     }
 
     function rejectEnablement(id) {
-        const reason = prompt("Enter rejection reason (Required):");
-        if (!reason) {
-            alert('Rejection reason is required!');
-            return;
-        }
-
-        $.ajax({
-            url: `/admin/exclusive/enablements/${id}/reject`,
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            data: {
-                admin_notes: reason
-            },
-            success: function(response) {
-                alert('Enablement request rejected successfully!');
-                loadEnablementRequests();
-            },
-            error: function(xhr) {
-                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to reject'));
+        Swal.fire({
+            title: 'Reject Enablement',
+            text: 'Enter rejection reason (Required):',
+            input: 'text',
+            inputPlaceholder: 'Reason...',
+            showCancelButton: true,
+            confirmButtonText: 'Reject',
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'Rejection reason is required!'
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const reason = result.value;
+                $.ajax({
+                    url: `/admin/exclusive/enablements/${id}/reject`,
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    data: {
+                        admin_notes: reason
+                    },
+                    success: function(response) {
+                        Swal.fire({
+                            title: 'Rejected!',
+                            text: 'Enablement request rejected successfully!',
+                            icon: 'success',
+                            confirmButtonColor: '#3085d6'
+                        });
+                        loadEnablementRequests();
+                    },
+                    error: function(xhr) {
+                        Swal.fire({
+                            title: 'Error!',
+                            text: 'Error: ' + (xhr.responseJSON?.message || 'Failed to reject'),
+                            icon: 'error',
+                            confirmButtonColor: '#3085d6'
+                        });
+                    }
+                });
             }
         });
     }

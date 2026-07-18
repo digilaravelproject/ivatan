@@ -126,6 +126,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     let activePostId = null;
     let pendingPosts = [];
@@ -206,14 +207,14 @@
     }
 
     function loadApprovedContent() {
-        $('#pending-content-tbody').html('<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Loading approved content...</td></tr>');
+        $('#pending-content-tbody').html('<tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">Loading approved content...</td></tr>');
         
         $.get('{{ route('admin.exclusive.approved.list') }}', function(response) {
             let html = '';
             pendingPosts = response.data || [];
             
             if (pendingPosts.length === 0) {
-                html = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No approved exclusive content found.</td></tr>';
+                html = '<tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No approved exclusive content found.</td></tr>';
             } else {
                 pendingPosts.forEach(post => {
                     const username = post.user ? post.user.username : 'Unknown';
@@ -221,11 +222,21 @@
                     const price = post.price ? `₹${post.price}` : '₹0.00';
                     const type = post.type || 'post';
 
+                    let approvedAt = 'N/A';
+                    if (post.updated_at) {
+                        const dateObj = new Date(post.updated_at);
+                        approvedAt = dateObj.toLocaleString('en-IN', { 
+                            dateStyle: 'medium', 
+                            timeStyle: 'short' 
+                        });
+                    }
+
                     html += `
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${creatorName} (@${username})</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 uppercase">${type}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">${price}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${approvedAt}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <button onclick="showPreview(${post.id})" class="text-blue-600 hover:text-blue-900 font-semibold flex items-center gap-1">
                                     <i class="fas fa-eye"></i> View Post
@@ -243,6 +254,7 @@
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator</th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approved At</th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             `);
@@ -346,40 +358,73 @@
                 override_platform_fee: feeValue || null
             },
             success: function(response) {
-                alert('Content approved successfully!');
+                Swal.fire({
+                    title: 'Approved!',
+                    text: 'Content approved successfully!',
+                    icon: 'success',
+                    confirmButtonColor: '#3085d6'
+                });
                 closeModal();
                 if (activeTab === 'pending') loadPendingContent();
                 else loadApprovedContent();
             },
             error: function(xhr) {
-                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to approve'));
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Error: ' + (xhr.responseJSON?.message || 'Failed to approve'),
+                    icon: 'error',
+                    confirmButtonColor: '#3085d6'
+                });
             }
         });
     }
 
     function rejectContent(id) {
-        const reason = prompt("Enter reason for rejection (Required):");
-        if (!reason) {
-            alert('Rejection reason is required!');
-            return;
-        }
-
-        $.ajax({
-            url: `/admin/exclusive/pending-content/${id}/reject`,
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            data: {
-                rejection_reason: reason
-            },
-            success: function(response) {
-                alert('Content status updated to Rejected successfully!');
-                if (activeTab === 'pending') loadPendingContent();
-                else loadApprovedContent();
-            },
-            error: function(xhr) {
-                alert('Error: ' + (xhr.responseJSON?.message || 'Failed to reject'));
+        Swal.fire({
+            title: 'Reject Content',
+            text: 'Enter reason for rejection (Required):',
+            input: 'text',
+            inputPlaceholder: 'Reason...',
+            showCancelButton: true,
+            confirmButtonText: 'Submit Rejection',
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'Rejection reason is required!'
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const reason = result.value;
+                $.ajax({
+                    url: `/admin/exclusive/pending-content/${id}/reject`,
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    data: {
+                        rejection_reason: reason
+                    },
+                    success: function(response) {
+                        Swal.fire({
+                            title: 'Rejected!',
+                            text: 'Content status updated to Rejected successfully!',
+                            icon: 'success',
+                            confirmButtonColor: '#3085d6'
+                        });
+                        if (activeTab === 'pending') loadPendingContent();
+                        else loadApprovedContent();
+                    },
+                    error: function(xhr) {
+                        Swal.fire({
+                            title: 'Error!',
+                            text: 'Error: ' + (xhr.responseJSON?.message || 'Failed to reject'),
+                            icon: 'error',
+                            confirmButtonColor: '#3085d6'
+                        });
+                    }
+                });
             }
         });
     }
