@@ -72,6 +72,31 @@ class PostResource extends JsonResource
             'interests' => $interestsString,
         ];
 
+        // ✅ LOGIC 4: EXCLUSIVE CONTENT & PURCHASE STATUS
+        $hasAccess = true;
+        if ($this->is_exclusive) {
+            if (!$authUser) {
+                $hasAccess = false;
+            } elseif ($isMine) {
+                $hasAccess = true;
+            } elseif ($authUser->is_admin) {
+                $hasAccess = true;
+            } else {
+                $hasAccess = (bool)$authUser->hasExclusiveAccessTo($this->id);
+            }
+        }
+
+        $purchaseStatus = null;
+        if ($authUser && $this->is_exclusive) {
+            $purchase = \App\Models\ExclusiveContentPurchase::where('buyer_id', $authUser->id)
+                ->where('user_post_id', $this->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+            if ($purchase) {
+                $purchaseStatus = $purchase->status; // 'pending', 'completed', 'failed'
+            }
+        }
+
         return [
             // 1. Post Identity
             'id' => $this->id,
@@ -87,13 +112,17 @@ class PostResource extends JsonResource
             // 2. Author Details
             'user' => $authorData,
 
-            // 3. Media Collection
-            'media' => $this->media->map(function ($m) {
+            // 3. Media Collection - Secure URLs if exclusive and locked
+            'media' => $this->media->map(function ($m) use ($hasAccess) {
                 return [
                     'id' => $m->id,
                     'type' => str_starts_with($m->mime_type, 'video') ? 'video' : 'image',
-                    'url' => $m->getUrl(),
-                    'thumbnail' => $m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : $m->getUrl(),
+                    'url' => $this->is_exclusive 
+                        ? ($hasAccess ? url("/api/v1/exclusive/posts/{$this->id}/media/{$m->id}") : null)
+                        : $m->getUrl(),
+                    'thumbnail' => $this->is_exclusive 
+                        ? null 
+                        : ($m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : $m->getUrl()),
                     'mime_type' => $m->mime_type,
                     'aspect_ratio' => $m->getCustomProperty('aspect_ratio', null),
                 ];
@@ -113,6 +142,13 @@ class PostResource extends JsonResource
             // 5. Timestamps
             'created_at' => $this->created_at->toIso8601String(),
             'created_human' => $this->created_at->diffForHumans(),
+
+            // 6. Exclusive Content Fields (Added at the end to keep existing fields intact)
+            'is_exclusive' => (bool)$this->is_exclusive,
+            'price' => $this->is_exclusive ? (float)$this->price : null,
+            'exclusive_status' => $this->exclusive_status,
+            'has_access' => $hasAccess,
+            'purchase_status' => $purchaseStatus,
         ];
     }
 }
