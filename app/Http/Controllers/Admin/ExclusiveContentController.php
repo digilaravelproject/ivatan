@@ -74,16 +74,52 @@ class ExclusiveContentController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
+        $posts->getCollection()->transform(function ($post) {
+            $post->images = $post->getMedia('images')->map(function ($media) {
+                return [
+                    'id' => $media->id,
+                    'original_url' => $media->getUrl(),
+                    'thumb_url' => $media->getUrl('thumb'),
+                    'mime_type' => $media->mime_type,
+                ];
+            });
+
+            $post->videos = $post->getMedia('videos')->map(function ($media) {
+                return [
+                    'id' => $media->id,
+                    'original_url' => $media->getUrl(),
+                    'thumb_url' => $media->getUrl('thumb'),
+                    'mime_type' => $media->mime_type,
+                ];
+            });
+
+            return $post;
+        });
+
         return response()->json($posts);
     }
 
     public function approveContent(Request $request, $id): JsonResponse
     {
+        $request->validate([
+            'override_platform_fee_type' => 'nullable|string|in:flat,percentage',
+            'override_platform_fee' => 'nullable|numeric|min:0',
+        ]);
+
         $post = UserPost::exclusive()->findOrFail($id);
+
+        $feeType = $request->override_platform_fee_type;
+        $feeValue = $request->override_platform_fee;
+
+        if (empty($feeType)) {
+            $feeType = null;
+            $feeValue = null;
+        }
+
         $post->update([
             'exclusive_status' => 'approved',
-            'override_platform_fee' => $request->override_platform_fee,
-            'override_platform_fee_type' => $request->override_platform_fee_type,
+            'override_platform_fee' => $feeValue,
+            'override_platform_fee_type' => $feeType,
         ]);
 
         return response()->json(['message' => 'Content approved.']);

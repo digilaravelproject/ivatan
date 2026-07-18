@@ -79,6 +79,11 @@ class UserPostObserver
 
     public function retrieved(UserPost $userPost): void
     {
+        // Prevent view tracking in admin area, console/jobs, or telescope requests
+        if (app()->runningInConsole() || request()->is('admin/*') || request()->is('api/admin/*') || request()->is('telescope*')) {
+            return;
+        }
+
         // Only track if it's a GET request and the user is not an admin
         // Guests (unauthenticated users) are tracked by IP in the service
         $user = Auth::user();
