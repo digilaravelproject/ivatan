@@ -118,10 +118,10 @@ class PostResource extends JsonResource
                     'id' => $m->id,
                     'type' => str_starts_with($m->mime_type, 'video') ? 'video' : 'image',
                     'url' => $this->is_exclusive 
-                        ? ($hasAccess ? url("/api/v1/exclusive/posts/{$this->id}/media/{$m->id}") : null)
+                        ? ($hasAccess ? $m->getUrl() : null)
                         : $m->getUrl(),
                     'thumbnail' => $this->is_exclusive 
-                        ? null 
+                        ? ($hasAccess ? ($m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : $m->getUrl()) : null) 
                         : ($m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : $m->getUrl()),
                     'mime_type' => $m->mime_type,
                     'aspect_ratio' => $m->getCustomProperty('aspect_ratio', null),

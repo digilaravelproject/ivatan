@@ -37,13 +37,12 @@ class ExclusivePostResource extends PostResource
         $data['exclusive_status'] = $this->exclusive_status;
         $data['has_access'] = $hasAccess;
 
-        // Secure media access logic
         $data['media'] = $this->media->map(function ($m) use ($hasAccess) {
             return [
                 'id' => $m->id,
                 'type' => str_starts_with($m->mime_type, 'video') ? 'video' : 'image',
-                'url' => $hasAccess ? url("/api/v1/exclusive/posts/{$this->id}/media/{$m->id}") : null,
-                'thumbnail' => null, // Hide thumbnail for secure/locked content
+                'url' => $hasAccess ? $m->getUrl() : null,
+                'thumbnail' => $hasAccess ? ($m->hasGeneratedConversion('thumb') ? $m->getUrl('thumb') : $m->getUrl()) : null,
                 'mime_type' => $m->mime_type,
                 'aspect_ratio' => $m->getCustomProperty('aspect_ratio', null),
             ];

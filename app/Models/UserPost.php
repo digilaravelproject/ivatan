@@ -54,6 +54,7 @@ class UserPost extends Model implements HasMedia
         'like_count' => 'integer',
         'comment_count' => 'integer',
         'view_count' => 'integer',
+        'is_exclusive' => 'boolean',
     ];
 
     protected $appends = ['images'];
