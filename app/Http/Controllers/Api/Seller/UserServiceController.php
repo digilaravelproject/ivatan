@@ -85,15 +85,21 @@ class UserServiceController extends Controller
                 return $this->errorResponse('Unauthenticated.', 401);
             }
 
-            // Check subscription limit for selling services
-            $sellServicesLimit = $user->getFeatureLimit('sell_services', 'seller');
-            if (strtolower($sellServicesLimit) === 'no' || !$sellServicesLimit) {
-                $sellServicesGigsLimit = $user->getFeatureLimit('sell_services_gigs', 'creator');
-                if (strtolower($sellServicesGigsLimit) === 'no' || !$sellServicesGigsLimit) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Your current subscription plan does not allow selling services or gigs.'
-                    ], 403);
+            // Check dynamic admin setting for free service listing
+            $allowFreeListing = \App\Models\Setting::where('key', 'allow_free_service_listing')->value('value') ?? '1';
+            $isFreeListingAllowed = in_array(strtolower((string)$allowFreeListing), ['1', 'true', 'yes'], true);
+
+            if (!$isFreeListingAllowed) {
+                // Enforce subscription plan limit for selling services if admin disabled free listing
+                $sellServicesLimit = $user->getFeatureLimit('sell_services', 'seller');
+                if (strtolower($sellServicesLimit) === 'no' || !$sellServicesLimit) {
+                    $sellServicesGigsLimit = $user->getFeatureLimit('sell_services_gigs', 'creator');
+                    if (strtolower($sellServicesGigsLimit) === 'no' || !$sellServicesGigsLimit) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Your current subscription plan does not allow selling services or gigs.'
+                        ], 403);
+                    }
                 }
             }
 

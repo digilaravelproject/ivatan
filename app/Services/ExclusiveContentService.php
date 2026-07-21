@@ -91,42 +91,52 @@ class ExclusiveContentService
     public function processSuccessfulPurchase(ExclusiveContentPurchase $purchase): void
     {
         DB::transaction(function () use ($purchase) {
-            if ($purchase->status === 'completed') {
+            /** @var ExclusiveContentPurchase|null $lockedPurchase */
+            $lockedPurchase = ExclusiveContentPurchase::where('id', $purchase->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$lockedPurchase || $lockedPurchase->status === 'completed') {
                 return; // Already processed
             }
 
+            $lockedPurchase->status = 'completed';
+            $lockedPurchase->save();
             $purchase->status = 'completed';
-            $purchase->save();
 
-            // 1. Grant Access
-            ExclusiveContentAccess::create([
-                'user_id' => $purchase->buyer_id,
-                'user_post_id' => $purchase->user_post_id,
-                'purchase_id' => $purchase->id,
-                'granted_at' => now(),
-                'expires_at' => now()->addDays(30),
-            ]);
+            // 1. Grant Access (Idempotent firstOrCreate / updateOrCreate)
+            ExclusiveContentAccess::updateOrCreate(
+                [
+                    'user_id' => $lockedPurchase->buyer_id,
+                    'user_post_id' => $lockedPurchase->user_post_id,
+                ],
+                [
+                    'purchase_id' => $lockedPurchase->id,
+                    'granted_at' => now(),
+                    'expires_at' => now()->addDays(30),
+                ]
+            );
 
             // 2. Distribute Funds (Creator Share to Wallet)
-            $creator = $purchase->post->user;
+            $creator = $lockedPurchase->post->user;
             
             // Calculate Creator's exact share.
             // Under Add-On logic, creator gets exactly Creator Price.
             // Unless gateway charge is borne by creator.
-            $creatorEarnings = $purchase->creator_price;
-            if ($purchase->gateway_charge_bearer === 'creator') {
-                $creatorEarnings -= $purchase->gateway_charge_amount;
+            $creatorEarnings = $lockedPurchase->creator_price;
+            if ($lockedPurchase->gateway_charge_bearer === 'creator') {
+                $creatorEarnings -= $lockedPurchase->gateway_charge_amount;
             }
 
-            if ($creatorEarnings > 0) {
+            if ($creator && $creatorEarnings > 0) {
                 $this->walletService->credit(
                     $creator->id,
                     $creatorEarnings,
                     ExclusiveContentPurchase::class,
-                    $purchase->id,
-                    "Earnings for Exclusive Content #{$purchase->user_post_id}",
-                    $purchase->buyer_id,
-                    $purchase->user_post_id
+                    $lockedPurchase->id,
+                    "Earnings for Exclusive Content #{$lockedPurchase->user_post_id}",
+                    $lockedPurchase->buyer_id,
+                    $lockedPurchase->user_post_id
                 );
             }
         });

@@ -12,6 +12,12 @@ class ExclusivePostResource extends PostResource
 
         /** @var \App\Models\User|null $authUser */
         $authUser = Auth::guard('sanctum')->user() ?? Auth::user();
+        if (!$authUser && $request && method_exists($request, 'bearerToken') && $request->bearerToken()) {
+            $token = \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken());
+            if ($token && $token->tokenable instanceof \App\Models\User) {
+                $authUser = $token->tokenable;
+            }
+        }
         
         $isMine = false;
         if ($authUser && $this->user) {

@@ -21,11 +21,21 @@ class SellerProfileService
         }
     }
 
+    public function isFreeServiceListingAllowed(): bool
+    {
+        $val = \App\Models\Setting::where('key', 'allow_free_service_listing')->value('value') ?? '1';
+        return in_array(strtolower((string)$val), ['1', 'true', 'yes'], true);
+    }
+
     public function validateSellerTypeChange(SellerDetail $sellerDetail, string $newType): void
     {
         $this->validateSellerType($newType);
 
         if ($newType === 'both' || ($sellerDetail->seller_type !== 'both' && $newType === 'both')) {
+            if ($this->isFreeServiceListingAllowed()) {
+                return; // Dynamic setting allows free service listing
+            }
+
             $profile = $sellerDetail->profile;
 
             $hasActiveSub = UserSubscription::where('profile_id', $profile->id)
@@ -83,7 +93,7 @@ class SellerProfileService
         }
 
         if ($details->sellsBoth()) {
-            return $this->hasActiveSubscription($profile);
+            return $this->hasActiveSubscription($profile) || $this->isFreeServiceListingAllowed();
         }
 
         return $details->sellsProducts();
@@ -94,6 +104,10 @@ class SellerProfileService
         $details = $profile->sellerDetails;
         if (!$details) {
             return false;
+        }
+
+        if ($this->isFreeServiceListingAllowed()) {
+            return $details->sellsServices() || $details->sellsBoth();
         }
 
         if ($details->sellsBoth()) {
