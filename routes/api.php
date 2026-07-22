@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Route;
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 use App\Http\Controllers\Admin\ProfileApprovalController;
 use App\Http\Controllers\Api\BannerController;
+use App\Http\Controllers\Api\CreatorDashboardController;
 use App\Http\Controllers\Api\CreatorEnablementController;
 use App\Http\Controllers\Api\CreatorWalletController;
 use App\Http\Controllers\Api\ExclusiveContentController;
@@ -242,6 +243,14 @@ Route::prefix('v1')->group(function () {
             // Creator Wallet
             Route::get('/wallet/balance', [CreatorWalletController::class, 'balance']);
             Route::get('/wallet/transactions', [CreatorWalletController::class, 'transactions']);
+        });
+
+        // ================================
+        // Creator Exclusive Content Dashboard Routes
+        // ================================
+        Route::prefix('creator/dashboard')->controller(CreatorDashboardController::class)->group(function () {
+            Route::get('stats', 'stats');
+            Route::get('exclusive-content', 'exclusiveContent');
         });
 
         // ================================

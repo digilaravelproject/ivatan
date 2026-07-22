@@ -43,6 +43,7 @@ Route::get('/contcat-us', fn() => view('web.contact'))->name('web.contact');
 Route::get('/child-safety', fn() => view('web.child_safety'))->name('web.child.safety');
 Route::get('/payment-and-refund-policy', fn() => view('web.financial-policy'))->name('web.financial-policy');
 Route::get('/pricing-plan', fn() => view('web.pricing'))->name('web.pricing-plan');
+Route::get('/creator/dashboard/exclusive-content', [\App\Http\Controllers\Web\CreatorDashboardWebController::class, 'index'])->name('creator.dashboard.exclusive-content');
 
 // =====================
 // Payment Callback (PhonePe redirects users here)
