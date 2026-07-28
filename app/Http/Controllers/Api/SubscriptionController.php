@@ -66,6 +66,13 @@ class SubscriptionController extends Controller
 
             $profile = $user->profiles()->findOrFail($profileId);
 
+            $plan = \App\Models\SubscriptionPlan::where('is_active', true)->findOrFail($request->subscription_plan_id);
+
+            // Paid plans MUST NOT be activated directly via purchase endpoint without verified payment
+            if (!$plan->isFree()) {
+                return $this->error('Paid subscriptions must be initiated via payment gateway and verified via server-to-server callback.', 422);
+            }
+
             $subscription = $this->subscriptionService->purchase(
                 $user->id,
                 $profileId,
@@ -73,15 +80,9 @@ class SubscriptionController extends Controller
                 $request->payment_method
             );
 
-            if ($request->filled('gateway_subscription_id')) {
-                $subscription->update([
-                    'gateway_subscription_id' => $request->gateway_subscription_id,
-                ]);
-            }
-
             return $this->success([
                 'subscription' => $subscription->load('plan'),
-            ], 'Subscription purchased successfully.', 201);
+            ], 'Free subscription assigned successfully.', 201);
         } catch (ModelNotFoundException $e) {
             Log::warning('Subscription purchase failed: Profile or plan not found', [
                 'user_id' => $request->user()->id ?? null,

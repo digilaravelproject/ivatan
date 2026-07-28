@@ -21,6 +21,8 @@ class ExclusiveContentController extends Controller
     public function listEnablementRequests(): JsonResponse
     {
         $requests = ExclusiveContentEnablement::with('user')
+            ->where('payment_status', 'completed')
+            ->where('status', 'pending')
             ->orderBy('created_at', 'desc')
             ->paginate(20);
             
