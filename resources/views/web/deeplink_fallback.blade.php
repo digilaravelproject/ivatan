@@ -126,8 +126,8 @@
             <p>{{ $description }}</p>
 
             <div class="btn-group">
-                <a href="{{ $deepLink }}" class="btn btn-primary" id="openAppBtn">Open in App</a>
-                <a href="https://play.google.com/store/apps/details?id=com.octroid.ivatan_app" target="_blank" class="btn btn-secondary">Get the iVatan App</a>
+                <a href="{{ $deepLink }}" class="btn btn-primary" id="openAppBtn" onclick="openApp(event)">Open in App</a>
+                <a href="https://play.google.com/store/apps/details?id=com.octroid.ivatan" target="_blank" class="btn btn-secondary">Get the iVatan App</a>
             </div>
 
             <p class="footer-text">Experience full features on the iVatan Mobile App</p>
@@ -135,15 +135,28 @@
     </div>
 
     <script>
+        function openApp(e) {
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            const rawUrl = "{{ str_replace('https://', '', $url) }}";
+            const intentUrl = "intent://" + rawUrl + "#Intent;scheme=https;package=com.octroid.ivatan;S.browser_fallback_url=" + encodeURIComponent("{{ $url }}") + ";end;";
+            
+            if (isAndroid) {
+                window.location.href = intentUrl;
+            } else {
+                window.location.href = "{{ $deepLink }}";
+            }
+        }
+
         // Auto attempt opening deep link on mobile devices
         window.addEventListener('DOMContentLoaded', () => {
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             if (isMobile) {
                 setTimeout(() => {
-                    window.location.href = "{{ $deepLink }}";
+                    openApp();
                 }, 500);
             }
         });
     </script>
+
 </body>
 </html>

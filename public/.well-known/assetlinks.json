@@ -5,7 +5,7 @@
     ],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.octroid.ivatan_app",
+      "package_name": "com.octroid.ivatan",
       "sha256_cert_fingerprints": [
         "ba:64:fc:e6:f7:76:5d:10:7a:ed:86:ee:3e:99:a1:c5:eb:99:f8:a3:24:4e:e1:7f:67:c0:40:d1:64:9b:96:1b",
         "0d:99:76:3a:2f:18:bd:c0:5c:f8:f0:0a:07:35:3d:b4:18:bb:7c:58:f8:c0:c4:f0:5e:ac:19:6e:49:81:14:e3",
