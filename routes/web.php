@@ -46,6 +46,17 @@ Route::get('/pricing-plan', fn() => view('web.pricing'))->name('web.pricing-plan
 Route::get('/creator/dashboard/exclusive-content', [\App\Http\Controllers\Web\CreatorDashboardWebController::class, 'index'])->name('creator.dashboard.exclusive-content');
 
 // =====================
+// Deep Linking (.well-known & Web Fallbacks)
+// =====================
+Route::get('/.well-known/{filename}', [\App\Http\Controllers\Web\DeepLinkWebFallbackController::class, 'serveWellKnownFile'])
+    ->where('filename', 'assetlinks\.json|apple-app-site-association');
+
+Route::get('/post/{id}', [\App\Http\Controllers\Web\DeepLinkWebFallbackController::class, 'showPost'])->name('deeplink.post');
+Route::get('/profile/{id}', [\App\Http\Controllers\Web\DeepLinkWebFallbackController::class, 'showProfile'])->name('deeplink.profile');
+Route::get('/product/{id}', [\App\Http\Controllers\Web\DeepLinkWebFallbackController::class, 'showProduct'])->name('deeplink.product');
+Route::get('/job/{id}', [\App\Http\Controllers\Web\DeepLinkWebFallbackController::class, 'showJob'])->name('deeplink.job');
+
+// =====================
 // Payment Callback (PhonePe redirects users here)
 // =====================
 Route::match(['get', 'post'], 'payment/callback/{gateway}', [\App\Http\Controllers\Api\PaymentCallbackController::class, 'handle'])

@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.octroid.ivatanApp",
+        "paths": [
+          "/post/*",
+          "/profile/*",
+          "/product/*",
+          "/job/*"
+        ]
+      }
+    ]
+  }
+}
